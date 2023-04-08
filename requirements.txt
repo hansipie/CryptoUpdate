@@ -1,0 +1,11 @@
+alive_progress
+dash
+dash_core_components
+dash_html_components
+dash-table
+matplotlib
+pandas
+pandas_datareader
+plotly
+PyYAML
+requests

@@ -1,0 +1,8 @@
+
+archive
+__pycache__
+.venv
+.ipynb_checkpoints
+outputs/
+inputs/
+archives/
