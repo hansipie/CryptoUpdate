@@ -1,0 +1,10 @@
+version: '3.8'
+
+services:
+  cryptoupdate:
+    image: cryptoupdate
+    volumes:
+      - ./data/inputs:/app/inputs
+      - ./data/outputs:/app/outputs
+      - ./data/archives:/app/archives
+
