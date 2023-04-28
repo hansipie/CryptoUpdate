@@ -13,10 +13,14 @@ USER docker
 # Définissez le répertoire de travail
 WORKDIR /home/docker
 
+# Add directoty to the PATH
+ENV PATH="/home/docker/.local/bin:${PATH}"
+
 # Copiez les fichiers de configuration et d'installation du projet dans le répertoire de travail
 COPY requirements.txt .
 
 # Installez les dépendances Python nécessaires
+RUN pip install --upgrade pip
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copiez le reste des fichiers du projet dans le répertoire de travail
