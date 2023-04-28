@@ -83,33 +83,12 @@ class Updater:
         response = requests.get(url, headers=headers, params=params)
         if response.status_code == 200:
             content = response.json()
-            print('Update prices')
+            print("Get current coins value successfully")
             for name in content['data']:
                 self.my_variables_map["NOTION_ENTRIES"][name]['price'] = content['data'][name][0]['quote']['EUR']['price']
         else:
             print("Error getting current coins values. code: ", response.status_code)
             quit()
-
-    def getFourKings(self):
-        """
-        Get infos from 4kings
-        """
-        data = {}
-        url = "https://app.4kings.xyz/api/crypto/list"
-        payload={}
-        headers = {}
-        response = requests.request("GET", url, headers=headers, data=payload)
-        resp = response.json()
-        for v in resp['data']:
-            #print(v['symbol'], " - ", v['zone']['name'], " - ", v['zone']['price_indicator'])
-            data[v['symbol']] = v['zone']['name']
-        
-        for name, databis in self.my_variables_map["NOTION_ENTRIES"].items():
-            if name in data :
-                databis['advice'] = data[name]
-            else:
-                print(name, "not found in 4kings data")
-                databis['advice'] = ""
 
     def updateNotionDatabase(self, pageId, coinPrice):
         """
