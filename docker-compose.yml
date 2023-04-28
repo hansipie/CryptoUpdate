@@ -4,7 +4,7 @@ services:
   cryptoupdate:
     image: cryptoupdate
     volumes:
-      - ./data/inputs:/app/inputs
-      - ./data/outputs:/app/outputs
-      - ./data/archives:/app/archives
+      - ./data/inputs:/home/docker/inputs
+      - ./data/outputs:/home/docker/outputs
+      - ./data/archives:/home/docker/archives
 
