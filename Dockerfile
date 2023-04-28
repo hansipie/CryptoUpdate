@@ -13,6 +13,9 @@ USER docker
 # Définissez le répertoire de travail
 WORKDIR /home/docker
 
+# Add directoty to the PATH
+ENV PATH="/home/docker/.local/bin:${PATH}"
+
 # Copiez les fichiers de configuration et d'installation du projet dans le répertoire de travail
 COPY requirements.txt .
 
