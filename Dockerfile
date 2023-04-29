@@ -2,7 +2,7 @@
 FROM python:3.10-slim
 
 # Create a new user and group
-RUN groupadd -r docker && useradd -r -g docker -m -d /home/docker docker
+RUN groupadd -r docker -g 1000 && useradd -r -g docker -u 1000 -m -d /home/docker docker
 
 # Set the home directory ownership and permissions
 RUN chown -R docker:docker /home/docker && chmod -R 755 /home/docker

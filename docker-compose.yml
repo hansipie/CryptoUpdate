@@ -3,6 +3,7 @@ version: '3.8'
 services:
   cryptoupdate:
     image: cryptoupdate
+    user: "1000:1000"
     volumes:
       - ./data/inputs:/home/docker/inputs
       - ./data/outputs:/home/docker/outputs
