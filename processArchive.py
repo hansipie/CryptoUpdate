@@ -8,6 +8,8 @@ df = pd.DataFrame({})
 archivepath = os.path.join(os.getcwd(), "archives")
 dirs = os.listdir(archivepath)
 for d in dirs:
+    if not d.isnumeric():
+        continue
     print("directory: ", d)
     sub = os.path.join(archivepath, d)
     files = os.listdir(sub)
