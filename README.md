@@ -4,27 +4,26 @@ Integrate auto cryptocurrencies price update to Notion.
 
 ## Install the required software dependencies by running the following command,
     
-Linux: 
-    
-    pip3 install -r requirements.txt
+    python3 -m pip install -r requirements.txt
 
-Windows: 
-    
-    py -m pip install -r requirements.txt
-
-## Update and save the my_variables.yml file with your notion and coinmarketcap related informations,
+## create ./inputs/my_variables.yml file with your notion and coinmarketcap related informations,
     
     MY_NOTION_SECRET_TOKEN: <insert-your-notion-integration-secret-token>
+    DATABASE_ID: <insert-your-notion-database-id>
+    MY_NOTION_SECRET_TOKEN: <insert-your-notion-integration-secret-token> 
+    MY_NOTION_INTERNAL_TOKEN: <insert-your-notion-integration-internal-token>
+    MY_NOTION_FILE_TOKEN: <insert-your-notion-file-token>
     MY_COINMARKETCAP_APIKEY: <insert-your-coinmarketcap-integration-secret-token>
 
 ## Run the following command to execute python script,
     
-Linux:
-
-    python3 read.py   
+    python3 main.py
     
-Windows:
+    This command will update the notion Dashboard with coins current values and save it in the archives directory as a CSV file.
     
-    py read.py
+## Archives processing
 
-## 🙌🏻. Watch your crypto dashboard update automatically !! (in < 1 minute intervals) 🎉
+    python processArchive.py
+    
+    This command will process the archives directory to create a CSV file for wallets evolution throught time.
+    
