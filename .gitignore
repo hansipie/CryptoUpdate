@@ -3,9 +3,13 @@ archive
 __pycache__
 .venv
 .ipynb_checkpoints
+
+# personal directories
 outputs/
 inputs/
 archives/
 notebooks/
 data/
+
+# files not ready to diffuse
 syncArchives.py
