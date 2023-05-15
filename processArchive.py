@@ -1,12 +1,16 @@
+#%% import libs
 import os
 import mydata
 import pandas as pd
-import matplotlib.pyplot as plt
 
+#%% dataframe initialisation
 df = pd.DataFrame({})
 
+#%% make archive path
 archivepath = os.path.join(os.getcwd(), "archives")
 dirs = os.listdir(archivepath)
+
+#%% crawl in archive dirs
 for d in dirs:
     if not d.isnumeric():
         continue
@@ -21,14 +25,20 @@ for d in dirs:
         df = pd.concat([df,newdf])
         print("------------------")
 
+#%% sort dataframe by date
 df.set_index("Timestamp",inplace=True)
 df.sort_index(inplace=True)
 
+
+#%% add sum column
 all_sum = df.sum(axis=1, numeric_only=True)
 df["_Sum"] = all_sum
+
+#%% print description
 print(df.describe())
 print("------------------")
 
+#%% create final file
 outputfile = os.path.join(os.getcwd(), "./outputs/ArchiveFinal.csv")
 print("Write ", outputfile)
 os.remove(outputfile)

@@ -8,4 +8,3 @@ services:
       - ./data/inputs:/home/docker/inputs
       - ./data/outputs:/home/docker/outputs
       - ./data/archives:/home/docker/archives
-
