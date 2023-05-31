@@ -9,4 +9,4 @@ pandas_datareader==0.10.0
 plotly==5.11.0
 PyYAML==6.0
 requests==2.28.1
-steamlit==0.63
+streamlit==0.63
