@@ -28,7 +28,7 @@ class Updater:
         """
         url = "https://api.notion.com/v1/search"
         headers = {
-            'Notion-Version': '2021-08-16',
+            'Notion-Version': str(self.my_variables_map["NOTION_VERSION"]),
             'Authorization':
                 'Bearer ' + self.my_variables_map["MY_NOTION_SECRET_TOKEN"]
         }
@@ -42,7 +42,7 @@ class Updater:
         """
         url = f"https://api.notion.com/v1/databases/{self.my_variables_map['DATABASE_ID']}/query"
         headers = {
-            'Notion-Version': '2021-08-16',
+            'Notion-Version': str(self.my_variables_map["NOTION_VERSION"]),
             'Authorization': 'Bearer ' + self.my_variables_map["MY_NOTION_SECRET_TOKEN"]
         }
         response = requests.post(url, headers=headers)
@@ -99,7 +99,7 @@ class Updater:
         headers = {
             'Authorization':
                 'Bearer ' + self.my_variables_map["MY_NOTION_SECRET_TOKEN"],
-            'Notion-Version': '2021-08-16',
+            'Notion-Version': str(self.my_variables_map["NOTION_VERSION"]),
             'Content-Type': 'application/json'
         }
         payload = json.dumps({
@@ -125,7 +125,7 @@ class Updater:
                     pageId=data['page'],
                     coinPrice=data['price']
                 )
-                time.sleep(2 * 10)
+                time.sleep(5)
                 bar()
 
     def UpdateCryptoSilent(self):
@@ -134,9 +134,6 @@ class Updater:
         ... without display
         """
         self.getCryptoPrices()
-
-        # Broken!
-        #self.getFourKings()
         
         print('Updating Notion ...')
         for _, data in self.my_variables_map["NOTION_ENTRIES"].items():
@@ -144,7 +141,7 @@ class Updater:
                 pageId=data['page'],
                 coinPrice=data['price']        
             )
-            time.sleep(2*10)
+            time.sleep(5)
 
     def UpdateIndefinitely(self):
         """

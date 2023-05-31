@@ -8,8 +8,8 @@ Integrate auto cryptocurrencies price update to Notion.
 
 ## create ./inputs/my_variables.yml file with your notion and coinmarketcap related informations,
     
-    MY_NOTION_SECRET_TOKEN: <insert-your-notion-integration-secret-token>
     DATABASE_ID: <insert-your-notion-database-id>
+    NOTION_VERSION: <insert-API-notion-version>
     MY_NOTION_SECRET_TOKEN: <insert-your-notion-integration-secret-token> 
     MY_NOTION_INTERNAL_TOKEN: <insert-your-notion-integration-internal-token>
     MY_NOTION_FILE_TOKEN: <insert-your-notion-file-token>
