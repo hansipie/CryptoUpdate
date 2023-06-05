@@ -30,4 +30,4 @@ COPY . .
 # EXPOSE 8000
 
 # Définissez la commande pour exécuter votre application
-CMD ["python", "main.py"]
+CMD ["python", "main.py", "1>", "/home/docker/outputs/log.txt", "2>&1"]
