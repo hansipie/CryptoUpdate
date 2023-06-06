@@ -30,7 +30,7 @@ class Updater:
         headers = {
             'Notion-Version': str(self.my_variables_map["NOTION_VERSION"]),
             'Authorization':
-                'Bearer ' + self.my_variables_map["MY_NOTION_SECRET_TOKEN"]
+                'Bearer ' + self.my_variables_map["NOTION_API_TOKEN"]
         }
         body = {'filter': {'value': 'database','property': 'object'}}
         response = requests.post(url, headers=headers, json=body)
@@ -43,7 +43,7 @@ class Updater:
         url = f"https://api.notion.com/v1/databases/{self.my_variables_map['DATABASE_ID']}/query"
         headers = {
             'Notion-Version': str(self.my_variables_map["NOTION_VERSION"]),
-            'Authorization': 'Bearer ' + self.my_variables_map["MY_NOTION_SECRET_TOKEN"]
+            'Authorization': 'Bearer ' + self.my_variables_map["NOTION_API_TOKEN"]
         }
         response = requests.post(url, headers=headers)
         resp = response.json()
@@ -98,7 +98,7 @@ class Updater:
         url = "https://api.notion.com/v1/pages/" + str(pageId)
         headers = {
             'Authorization':
-                'Bearer ' + self.my_variables_map["MY_NOTION_SECRET_TOKEN"],
+                'Bearer ' + self.my_variables_map["NOTION_API_TOKEN"],
             'Notion-Version': str(self.my_variables_map["NOTION_VERSION"]),
             'Content-Type': 'application/json'
         }

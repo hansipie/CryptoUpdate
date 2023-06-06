@@ -37,7 +37,7 @@ class Exporter:
             }
         })
         headers = {
-        'Cookie': 'token_v2=' + self.my_variables_map["MY_NOTION_INTERNAL_TOKEN"],
+        'Cookie': 'token_v2=' + self.my_variables_map["NOTION_TOKEN_V2"],
         'Content-Type': 'application/json'
         }
         response = requests.request("POST", url, headers=headers, data=payload)
@@ -53,7 +53,7 @@ class Exporter:
         ]
         })
         headers = {
-        'Cookie': 'token_v2=' + self.my_variables_map["MY_NOTION_INTERNAL_TOKEN"],
+        'Cookie': 'token_v2=' + self.my_variables_map["NOTION_TOKEN_V2"],
         'Content-Type': 'application/json'
         }
         response = requests.request("POST", url, headers=headers, data=payload)
@@ -61,7 +61,7 @@ class Exporter:
 
     def DownloadArchive(self, url, dest):
         print("Download url: " + url)
-        headers = {'Cookie': 'file_token=' + self.my_variables_map["MY_NOTION_FILE_TOKEN"]}
+        headers = {'Cookie': 'file_token=' + self.my_variables_map["NOTION_FILE_TOKEN"]}
         response = requests.request("GET", url, headers=headers)
         if (response.status_code != 200):
             print("Error downloading archive (code:", response.status_code, ")")

@@ -10,22 +10,22 @@ Integrate auto cryptocurrencies price update to Notion and archive database.
     
     DATABASE_ID: <insert-your-notion-database-id>
     NOTION_VERSION: <insert-API-notion-version>
-    MY_NOTION_SECRET_TOKEN: <insert-your-notion-integration-secret-token> 
-    MY_NOTION_INTERNAL_TOKEN: <insert-your-notion-integration-internal-token>
-    MY_NOTION_FILE_TOKEN: <insert-your-notion-file-token>
+    NOTION_API_TOKEN: <insert-your-notion-integration-secret-token> 
+    NOTION_TOKEN_V2: <insert-your-notion-integration-internal-token>
+    NOTION_FILE_TOKEN: <insert-your-notion-file-token>
     MY_COINMARKETCAP_APIKEY: <insert-your-coinmarketcap-integration-secret-token>
 
 ### **How to find those values**
 
-MY_NOTION_SECRET_TOKEN: It has to be created from your Notion account (https://www.notion.so/my-integrations)
+NOTION_API_TOKEN: It has to be created from your Notion account (https://www.notion.so/my-integrations)
 
 NOTION_VERSION: It is found in the API documentation (https://developers.notion.com/reference/versioning)
 
 DATABASE_ID:
 
-MY_NOTION_INTERNAL_TOKEN:
+NOTION_TOKEN_V2:
 
-MY_NOTION_FILE_TOKEN:
+NOTION_FILE_TOKEN:
 
 MY_COINMARKETCAP_APIKEY: It is found in your API account (https://pro.coinmarketcap.com/account)
 
