@@ -16,6 +16,7 @@ def get_folder_names_by_date(folder_path):
         epoch_folder_date = get_epoch_folder_date(folder)
         if epoch_folder_date is None:
             continue
+        print(f"Found folder {folder} with date {epoch_folder_date}")
         if epoch_folder_date not in folders_by_date:
             folders_by_date[epoch_folder_date] = []
         folders_by_date[epoch_folder_date].append(folder)
