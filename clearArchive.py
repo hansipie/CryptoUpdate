@@ -34,7 +34,7 @@ def keep_folders_by_date(folder_path):
     folders_to_rename = [folder for folder in os.listdir(folder_path) if folder not in folders_to_keep]
     for folder in folders_to_rename:
         folder_path_to_rename = os.path.join(folder_path, folder)
-        newname = os.path.join(folder_path, "todelete_" + folder)
+        newname = os.path.join(folder_path, folder + "_todelete")
         if os.path.isdir(folder_path_to_rename):
             print(f"Renaming folder {folder_path_to_rename} (", get_epoch_folder_date(folder), ") to ", newname)
             try:
