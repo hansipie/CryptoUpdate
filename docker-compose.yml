@@ -3,6 +3,10 @@ version: '3.8'
 services:
   cryptoupdate:
     image: cryptoupdate
+    x-develop:
+      watch:
+        - action: rebuild
+          path: .
     user: "1000:1000"
     volumes:
       - ./data/inputs:/home/docker/inputs
