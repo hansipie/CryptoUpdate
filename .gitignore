@@ -14,3 +14,6 @@ data/
 
 # files not ready to diffuse
 syncArchives.py
+
+# Dev Container
+.devcontainer/devcontainer.json
