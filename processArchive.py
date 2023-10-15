@@ -1,7 +1,21 @@
 #%% import libs
 import os
-import mydata
+import time
 import pandas as pd
+
+def ExtractData(file):
+    df = pd.DataFrame({})
+    df = pd.read_csv(file)
+
+    dico = {}
+    epoch = int(os.path.basename(os.path.dirname(file)))
+    epochformat = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(epoch))
+    dico['Timestamp'] = epochformat
+    for _,row in df.iterrows() :
+        dico[row['Name']] = row['Wallet Value (€)']
+    print("New data :")
+    print(dico)
+    return dico
 
 #%% dataframe initialisation
 df = pd.DataFrame({})
@@ -20,7 +34,7 @@ for d in dirs:
     for f in files:
         fullf = os.path.join(sub, f)
         print("file: ", fullf)
-        dico = mydata.ExtractData(fullf)
+        dico = ExtractData(fullf)
         newdf = pd.DataFrame([dico])
         df = pd.concat([df,newdf])
         print("------------------")

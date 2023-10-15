@@ -24,7 +24,6 @@ app.layout = html.Div([
 
 @app.callback(Output('my-graph', 'figure'), [Input('my-dropdown', 'value')])
 def update_graph(selected_dropdown_value):  
-    #df = makeDataFrame()
     return {
         'data': [{
             'x': df.index,
