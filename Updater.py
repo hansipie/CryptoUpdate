@@ -85,7 +85,11 @@ class Updater:
             content = response.json()
             print("Get current coins value successfully")
             for name in content['data']:
-                self.my_variables_map["NOTION_ENTRIES"][name]['price'] = content['data'][name][0]['quote']['EUR']['price']
+                try:
+                    self.my_variables_map["NOTION_ENTRIES"][name]['price'] = content['data'][name][0]['quote']['EUR']['price']
+                except:
+                    print("Error getting current coins values (",name,"). Set to null.")
+                    self.my_variables_map["NOTION_ENTRIES"][name]['price'] = 0
         else:
             print("Error getting current coins values. code: ", response.status_code)
             quit()
