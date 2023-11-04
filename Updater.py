@@ -53,13 +53,13 @@ class Updater:
         response = requests.post(url, headers=headers)
         resp = response.json()
         for v in resp["results"]:
-            text = v["properties"]["Name"]["title"][0]["text"]["content"]
+            text = v["properties"]["Tokens"]["title"][0]["text"]["content"]
             if v["properties"]["Price/Coin"]["number"] is None:
                 price = 0
             else:
                 price = float(v["properties"]["Price/Coin"]["number"])
             self.my_variables_map["NOTION_ENTRIES"].update({
-                v["properties"]["Name"]["title"][0]["text"]["content"]: {
+                v["properties"]["Tokens"]["title"][0]["text"]["content"]: {
                     "page": v["id"], 
                     "price": price
                     }
