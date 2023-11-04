@@ -32,9 +32,14 @@ class Updater:
             'Authorization':
                 'Bearer ' + self.my_variables_map["NOTION_API_TOKEN"]
         }
-        body = {'filter': {'value': 'database','property': 'object'}}
+        body = {"query": "Dashboard"}
         response = requests.post(url, headers=headers, json=body)
-        self.my_variables_map["DATABASE_ID"] = response.json()["results"][0]["id"]
+        if response.status_code == 200:
+            print("Get database id successfully")
+            self.my_variables_map["DATABASE_ID"] = response.json()["results"][0]["id"]
+        else:
+            print("Error getting database id. code: ", response.status_code)
+            quit()
 
     def getNotionDatabaseEntities(self):
         """
@@ -114,7 +119,18 @@ class Updater:
                 }
             }
         })
-        requests.request("PATCH", url, headers=headers, data=payload)
+        response = requests.request("PATCH", url, headers=headers, data=payload)
+        if response.status_code == 200:
+            return
+        elif response.status_code == 429:
+            print("Error updating Notion database. Rate limit exceeded. code: ", response.status_code)
+            retry_after = int(response.headers['Retry-After'])
+            print("Retry after ", retry_after, " seconds")
+            time.sleep(retry_after)
+            self.updateNotionDatabase(pageId, coinPrice)
+        else:
+            print("Error updating Notion database. code: ", response.status_code)
+            quit()
 
     def UpdateCrypto(self):
         """
@@ -129,7 +145,6 @@ class Updater:
                     pageId=data['page'],
                     coinPrice=data['price']
                 )
-                time.sleep(5)
                 bar()
 
     def UpdateCryptoSilent(self):
