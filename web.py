@@ -27,6 +27,7 @@ def formatepoch(epoch):
 
 @st.cache_data 
 def df_from_archives(column):
+    print("Read archives start")
     dicolist = []
     dirs=os.listdir("./archives")
     for dir in dirs:
@@ -42,6 +43,7 @@ def df_from_archives(column):
     df = pd.DataFrame(dicolist)
     df.set_index('Timeframe',inplace=True)
     df.sort_index(inplace=True)
+    print("Read archives end")
     return df
 
 def build_tabs(df):
@@ -117,9 +119,9 @@ if add_selectbox == 'Market':
 if st.checkbox('Clear cache'):
     st.cache_data.clear()
 
-st.subheader("debug")
-col1, col2 = st.columns(2)
-col1.write("options") 
-col1.write(st.session_state.options)
-col2.write("options_save") 
-col2.write(st.session_state.options_save)
+# st.subheader("debug")
+# col1, col2 = st.columns(2)
+# col1.write("options") 
+# col1.write(st.session_state.options)
+# col2.write("options_save") 
+# col2.write(st.session_state.options_save)
