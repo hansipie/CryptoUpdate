@@ -12,7 +12,7 @@ def ExtractData(file):
     epochformat = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(epoch))
     dico['Timestamp'] = epochformat
     for _,row in df.iterrows() :
-        dico[row['Name']] = row['Wallet Value (€)']
+        dico[row['Tokens']] = row['Wallet Value (€)']
     print("New data :")
     print(dico)
     return dico

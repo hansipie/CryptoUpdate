@@ -38,7 +38,7 @@ def df_from_archives(column):
             dfcsv.reset_index()
             dico['Timeframe'] = formatepoch(dir)
             for index, row in dfcsv.iterrows():
-                dico[row['Name']] = row[column]
+                dico[row['Tokens']] = row[column]
         dicolist.append(dico)  
     df = pd.DataFrame(dicolist)
     df.set_index('Timeframe',inplace=True)
