@@ -32,6 +32,8 @@ for d in dirs:
     sub = os.path.join(archivepath, d)
     files = os.listdir(sub)
     for f in files:
+        if f.endswith("_all.csv"):
+            continue
         fullf = os.path.join(sub, f)
         print("file: ", fullf)
         dico = ExtractData(fullf)
