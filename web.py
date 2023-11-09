@@ -77,8 +77,10 @@ add_selectbox = st.sidebar.selectbox(
     ("Global", "Assets Value", "Assets Count", "Market")
 )
 
+st.sidebar.divider()
+
 if add_selectbox != 'Global':
-    startdate = st.sidebar.date_input('Start date', value=pd.to_datetime('today') - pd.to_timedelta(30, unit='d'))
+    startdate = st.sidebar.date_input('Start date', value=pd.to_datetime('today') - pd.to_timedelta(365, unit='d'))
     enddate = st.sidebar.date_input('End date', value=pd.to_datetime('today'))
 
 # session state variable
