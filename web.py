@@ -26,7 +26,7 @@ def formatepoch(epoch):
     return epochformat
 
 @st.cache_data 
-def df_from_archives(column):
+def df_from_archives(*columns):
     print("Read archives start")
     dicolist = []
     dirs=os.listdir("./archives")
@@ -37,8 +37,10 @@ def df_from_archives(column):
             dfcsv = pd.read_csv("./archives/"+dir+"/"+file)
             dfcsv.reset_index()
             dico['Timeframe'] = formatepoch(dir)
-            for index, row in dfcsv.iterrows():
-                dico[row['Tokens']] = row[column]
+            for _, row in dfcsv.iterrows():
+                dico[row['Tokens']] = []
+                for column in columns:
+                    dico[row['Tokens']].append(row[column])
         dicolist.append(dico)  
     df = pd.DataFrame(dicolist)
     df.set_index('Timeframe',inplace=True)
@@ -46,7 +48,7 @@ def df_from_archives(column):
     print("Read archives end")
     return df
 
-def build_tabs(df):
+def build_tabs(df, index):
     tokens=list(df.columns)
     print("select options")
     print("check save", st.session_state.options_save)    
@@ -58,45 +60,49 @@ def build_tabs(df):
         tabs = st.tabs(options)
         count = 0
         for tab in tabs:
-            tab.line_chart(df[options[count]])
+            df_view = df.applymap(lambda x: x[index] if isinstance(x, list) and len(x) > 0 else x)
+            st.write(df_view[options[count]])
+            tab.line_chart(df_view[options[count]])
             count += 1
     print("save options")
     st.session_state.options_save = options
+
+print("main")
+
+# get dataframes from archives
+df_work = df_from_archives('Coins in wallet', 'Wallet Value (€)', 'Price/Coin')
 
 add_selectbox = st.sidebar.selectbox(
     "Assets View",
     ("Global", "Assets Value", "Assets Count", "Market")
 )
 
-print("-> Root code")
-
-# get dataframes from archives
-df_coinscount = df_from_archives('Coins in wallet')
-df_coinsvalue = df_from_archives('Wallet Value (€)')
-df_market = df_from_archives('Price/Coin')
+startdate = st.sidebar.date_input('Start date', value=pd.to_datetime('today') - pd.to_timedelta(30, unit='d'))
+endate = st.sidebar.date_input('End date', value=pd.to_datetime('today'))
 
 # session state variable
 if 'options' not in st.session_state:
-    print("-> options_init")
     st.session_state.options = []
 if 'options_save' not in st.session_state:
-    print("-> options_save_init")
     st.session_state.options_save = []
 
 # create sum df
-df_all_sum = df_coinsvalue.sum(axis=1, numeric_only=True)
+df_all_sum = df_work.apply(lambda x: sum(i[1] for i in x if isinstance(i, list)), axis=1)
 
 if add_selectbox == 'Global':
     st.title("Global")
 
+    # get last values
+    last = get_last_line(df_work).applymap(lambda x: round(x[1], 2) if isinstance(x, list) and len(x) > 0 else x)
+    balance = last.sum(axis=1).values[0]
+    balance = round(balance, 2)
+    
     # show wallet value
-    st.header("Wallet value")
+    st.header("Wallet value : " + str(balance) + " €")
     st.line_chart(df_all_sum)
 
     # show last values
     st.header("Last values")
-    last = get_last_line(df_coinsvalue)
-    #show € after value
     last_u = last.astype(str) + " €"
     st.write(last_u)
 
@@ -106,22 +112,15 @@ if add_selectbox == 'Global':
 
 if add_selectbox == 'Assets Value':
     st.title("Assets Value")
-    build_tabs(df_coinsvalue)
+    build_tabs(df_work, 1)
 
 if add_selectbox == 'Assets Count':
     st.title("Assets Count")
-    build_tabs(df_coinscount)
+    build_tabs(df_work, 0)
 
 if add_selectbox == 'Market':
     st.title("Market")
-    build_tabs(df_market)
+    build_tabs(df_work, 2)
 
 if st.checkbox('Clear cache'):
     st.cache_data.clear()
-
-# st.subheader("debug")
-# col1, col2 = st.columns(2)
-# col1.write("options") 
-# col1.write(st.session_state.options)
-# col2.write("options_save") 
-# col2.write(st.session_state.options_save)
