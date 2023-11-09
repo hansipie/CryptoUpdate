@@ -49,23 +49,23 @@ def df_from_archives(*columns):
     return df
 
 def build_tabs(df, index):
-    tokens=list(df.columns)
-    print("select options")
-    print("check save", st.session_state.options_save)    
-    st.session_state.options = st.multiselect("Select Tokens to display", tokens)
-    options = st.session_state.options
-    print("check options", options)    
-
-    if options:
-        tabs = st.tabs(options)
-        count = 0
-        for tab in tabs:
-            df_view = df.applymap(lambda x: x[index] if isinstance(x, list) and len(x) > 0 else x)
-            st.write(df_view[options[count]])
-            tab.line_chart(df_view[options[count]])
-            count += 1
-    print("save options")
-    st.session_state.options_save = options
+    if startdate < enddate:
+        tokens=list(df.columns)
+        st.session_state.options = st.multiselect("Select Tokens to display", tokens)
+        options = st.session_state.options
+        if options:
+            tabs = st.tabs(options)
+            count = 0
+            for tab in tabs:
+                df_view = df.map(lambda x: x[index] if isinstance(x, list) and len(x) > 0 else x)
+                df_view = df_view.loc[str(startdate):str(enddate)]
+                st.write(df_view[options[count]])
+                tab.line_chart(df_view[options[count]])              
+                count += 1
+        print("save options")
+        st.session_state.options_save = options
+    else:
+        st.error('End date must be after start date')  
 
 print("main")
 
@@ -77,8 +77,9 @@ add_selectbox = st.sidebar.selectbox(
     ("Global", "Assets Value", "Assets Count", "Market")
 )
 
-startdate = st.sidebar.date_input('Start date', value=pd.to_datetime('today') - pd.to_timedelta(30, unit='d'))
-endate = st.sidebar.date_input('End date', value=pd.to_datetime('today'))
+if add_selectbox != 'Global':
+    startdate = st.sidebar.date_input('Start date', value=pd.to_datetime('today') - pd.to_timedelta(30, unit='d'))
+    enddate = st.sidebar.date_input('End date', value=pd.to_datetime('today'))
 
 # session state variable
 if 'options' not in st.session_state:
@@ -93,7 +94,7 @@ if add_selectbox == 'Global':
     st.title("Global")
 
     # get last values
-    last = get_last_line(df_work).applymap(lambda x: round(x[1], 2) if isinstance(x, list) and len(x) > 0 else x)
+    last = get_last_line(df_work).map(lambda x: round(x[1], 2) if isinstance(x, list) and len(x) > 0 else x)
     balance = last.sum(axis=1).values[0]
     balance = round(balance, 2)
     
