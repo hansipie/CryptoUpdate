@@ -43,9 +43,9 @@ This is the general structure of the database processed:
 		}
 	],
 	"properties": {
-		"Name": {
+		"Token": {
 			"id": "title",
-			"name": "Name",
+			"name": "Token",
 			"type": "title",
 			"title": {}
 		},
