@@ -2,6 +2,7 @@
 import os
 import time
 import pandas as pd
+from alive_progress import alive_bar
 
 def ExtractData(file):
     df = pd.DataFrame({})
@@ -12,9 +13,8 @@ def ExtractData(file):
     epochformat = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(epoch))
     dico['Timestamp'] = epochformat
     for _,row in df.iterrows() :
-        dico[row['Tokens']] = row['Wallet Value (€)']
-    print("New data :")
-    print(dico)
+        if type(row['Tokens']) == str:
+            dico[row['Tokens']] = row['Wallet Value (€)']
     return dico
 
 #%% dataframe initialisation
@@ -25,21 +25,22 @@ archivepath = os.path.join(os.getcwd(), "archives")
 dirs = os.listdir(archivepath)
 
 #%% crawl in archive dirs
-for d in dirs:
-    if not d.isnumeric():
-        continue
-    print("directory: ", d)
-    sub = os.path.join(archivepath, d)
-    files = os.listdir(sub)
-    for f in files:
-        if f.endswith("_all.csv"):
+count = len(dirs)
+with alive_bar(count, title='Extracting data', force_tty=True, stats='(eta:{eta})') as bar:
+    for d in dirs:
+        if not d.isnumeric():
             continue
-        fullf = os.path.join(sub, f)
-        print("file: ", fullf)
-        dico = ExtractData(fullf)
-        newdf = pd.DataFrame([dico])
-        df = pd.concat([df,newdf])
-        print("------------------")
+        sub = os.path.join(archivepath, d)
+        files = os.listdir(sub)
+        count=len(files)
+        for f in files:
+            if f.endswith("_all.csv"):
+                continue
+            fullf = os.path.join(sub, f)
+            dico = ExtractData(fullf)
+            newdf = pd.DataFrame([dico])
+            df = pd.concat([df,newdf])
+        bar()
 
 #%% sort dataframe by date
 df.set_index("Timestamp",inplace=True)
@@ -55,7 +56,8 @@ print(df.describe())
 print("------------------")
 
 #%% create final file
-outputfile = os.path.join(os.getcwd(), "./outputs/ArchiveFinal.csv")
+outputfile = os.path.join(os.getcwd(), "outputs")
+outputfile = os.path.join(outputfile, "ArchiveFinal.csv")
 print("Write ", outputfile)
 os.remove(outputfile)
 df.to_csv(outputfile)
