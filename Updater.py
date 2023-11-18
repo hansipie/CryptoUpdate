@@ -54,13 +54,17 @@ class Updater:
         response = requests.post(url, headers=headers)
         resp = response.json()
         for v in resp["results"]:
-            text = v["properties"]["Tokens"]["title"][0]["text"]["content"]
+            try:
+                text = v["properties"]["Tokens"]["title"][0]["text"]["content"]
+            except:
+                print("Invalid entry in Dashboard: ", v["id"])
+                continue
             if v["properties"]["Price/Coin"]["number"] is None:
                 price = 0
             else:
                 price = float(v["properties"]["Price/Coin"]["number"])
             self.my_variables_map["NOTION_ENTRIES"].update({
-                v["properties"]["Tokens"]["title"][0]["text"]["content"]: {
+                text: {
                     "page": v["id"], 
                     "price": price
                     }
