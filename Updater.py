@@ -96,7 +96,10 @@ class Updater:
             print("Get current coins value successfully")
             for name in content['data']:
                 try:
-                    self.my_variables_map["NOTION_ENTRIES"][name]['price'] = content['data'][name][0]['quote']['EUR']['price']
+                    if content['data'][name][0]['quote']['EUR']['price'] is None:
+                        self.my_variables_map["NOTION_ENTRIES"][name]['price'] = 0
+                    else:
+                        self.my_variables_map["NOTION_ENTRIES"][name]['price'] = content['data'][name][0]['quote']['EUR']['price']
                 except:
                     print("Error getting current coins values (",name,"). Set to null.")
                     self.my_variables_map["NOTION_ENTRIES"][name]['price'] = 0
