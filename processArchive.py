@@ -46,6 +46,8 @@ with alive_bar(count, title='Extracting data', force_tty=True, stats='(eta:{eta}
 df.set_index("Timestamp",inplace=True)
 df.sort_index(inplace=True)
 
+## set all nan to 0
+df.fillna(0, inplace=True)
 
 #%% add sum column
 all_sum = df.sum(axis=1, numeric_only=True)
