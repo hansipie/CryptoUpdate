@@ -5,3 +5,5 @@ pandas
 dash
 streamlit
 matplotlib
+python-dotenv
+pillow
