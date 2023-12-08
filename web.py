@@ -4,6 +4,8 @@ import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
 
+st.set_page_config(layout="wide")
+
 def get_last_line(df):
     last = df.tail(1)
     last = last.reset_index(drop=True)
@@ -27,7 +29,6 @@ def formatepoch(epoch):
 
 @st.cache_data 
 def df_from_archives(*columns):
-    print("Read archives start")
     dicolist = []
     dirs=os.listdir("./archives")
     for dir in dirs:
@@ -45,7 +46,7 @@ def df_from_archives(*columns):
     df = pd.DataFrame(dicolist)
     df.set_index('Timeframe',inplace=True)
     df.sort_index(inplace=True)
-    print("Read archives end")
+    print("Archive loaded")
     return df
 
 def build_tabs(df, index):
@@ -59,15 +60,12 @@ def build_tabs(df, index):
             for tab in tabs:
                 df_view = df.map(lambda x: x[index] if isinstance(x, list) and len(x) > 0 else x)
                 df_view = df_view.loc[str(startdate):str(enddate)]
-                st.write(df_view[options[count]])
+                #st.write(df_view[options[count]])
                 tab.line_chart(df_view[options[count]])              
                 count += 1
-        print("save options")
         st.session_state.options_save = options
     else:
         st.error('End date must be after start date')  
-
-print("main")
 
 # get dataframes from archives
 df_work = df_from_archives('Coins in wallet', 'Wallet Value (€)', 'Price/Coin')
@@ -93,6 +91,7 @@ if 'options_save' not in st.session_state:
 df_all_sum = df_work.apply(lambda x: sum(i[1] for i in x if isinstance(i, list)), axis=1)
 
 if add_selectbox == 'Global':
+    print("Global")
     st.title("Global")
 
     # get last values
@@ -114,14 +113,17 @@ if add_selectbox == 'Global':
     display_as_pie(last)
 
 if add_selectbox == 'Assets Value':
+    print("Assets Value")
     st.title("Assets Value")
     build_tabs(df_work, 1)
 
 if add_selectbox == 'Assets Count':
+    print("Assets Count")
     st.title("Assets Count")
     build_tabs(df_work, 0)
 
 if add_selectbox == 'Market':
+    print("Market")
     st.title("Market")
     build_tabs(df_work, 2)
 
