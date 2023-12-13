@@ -41,6 +41,11 @@ class Exporter:
         'Content-Type': 'application/json'
         }
         response = requests.request("POST", url, headers=headers, data=payload)
+        if (response.status_code != 200):
+            print("Error enqueuing task (code:", response.status_code, ")")
+            if (response.status_code == 401):
+                print("Token was invalid or expired.")
+            quit()
         print(response);
         resp = response.json()
         return(resp["taskId"])
