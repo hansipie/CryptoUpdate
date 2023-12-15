@@ -137,24 +137,6 @@ class Updater:
                 bar()
         self.UpdateLastUpdate()
 
-
-    def UpdateCryptoSilent(self):
-        """
-        Update the Notion database with the current price of the cryptocurrency
-        ... without display
-        """
-        self.getCryptoPrices()
-        
-        print('Updating Notion ...')
-        for _, data in self.notion_entries.items():
-            self.updateNotionDatabase(
-                pageId=data['page'],
-                coinPrice=data['price']        
-            )
-            time.sleep(5)
-        self.UpdateLastUpdate()
-
-
     def UpdateIndefinitely(self):
         """
         Orchestrates downloading prices and updating the same

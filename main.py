@@ -9,12 +9,7 @@ if __name__ == "__main__":
     load_dotenv()
 
     #update database with current market values
-    if "cli" in sys.argv :
-        print("CLI mode")
-        Updater.Updater().UpdateCrypto()
-    else:
-        print("Silent mode")
-        Updater.Updater().UpdateCryptoSilent()
+    Updater.Updater().UpdateCrypto()
 
     #export database to csv file. 
     # destination: ./archives/[epoch]/*.csv
