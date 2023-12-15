@@ -1,61 +1,25 @@
 import json
 import time
 import requests
-import yaml
+import Notion
+import os
 from alive_progress import alive_bar
+from dotenv import load_dotenv
 
 class Updater:
 
     def __init__(self):
-        """
-        Reads the my_variables.yml file and gets the notion_database_id and the notion_entries
-        """
-        """
-        Gets required variable data from config yaml file.
-        """
-        with open("./inputs/my_variables.yml", 'r') as stream:
-            try:
-                self.my_variables_map = yaml.safe_load(stream)
-            except yaml.YAMLError as exc:
-                print("[Error]: while reading yml file", exc)
-        self.my_variables_map["NOTION_ENTRIES"] = {}
-        self.getDatabaseId("Dashboard", "DATABASE_ID")
-        self.getDatabaseId("LastUpdate", "LASTUPDATE_ID")
-        self.getNotionDatabaseEntities()
+        self.notion_entries = {}
+        self.notion = Notion.Notion(os.getenv('NOTION_API_TOKEN'))
+        self.database_id = self.notion.getDatabaseId("Dashboard")
+        self.lastupdate_id = self.notion.getDatabaseId("LastUpdate")
+        self.notion_entries = self.getNotionDatabaseEntries()
 
-    def getDatabaseId(self, name, database_var):
-        """
-        Get the database ID of the Notion database
-        """
-        url = "https://api.notion.com/v1/search"
-        headers = {
-            'Notion-Version': str(self.my_variables_map["NOTION_VERSION"]),
-            'Authorization':
-                'Bearer ' + self.my_variables_map["NOTION_API_TOKEN"]
-        }
-        body = {"query": name}
-        response = requests.post(url, headers=headers, json=body)
-        if response.status_code == 200:
-            print(f"Get database {name} id successfully")
-            self.my_variables_map[database_var] = response.json()["results"][0]["id"]
-        else:
-            print("Error getting database id. code: ", response.status_code)
-            quit()
-
-    def getNotionDatabaseEntities(self):
-        """
-        Get all the Notion database entities and their properties
-        """
-        url = f"https://api.notion.com/v1/databases/{self.my_variables_map['DATABASE_ID']}/query"
-        headers = {
-            'Notion-Version': str(self.my_variables_map["NOTION_VERSION"]),
-            'Authorization': 'Bearer ' + self.my_variables_map["NOTION_API_TOKEN"]
-        }
-        response = requests.post(url, headers=headers)
-        resp = response.json()
-        for v in resp["results"]:
+    def getNotionDatabaseEntries(self):
+        resp = {}
+        for v in self.notion.getNotionDatabaseEntities(self.database_id):
             try:
-                text = v["properties"]["Tokens"]["title"][0]["text"]["content"]
+                text = v["properties"]["Token"]["title"][0]["text"]["content"]
             except:
                 print("Invalid entry in Dashboard: ", v["id"])
                 continue
@@ -63,19 +27,20 @@ class Updater:
                 price = 0
             else:
                 price = float(v["properties"]["Price/Coin"]["number"])
-            self.my_variables_map["NOTION_ENTRIES"].update({
+            resp.update({
                 text: {
                     "page": v["id"], 
                     "price": price
                     }
                 })
+        return resp
 
     def getCryptoPrices(self):
         """
         Get the price of the cryptocurrencies from the Coinmarketcap API
         """
         names = ""
-        for name in self.my_variables_map["NOTION_ENTRIES"]:
+        for name in self.notion_entries:
             if len(names) > 0:
                names += ","
             names += name                        
@@ -87,47 +52,48 @@ class Updater:
             'convert':'EUR',
         }
         headers = {
-                'X-CMC_PRO_API_KEY': self.my_variables_map["MY_COINMARKETCAP_APIKEY"],
+                'X-CMC_PRO_API_KEY': os.getenv('MY_COINMARKETCAP_APIKEY'),
                 #'X-CMC_PRO_API_KEY': 'b54bcf4d-1bca-4e8e-9a24-22ff2c3d462c',
         }
         response = requests.get(url, headers=headers, params=params)
         if response.status_code == 200:
             content = response.json()
-            print("Get current coins value successfully")
+            print("Get current maket prices form Coinmarketcap successfully")
             for name in content['data']:
                 try:
                     if content['data'][name][0]['quote']['EUR']['price'] is None:
-                        self.my_variables_map["NOTION_ENTRIES"][name]['price'] = 0
+                        self.notion_entries[name]['price'] = 0
                     else:
-                        self.my_variables_map["NOTION_ENTRIES"][name]['price'] = content['data'][name][0]['quote']['EUR']['price']
+                        self.notion_entries[name]['price'] = content['data'][name][0]['quote']['EUR']['price']
                 except:
                     print("Error getting current coins values (",name,"). Set to null.")
-                    self.my_variables_map["NOTION_ENTRIES"][name]['price'] = 0
+                    self.notion_entries[name]['price'] = 0
         else:
             print("Error getting current coins values. code: ", response.status_code)
             quit()
+
+    def UpdateDBHandleError(self, response):
+        print("Error updating Notion database. code: ", response.status_code)
+        if response.status_code == 429:
+            print(" - Rate limit exceeded. Retry after ", retry_after, " seconds")
+            retry_after = int(response.headers['Retry-After'])
+        elif response.status_code == 522:
+            print(" - Connection timed out. Retry.")
+            retry_after = 2
+        else:
+            print(" - Unknown error updating Notion database. Quit.")
+            quit()
+        time.sleep(retry_after)
 
     def UpdateLastUpdate(self):
         """
         Update the Notion database with the current time
         """
 
-        url = f"https://api.notion.com/v1/databases/{self.my_variables_map['LASTUPDATE_ID']}/query"
-        headers = {
-            'Notion-Version': str(self.my_variables_map["NOTION_VERSION"]),
-            'Authorization': 'Bearer ' + self.my_variables_map["NOTION_API_TOKEN"]
-        }
-        response = requests.post(url, headers=headers)
-        resp = response.json()
-        pageId = resp["results"][0]["id"]
-        url = "https://api.notion.com/v1/pages/" + str(pageId)
-        headers = {
-            'Authorization':
-                'Bearer ' + self.my_variables_map["NOTION_API_TOKEN"],
-            'Notion-Version': str(self.my_variables_map["NOTION_VERSION"]),
-            'Content-Type': 'application/json'
-        }
-        payload = json.dumps({
+        resp = self.notion.getNotionDatabaseEntities(self.lastupdate_id)
+        pageId = resp[0]["id"]
+
+        properties = json.dumps({
             "properties": {
                 "date": {
                     "type": "date",
@@ -137,32 +103,14 @@ class Updater:
                 }
             }
         })
-        response = requests.request("PATCH", url, headers=headers, data=payload)
-        if response.status_code == 200:
-            return
-        elif response.status_code == 429:
-            print("Error updating Notion database. Rate limit exceeded. code: ", response.status_code)
-            retry_after = int(response.headers['Retry-After'])
-            print("Retry after ", retry_after, " seconds")
-            time.sleep(retry_after)
-            self.UpdateLastUpdate()
-        else:
-            print("Error updating Notion database. code: ", response.status_code)
-            quit()
+        self.notion.patchNotionPage(pageId, properties)
 
     def updateNotionDatabase(self, pageId, coinPrice):
         """
         A notion database (if integration is enabled) page with id `pageId`
         will be updated with the data `coinPrice`.
         """
-        url = "https://api.notion.com/v1/pages/" + str(pageId)
-        headers = {
-            'Authorization':
-                'Bearer ' + self.my_variables_map["NOTION_API_TOKEN"],
-            'Notion-Version': str(self.my_variables_map["NOTION_VERSION"]),
-            'Content-Type': 'application/json'
-        }
-        payload = json.dumps({
+        properties = json.dumps({
             "properties": {
                 "Price/Coin": {
                     "type": "number",
@@ -170,18 +118,8 @@ class Updater:
                 }
             }
         })
-        response = requests.request("PATCH", url, headers=headers, data=payload)
-        if response.status_code == 200:
-            return
-        elif response.status_code == 429:
-            print("Error updating Notion database. Rate limit exceeded. code: ", response.status_code)
-            retry_after = int(response.headers['Retry-After'])
-            print("Retry after ", retry_after, " seconds")
-            time.sleep(retry_after)
-            self.updateNotionDatabase(pageId, coinPrice)
-        else:
-            print("Error updating Notion database. code: ", response.status_code)
-            quit()
+        self.notion.patchNotionPage(pageId, properties)
+
 
     def UpdateCrypto(self):
         """
@@ -189,9 +127,9 @@ class Updater:
         """
         self.getCryptoPrices()
 
-        count=len(self.my_variables_map["NOTION_ENTRIES"])
+        count=len(self.notion_entries)
         with alive_bar(count, title='Updating Notion database', force_tty=True, stats='(eta:{eta})') as bar:
-            for _, data in self.my_variables_map["NOTION_ENTRIES"].items():
+            for _, data in self.notion_entries.items():
                 self.updateNotionDatabase(
                     pageId=data['page'],
                     coinPrice=data['price']
@@ -208,7 +146,7 @@ class Updater:
         self.getCryptoPrices()
         
         print('Updating Notion ...')
-        for _, data in self.my_variables_map["NOTION_ENTRIES"].items():
+        for _, data in self.notion_entries.items():
             self.updateNotionDatabase(
                 pageId=data['page'],
                 coinPrice=data['price']        

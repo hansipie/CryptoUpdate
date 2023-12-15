@@ -13,8 +13,8 @@ def ExtractData(file):
     epochformat = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(epoch))
     dico['Timestamp'] = epochformat
     for _,row in df.iterrows() :
-        if type(row['Tokens']) == str:
-            dico[row['Tokens']] = row['Wallet Value (€)']
+        if type(row['Token']) == str:
+            dico[row['Token']] = row['Price/Coin']*row['Coins in wallet']
     return dico
 
 #%% dataframe initialisation

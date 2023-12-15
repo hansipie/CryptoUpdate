@@ -1,103 +1,46 @@
 import math
 import os
-import shutil
-import tempfile
 import time
-import zipfile
-import requests
-import json
-import yaml
+import csv
+import Notion
 
 class Exporter:
 
     def __init__(self):
-        with open("./inputs/my_variables.yml", 'r') as stream:
-            try:
-                self.my_variables_map = yaml.safe_load(stream)
-            except yaml.YAMLError as exc:
-                print("[Error]: while reading yml file", exc)
-        self.my_variables_map["TASK_ID"]=self.EnqueueTask()
-
-    def EnqueueTask(self):
-        url = "https://www.notion.so/api/v3/enqueueTask"
-        payload = json.dumps({
-            "task": {
-                "eventName": "exportBlock",
-                "request": {
-                    "block": {
-                        "id": self.my_variables_map["DATABASE_ID"]
-                    },
-                    "recursive": False,
-                    "exportOptions": {
-                        "exportType": "markdown",
-                        "timeZone": "Europe/Paris",
-                        "locale": "en"
-                    }
-                }
-            }
-        })
-        headers = {
-        'Cookie': 'token_v2=' + self.my_variables_map["NOTION_TOKEN_V2"],
-        'Content-Type': 'application/json'
-        }
-        response = requests.request("POST", url, headers=headers, data=payload)
-        if (response.status_code != 200):
-            print("Error enqueuing task (code:", response.status_code, ")")
-            if (response.status_code == 401):
-                print("Token was invalid or expired.")
-            quit()
-        print(response);
-        resp = response.json()
-        return(resp["taskId"])
-
-    def GetTasks(self):
-        url = "https://www.notion.so/api/v3/getTasks"
-        payload = json.dumps({
-        "taskIds": [
-            self.my_variables_map["TASK_ID"]
-        ]
-        })
-        headers = {
-        'Cookie': 'token_v2=' + self.my_variables_map["NOTION_TOKEN_V2"],
-        'Content-Type': 'application/json'
-        }
-        response = requests.request("POST", url, headers=headers, data=payload)
-        return(response.json())
-
-    def DownloadArchive(self, url, dest):
-        print("Download url: " + url)
-        headers = {'Cookie': 'file_token=' + self.my_variables_map["NOTION_FILE_TOKEN"]}
-        response = requests.request("GET", url, headers=headers)
-        if (response.status_code != 200):
-            print("Error downloading archive (code:", response.status_code, ")")
-            quit()
-        destfile = os.path.join(dest,"archive.zip")
-        with open(destfile, "wb") as f:
-            f.write(response.content)
-        print("File downloaded: ", destfile)
-        return(destfile)
+        self.notion = Notion.Notion(os.getenv('NOTION_API_TOKEN'))
 
     def GetCSVfile(self):
         epochstr = str(math.floor(time.time()))
-        destpath = os.path.join(os.getcwd(), "archives", epochstr)
-        temppath = tempfile.mkdtemp()
-        loop = 1
-        while (loop == 1):
-            resp = self.GetTasks()
-            for v in resp["results"]:
-                print("state: " + v["state"])
-                if (v["state"] == "success"):
-                    if (v["status"]["type"] == "complete"):
-                        print("status: " + v["status"]["type"])
-                        archive = self.DownloadArchive(v["status"]["exportURL"], temppath)
-                        with zipfile.ZipFile(archive, 'r') as zip_ref:
-                            zip_ref.extractall(destpath)
-                        loop = 0
-                        break
-                print("retry")
-        shutil.rmtree(temppath)
+        destpath = os.path.join(os.getcwd(), "archives", epochstr, "archive.csv")
+
+        assets_id = self.notion.getDatabaseId("Assets")
+        entities = self.notion.getNotionDatabaseEntities(assets_id)
+        assets = self.notion.getEntitiesFromAssets(entities)
+
+        dashboard_id = self.notion.getDatabaseId("Dashboard")
+        entities = self.notion.getNotionDatabaseEntities(dashboard_id)
+        dashboard = self.notion.getEntitiesFromDashboard(entities)
+
+        #merge assets and dashboard
+        for token in dashboard:
+            if token in assets:
+                dashboard[token]["Coins in wallet"] = assets[token]["sum"]
+            else:
+                dashboard[token]["Coins in wallet"] = 0
+
+        #save dict to csv file
+
+        if not os.path.exists(os.path.dirname(destpath)):
+            os.makedirs(os.path.dirname(destpath))
+
+        with open(destpath, "w", newline='', encoding='utf-8') as f:
+            writer = csv.writer(f)
+            writer.writerow(["Token", "Price/Coin", "Coins in wallet"])
+            for token in dashboard:
+                writer.writerow([token, dashboard[token]["Price/Coin"], dashboard[token]["Coins in wallet"]])
+
         return(destpath)
 
 if __name__ == "__main__":
     destpath = Exporter().GetCSVfile()
-    print("output directory: ", destpath)
+    print("output cvs file: ", destpath)
