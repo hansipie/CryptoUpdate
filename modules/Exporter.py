@@ -2,7 +2,7 @@ import math
 import os
 import time
 import csv
-import Notion
+from modules import Notion
 
 class Exporter:
 

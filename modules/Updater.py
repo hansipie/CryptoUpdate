@@ -1,10 +1,10 @@
 import json
 import time
 import requests
-import Notion
 import os
 from alive_progress import alive_bar
 from dotenv import load_dotenv
+from modules import Notion
 
 class Updater:
 

@@ -1,9 +1,5 @@
-import sys
-import Exporter
-import Updater
-import os
 from dotenv import load_dotenv
-
+from modules import Exporter, Updater
 
 if __name__ == "__main__":
     load_dotenv()
