@@ -7,10 +7,16 @@ from dash import html
 
 con = sqlite3.connect('./outputs/db.sqlite3')
 df_tokens = pd.read_sql_query("SELECT DISTINCT token from Database;", con)
+df_timestamp = pd.read_sql_query("SELECT DISTINCT timestamp from Database ORDER BY timestamp", con)
+dfall = pd.DataFrame(columns=['datetime', 'value'])
+for mytime in df_timestamp['timestamp']:
+    df = pd.read_sql_query("SELECT ROUND(sum(price*(CASE WHEN count IS NOT NULL THEN count ELSE 0 END)), 2) as value, DATETIME(timestamp, 'unixepoch') AS datetime from Database WHERE timestamp = " + str(mytime), con)
+    dfall.loc[len(dfall)] = [df['datetime'][0], df['value'][0]]
 con.close()
 
 titles=list(df_tokens['token'])
-myoptions = []
+titles.sort()
+myoptions = [{'label': 'All', 'value': 'All'}]
 for t in titles:
     myoptions.append({'label': t, 'value': t})
 
@@ -21,8 +27,12 @@ app = dash.Dash('Hello World',
 def update_graph(selected_dropdown_value):
     print("selected:", selected_dropdown_value)
     con = sqlite3.connect('./outputs/db.sqlite3')
-    dff = pd.read_sql_query("SELECT ROUND(price*(CASE WHEN count IS NOT NULL THEN count ELSE 0 END), 2) AS value, DATETIME(timestamp, 'unixepoch') AS datetime FROM Database WHERE token = '"+selected_dropdown_value+"' ORDER BY timestamp;", con)
-    print(dff.head())
+    if selected_dropdown_value == 'All':
+        dff = dfall
+        print(dff.tail())
+    else:
+        dff = pd.read_sql_query("SELECT DATETIME(timestamp, 'unixepoch') AS datetime, ROUND(price*(CASE WHEN count IS NOT NULL THEN count ELSE 0 END), 2) AS value FROM Database WHERE token = '"+selected_dropdown_value+"' ORDER BY timestamp;", con)
+        print(dff.tail())
     con.close()
     return {
         'data': [{
@@ -36,7 +46,7 @@ app.layout = html.Div([
     dcc.Dropdown(
         id='my-dropdown',
         options=myoptions,  
-        value='BTC'
+        value='All'
     ),  
     dcc.Graph(id='my-graph')
 ], style={'width': '500'})
