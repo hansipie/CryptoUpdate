@@ -4,6 +4,15 @@ import sqlite3
 import pandas as pd
 from alive_progress import alive_bar
 
+def dropDuplicate(conn):
+    df = pd.read_sql_query("SELECT * from Database;", conn)
+    dupcount = df.duplicated().sum()
+    if dupcount > 0:
+        print(f"Found {dupcount} duplicated rows. Dropping...") 
+        df.drop_duplicates(inplace=True)
+        df.to_sql('Database', conn, if_exists='replace', index=False)
+
+
 def getDateFrame(inputfile, epoch):
     df = pd.read_csv(inputfile)
     df.fillna(0, inplace=True)
@@ -40,4 +49,5 @@ if __name__ == "__main__":
                 shutil.rmtree(forderpath, ignore_errors=True)
             bar()
 
+    dropDuplicate(conn)
     conn.close()
