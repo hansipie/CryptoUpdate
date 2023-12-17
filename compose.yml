@@ -5,6 +5,5 @@ services:
     build: .
     user: "1000:1000"
     volumes:
-      - ./inputs:/home/docker/inputs
       - ./outputs:/home/docker/outputs
       - ./archives:/home/docker/archives
