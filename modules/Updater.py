@@ -44,7 +44,7 @@ class Updater:
             if len(names) > 0:
                names += ","
             names += name                        
-        print('Request tokens current prices for ', names)   
+        print('Request tokens current prices for', names)   
         url = 'https://pro-api.coinmarketcap.com/v2/cryptocurrency/quotes/latest'
         #url = 'https://sandbox-api.coinmarketcap.com/v2/cryptocurrency/quotes/latest'
         params = {

@@ -14,7 +14,7 @@ class Notion:
         url = f"{self.base_url}/v1/search"
         headers = {
             'Notion-Version': str(self.version),
-            'Authorization': 'Bearer ' + self.apikey
+            'Authorization': 'Bearer ' + str(self.apikey)
         }
         body = {"query": name}
         response = requests.post(url, headers=headers, json=body)
@@ -32,7 +32,7 @@ class Notion:
         url = f"{self.base_url}/v1/databases/{database_id}/query"
         headers = {
             'Notion-Version': str(self.version),
-            'Authorization': 'Bearer ' + self.apikey
+            'Authorization': 'Bearer ' + str(self.apikey)
         }
         response = requests.post(url, headers=headers)
         resp = response.json()
@@ -46,7 +46,7 @@ class Notion:
         url = f"{self.base_url}/v1/pages/{page_id}"
         headers = {
             'Notion-Version': str(self.version),
-            'Authorization': 'Bearer ' + self.apikey
+            'Authorization': 'Bearer ' + str(self.apikey)
         }
         response = requests.get(url, headers=headers)
         if response.status_code != 200:
@@ -63,7 +63,7 @@ class Notion:
         url = f"{self.base_url}/v1/pages/{page_id}"
         headers = {
             'Notion-Version': str(self.version),
-            'Authorization': 'Bearer ' + self.apikey,
+            'Authorization': 'Bearer ' + str(self.apikey),
             'Content-Type': 'application/json'
         }
 
@@ -79,7 +79,7 @@ class Notion:
         url = f"{self.base_url}/v1/pages/{page_id}/properties/{formula_id}"
         headers = {
             'Notion-Version': str(self.version),
-            'Authorization': 'Bearer ' + self.apikey     
+            'Authorization': 'Bearer ' + str(self.apikey)    
         }
         response = requests.get(url, headers=headers)
         if response.status_code != 200:
