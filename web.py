@@ -1,18 +1,11 @@
 import os
+import sqlite3
 import time
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
 
 st.set_page_config(layout="wide")
-
-def get_last_line(df):
-    last = df.tail(1)
-    last = last.reset_index(drop=True)
-    last = last.loc[:, (last != 0).any(axis=0)]
-    last = last.dropna(axis='columns')
-    last = last.round(2)
-    return last
 
 def display_as_pie(df):
     values = df.values.tolist()[0]
@@ -22,34 +15,67 @@ def display_as_pie(df):
     ax1.pie(values, labels=labels)
     st.pyplot(plt)
 
-def formatepoch(epoch):
-    value = int(epoch)
-    epochformat = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(value))
-    return epochformat
-
-@st.cache_data 
-def df_from_archives(*columns):
-    dicolist = []
-    dirs=os.listdir("./archives")
-    for dir in dirs:
-        files=os.listdir("./archives/"+dir)
-        dico = {}
-        for file in files:
-            dfcsv = pd.read_csv("./archives/"+dir+"/"+file)
-            dfcsv.reset_index()
-            dico['Timeframe'] = formatepoch(dir)
-            for _, row in dfcsv.iterrows():
-                dico[row['Tokens']] = []
-                for column in columns:
-                    dico[row['Tokens']].append(row[column])
-        dicolist.append(dico)  
-    df = pd.DataFrame(dicolist)
-    df.set_index('Timeframe',inplace=True)
-    df.sort_index(inplace=True)
+@st.cache_data
+def make_sum() -> pd.DataFrame:
+    print("Make sum df")
+    con = sqlite3.connect('./outputs/db.sqlite3')
+    df_timestamp = pd.read_sql_query("SELECT DISTINCT timestamp from Database ORDER BY timestamp", con)
+    df = pd.DataFrame(columns=['datetime', 'value'])
+    for mytime in df_timestamp['timestamp']:
+        dftmp = pd.read_sql_query("SELECT ROUND(sum(price*(CASE WHEN count IS NOT NULL THEN count ELSE 0 END)), 2) as value, DATETIME(timestamp, 'unixepoch') AS datetime from Database WHERE timestamp = " + str(mytime), con)
+        df.loc[len(df)] = [dftmp['datetime'][0], dftmp['value'][0]]
+    df.set_index('datetime', inplace=True)
+    con.close()
     print("Archive loaded")
     return df
 
-def build_tabs(df, index):
+@st.cache_data
+def get_balances() -> pd.DataFrame:
+    print("Get balances df")
+    con = sqlite3.connect('./outputs/db.sqlite3')
+    df_result  = pd.DataFrame()
+    df_tokens = pd.read_sql_query("select DISTINCT token from Database", con)
+    for token in df_tokens['token']:
+        df = pd.read_sql_query(f"SELECT DATETIME(timestamp, 'unixepoch') AS datetime, ROUND(price*(CASE WHEN count IS NOT NULL THEN count ELSE 0 END), 2) AS {token} FROM Database WHERE token = '"+token+"' ORDER BY timestamp;", con)
+        df.set_index('datetime', inplace=True)
+        df_result = pd.concat([df_result, df], axis=1)   
+    df_result = df_result.fillna(0)
+    df_result.sort_index()
+    con.close()
+    return df_result
+
+@st.cache_data
+def get_tokencount() -> pd.DataFrame:
+    print("Get tokencount df")
+    con = sqlite3.connect('./outputs/db.sqlite3')
+    df_result  = pd.DataFrame()
+    df_tokens = pd.read_sql_query("select DISTINCT token from Database", con)
+    for token in df_tokens['token']:
+        df = pd.read_sql_query(f"SELECT DATETIME(timestamp, 'unixepoch') AS datetime, count AS {token} FROM Database WHERE token = '"+token+"' ORDER BY timestamp;", con)
+        df.set_index('datetime', inplace=True)
+        df_result = pd.concat([df_result, df], axis=1)   
+    df_result = df_result.fillna(0)
+    df_result.sort_index()
+    con.close()
+    return df_result
+
+@st.cache_data
+def get_market() -> pd.DataFrame:
+    print("Get market df")
+    con = sqlite3.connect('./outputs/db.sqlite3')
+    df_result  = pd.DataFrame()
+    df_tokens = pd.read_sql_query("select DISTINCT token from Database", con)
+    for token in df_tokens['token']:
+        df = pd.read_sql_query(f"SELECT DATETIME(timestamp, 'unixepoch') AS datetime, price AS {token} FROM Database WHERE token = '"+token+"' ORDER BY timestamp;", con)
+        df.set_index('datetime', inplace=True)
+        df_result = pd.concat([df_result, df], axis=1)   
+    df_result = df_result.fillna(0)
+    df_result.sort_index()
+    con.close()
+    return df_result
+
+def build_tabs(df):
+    print("Build tabs")
     if startdate < enddate:
         tokens=list(df.columns)
         st.session_state.options = st.multiselect("Select Tokens to display", tokens)
@@ -58,9 +84,9 @@ def build_tabs(df, index):
             tabs = st.tabs(options)
             count = 0
             for tab in tabs:
-                df_view = df.map(lambda x: x[index] if isinstance(x, list) and len(x) > 0 else x)
-                df_view = df_view.loc[str(startdate):str(enddate)]
-                #st.write(df_view[options[count]])
+                # print df indexes
+                df_view = df.loc[df.index>str(startdate)]
+                df_view = df_view.loc[df_view.index<str(enddate)]
                 tab.line_chart(df_view[options[count]])              
                 count += 1
         st.session_state.options_save = options
@@ -68,7 +94,10 @@ def build_tabs(df, index):
         st.error('End date must be after start date')  
 
 # get dataframes from archives
-df_work = df_from_archives('Coins in wallet', 'Wallet Value (€)', 'Price/Coin')
+df_sum = make_sum()
+df_balances = get_balances()
+df_count = get_tokencount()
+df_market = get_market()
 
 add_selectbox = st.sidebar.selectbox(
     "Assets View",
@@ -87,21 +116,18 @@ if 'options' not in st.session_state:
 if 'options_save' not in st.session_state:
     st.session_state.options_save = []
 
-# create sum df
-df_all_sum = df_work.apply(lambda x: sum(i[1] for i in x if isinstance(i, list)), axis=1)
-
 if add_selectbox == 'Global':
     print("Global")
     st.title("Global")
 
     # get last values
-    last = get_last_line(df_work).map(lambda x: round(x[1], 2) if isinstance(x, list) and len(x) > 0 else x)
+    last = df_balances.tail(1)
     balance = last.sum(axis=1).values[0]
     balance = round(balance, 2)
     
     # show wallet value
     st.header("Wallet value : " + str(balance) + " €")
-    st.line_chart(df_all_sum)
+    st.line_chart(df_sum)
 
     # show last values
     st.header("Last values")
@@ -115,17 +141,17 @@ if add_selectbox == 'Global':
 if add_selectbox == 'Assets Value':
     print("Assets Value")
     st.title("Assets Value")
-    build_tabs(df_work, 1)
+    build_tabs(df_balances)
 
 if add_selectbox == 'Assets Count':
     print("Assets Count")
     st.title("Assets Count")
-    build_tabs(df_work, 0)
+    build_tabs(df_count)
 
 if add_selectbox == 'Market':
     print("Market")
     st.title("Market")
-    build_tabs(df_work, 2)
+    build_tabs(df_market)
 
 if st.checkbox('Clear cache'):
     st.cache_data.clear()

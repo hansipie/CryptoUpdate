@@ -69,7 +69,7 @@ class Notion:
 
         response = requests.patch(url, headers=headers, data=properties)
         if response.status_code != 200:
-            print(f"Error patching page {page_id}. code:", response.status_code, response.text)
+            print(f"Error patching page {page_id}. code:", response.status_code)
             return None
         else:
             resp = response.json()

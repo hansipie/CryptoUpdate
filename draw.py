@@ -26,14 +26,14 @@ app = dash.Dash('Hello World',
 @app.callback(Output('my-graph', 'figure'), [Input('my-dropdown', 'value')])
 def update_graph(selected_dropdown_value):
     print("selected:", selected_dropdown_value)
-    con = sqlite3.connect('./outputs/db.sqlite3')
     if selected_dropdown_value == 'All':
         dff = dfall
         print(dff.tail())
     else:
+        con = sqlite3.connect('./outputs/db.sqlite3')
         dff = pd.read_sql_query("SELECT DATETIME(timestamp, 'unixepoch') AS datetime, ROUND(price*(CASE WHEN count IS NOT NULL THEN count ELSE 0 END), 2) AS value FROM Database WHERE token = '"+selected_dropdown_value+"' ORDER BY timestamp;", con)
         print(dff.tail())
-    con.close()
+        con.close()
     return {
         'data': [{
             'x': dff['datetime'],
