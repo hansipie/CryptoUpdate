@@ -28,9 +28,14 @@ if __name__ == "__main__":
     conn = sqlite3.connect(dbfile)
 
     archivedir = "./archives/"
-    count = len(os.listdir(archivedir))
+    # lambda function to filter archivedir to only folders
+    archivedirs = list(filter(lambda x: os.path.isdir(os.path.join(archivedir, x)), os.listdir(archivedir)))
+    count = len(archivedirs)
+    if count == 0:
+        print("No archives found. Exiting...")
+        exit()
     with alive_bar(count, title='Migrate archives', force_tty=True, stats='(eta:{eta})') as bar:
-        for folder in os.listdir(archivedir):
+        for folder in archivedirs:
             if folder.isnumeric():
                 epoch = int(folder)
                 forderpath = os.path.join(archivedir, folder)
@@ -43,7 +48,7 @@ if __name__ == "__main__":
                         df.to_sql('Database', conn, if_exists='append', index=False)
             bar()
     with alive_bar(count, title='Delete archives', force_tty=True, stats='(eta:{eta})') as bar:
-        for folder in os.listdir(archivedir):
+        for folder in archivedirs:
             forderpath = os.path.join(archivedir, folder)
             if os.path.isdir(forderpath):
                 shutil.rmtree(forderpath, ignore_errors=True)
