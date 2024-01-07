@@ -41,6 +41,7 @@ def get_balances() -> pd.DataFrame:
         df_result = pd.concat([df_result, df], axis=1)   
     df_result = df_result.fillna(0)
     df_result.sort_index()
+    print(df_result.tail(1))
     con.close()
     return df_result
 
@@ -56,6 +57,7 @@ def get_tokencount() -> pd.DataFrame:
         df_result = pd.concat([df_result, df], axis=1)   
     df_result = df_result.fillna(0)
     df_result.sort_index()
+    print(df_result.tail(1))
     con.close()
     return df_result
 
@@ -71,6 +73,7 @@ def get_market() -> pd.DataFrame:
         df_result = pd.concat([df_result, df], axis=1)   
     df_result = df_result.fillna(0)
     df_result.sort_index()
+    print(df_result.tail(1))
     con.close()
     return df_result
 
@@ -86,8 +89,9 @@ def build_tabs(df):
             for tab in tabs:
                 # print df indexes
                 df_view = df.loc[df.index>str(startdate)]
-                df_view = df_view.loc[df_view.index<str(enddate)]
-                tab.line_chart(df_view[options[count]])              
+                df_view = df_view.loc[df_view.index<str(enddate + pd.to_timedelta(1, unit='d'))]
+                tab.line_chart(df_view[options[count]])    
+                st.write(df_view[options[count]].tail(1))          
                 count += 1
         st.session_state.options_save = options
     else:

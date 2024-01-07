@@ -9,8 +9,10 @@ class Exporter:
     def __init__(self):
         self.notion = Notion.Notion(os.getenv('NOTION_API_TOKEN'))
 
-    def GetCSVfile(self):
+    def GetCSVfile(self, debug=False):
         epochstr = str(math.floor(time.time()))
+        if debug:
+            epochstr += "_debug"
         destpath = os.path.join(os.getcwd(), "archives", epochstr, "archive.csv")
 
         assets_id = self.notion.getDatabaseId("Assets")
