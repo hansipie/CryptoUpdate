@@ -7,7 +7,7 @@ from modules import process
 
 if __name__ == "__main__":
 
-    dbfile = "./outputs/db.sqlite3"
+    dbfile = "./data/db.sqlite3"
     conn = sqlite3.connect(dbfile)
 
     archivedir = "./archives/"

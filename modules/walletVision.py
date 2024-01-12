@@ -2,6 +2,7 @@ import base64
 import json
 import argparse
 import io
+import traceback
 from dotenv import load_dotenv
 from openai import OpenAI
 from PIL import Image
@@ -17,9 +18,9 @@ def get_image_type(image: bytes):
         return None
 
 
-def extract_crypto(bytes_data):
+def extract_crypto(bytes_data, api_key):
     # Create an OpenAI object
-    model = OpenAI()
+    model = OpenAI(api_key=api_key)
     total_tokens = 0
 
     type_image = get_image_type(bytes_data)
@@ -57,7 +58,7 @@ def extract_crypto(bytes_data):
             max_tokens=1024,
         )
     except Exception as e:
-        print(e)
+        traceback.print_exc()
         return None, None
 
     message = response.choices[0].message
@@ -84,7 +85,7 @@ def extract_crypto(bytes_data):
             response_format={"type": "json_object"},
         )
     except Exception as e:
-        print(e)
+        traceback.print_exc()
         return None, None
 
     message = response.choices[0].message

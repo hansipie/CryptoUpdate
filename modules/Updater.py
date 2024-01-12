@@ -1,16 +1,16 @@
 import json
 import time
+import traceback
 import requests
-import os
 from alive_progress import alive_bar
 from dotenv import load_dotenv
 from modules import Notion
 
-
 class Updater:
-    def __init__(self):
+    def __init__(self, coinmarketcap_token: str, notion_token: str):
         self.notion_entries = {}
-        self.notion = Notion.Notion(os.getenv("NOTION_API_TOKEN"))
+        self.notion = Notion.Notion(notion_token)
+        self.coinmarketcap_token = coinmarketcap_token
         self.database_id = self.notion.getDatabaseId("Dashboard")
         self.lastupdate_id = self.notion.getDatabaseId("LastUpdate")
         self.notion_entries = self.getNotionDatabaseEntries()
@@ -50,7 +50,7 @@ class Updater:
             headers = {"X-CMC_PRO_API_KEY": "b54bcf4d-1bca-4e8e-9a24-22ff2c3d462c"}
         else:
             url = "https://pro-api.coinmarketcap.com/v2/cryptocurrency/quotes/latest"
-            headers = {"X-CMC_PRO_API_KEY": os.getenv("MY_COINMARKETCAP_APIKEY")}
+            headers = {"X-CMC_PRO_API_KEY": str(self.coinmarketcap_token)}
 
         params = {
             "symbol": names,
@@ -150,7 +150,7 @@ class Updater:
                 self.UpdateCrypto()
                 time.sleep(1 * 60)
             except Exception as e:
-                print(f"[Error encountered]: {e}")
+                traceback.print_exc()
                 break
 
 

@@ -1,25 +1,27 @@
 import os
 import shutil
 import sqlite3
-from dotenv import load_dotenv
+import configparser
 import streamlit as st
+import traceback
 from modules.Exporter import Exporter
 from modules.Updater import Updater
 from modules.process import getDateFrame, dropDuplicate
 
-load_dotenv()
-
 st.set_page_config(layout="centered")
 
-if os.getenv("MY_COINMARKETCAP_APIKEY") is None:
-    print("Please set your Coinmarketcap API key in the .env file")
-    quit()
-if os.getenv("NOTION_API_TOKEN") is None:
-    print("Please set your Notion API key in the .env file")
-    quit()
+configfilepath = "./data/settings.ini"
+if not os.path.exists(configfilepath):
+    st.error("Please set your settings in the settings page")
+    st.stop()
 
-# debug flag to not consume the Coinmarketcap API
-debugflag = False
+config = configparser.ConfigParser()
+config.read(configfilepath)
+
+try:
+    debugflag = (True if config["DEFAULT"]["debug"] == "True" else False)
+except KeyError:
+    debugflag = False
 
 with st.form(key="update_database"):
     submit_button = st.form_submit_button(
@@ -31,8 +33,18 @@ with st.form(key="update_database"):
         st.write("Updating database...")
 
         with st.spinner("Getting current marketprices..."):
-            updater = Updater()
-            updater.getCryptoPrices(debug=debugflag)    
+            try:
+                updater = Updater(config["DEFAULT"]["coinmarketcap_token"], config["DEFAULT"]["notion_token"])
+                updater.getCryptoPrices(debug=debugflag)                                                        
+            except KeyError as ke:
+                st.error("Error: " + type(ke).__name__ + " - " + str(ke))
+                st.error("Please set your settings in the settings page")
+                traceback.print_exc()
+                st.stop()  
+            except Exception as e:
+                st.error("Error: " + type(e).__name__ + " - " + str(e))
+                traceback.print_exc()
+                st.stop() 
 
         updatetokens_bar = st.progress(0)
         count = 0
@@ -48,9 +60,19 @@ with st.form(key="update_database"):
         with st.spinner("Updating last update..."):
             updater.UpdateLastUpdate()
         
-        with st.spinner("Exporting database..."):   
-            exporter = Exporter()
-            csvfile = exporter.GetCSVfile(debug=debugflag)
+        with st.spinner("Exporting database..."): 
+            try:
+                exporter = Exporter(config["DEFAULT"]["notion_token"])
+                csvfile = exporter.GetCSVfile(debug=debugflag)
+            except KeyError as ke:
+                st.error("Error: " + type(ke).__name__ + " - " + str(ke))
+                st.error("Please set your settings in the settings page")
+                traceback.print_exc()
+                st.stop()
+            except Exception as e:
+                st.error("Error: " + type(e).__name__ + " - " + str(e))
+                traceback.print_exc()
+                st.stop()
             st.write("Output file: ", csvfile)
 
 archivedir = "./archives/"
@@ -58,23 +80,22 @@ archivedir = "./archives/"
 archivedirs = list(filter(lambda x: os.path.isdir(os.path.join(archivedir, x)), os.listdir(archivedir)))
 
 with st.form(key="process_archives"):
-
+    archivedirs = list(filter(lambda x: os.path.isdir(os.path.join(archivedir, x)), os.listdir(archivedir)))
+    st.write("Archives count:", len(archivedirs))
     submit_button = st.form_submit_button(
         label="Process archives",
         help="Process archives directories and migrate them to the application database.",
         use_container_width=True,
     )
     if submit_button:
-        archivedirs = list(filter(lambda x: os.path.isdir(os.path.join(archivedir, x)), os.listdir(archivedir)))
-
         if len(archivedirs) == 0:
             st.warning("No archives found.")
         else:
             st.write("Found archives: ", archivedirs)
             if debugflag:
-                dbfile = "./outputs/db_debug.sqlite3"
+                dbfile = "./data/db_debug.sqlite3"
             else:
-                dbfile = "./outputs/db.sqlite3"
+                dbfile = "./data/db.sqlite3"
             conn = sqlite3.connect(dbfile)
 
             st.write("Migrating archives...")

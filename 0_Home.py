@@ -1,20 +1,22 @@
-from st_pages import Page, add_page_title, show_pages
-from modules.data import Data
 import os
 import streamlit as st
+from st_pages import Page, add_page_title, show_pages
+from modules.data import Data
 
 show_pages(
     [
-        Page("app.py", "Home", "🏠"),
-        Page("pages/wallets.py", "Wallets", "💰"),
-        Page("pages/import.py", "Import", "📥"),
-        Page("pages/update.py", "Update", "🔄",)
+        Page("0_Home.py", "Home", "🏠"),
+        Page("pages/1_Wallets.py", "Wallets", "💰"),
+        Page("pages/2_Import.py", "Import", "📥"),
+        Page("pages/3_Update.py", "Update", "🔄"),
+        Page("pages/4_Settings.py", "Settings", "⚙️")
     ]
 )
 
+st.set_page_config(layout="wide")
 add_page_title("WalletVision")
 
-db_path = os.path.join(os.path.dirname(__file__), "./outputs/db.sqlite3")
+db_path = os.path.join(os.path.dirname(__file__), "./data/db.sqlite3")
 
 # get dataframes from archives
 

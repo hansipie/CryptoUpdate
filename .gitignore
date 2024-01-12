@@ -1,20 +1,15 @@
-
-archive
 __pycache__
 .venv
 .ipynb_checkpoints
 .streamlit
 .env
 
-# personal directories
-outputs/
-inputs/
+# personal files and folders
 archives/
-notebooks/
 data/
+inputs/
+notebooks/
+settings.ini
 
 # files not ready to diffuse
 syncArchives.py
-
-# Dev Container
-.devcontainer/devcontainer.json

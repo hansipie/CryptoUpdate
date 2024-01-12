@@ -1,6 +1,3 @@
-import os
-import sqlite3
-import time
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -35,7 +32,7 @@ def build_tabs(df):
         st.error('End date must be after start date')  
 
 st.set_page_config(layout="wide")
-db_path = './outputs/db.sqlite3'
+db_path = './data/db.sqlite3'
 
 with st.spinner('Extracting data...'):
     data = Data(db_path)

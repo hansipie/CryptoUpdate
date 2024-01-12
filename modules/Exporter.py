@@ -6,8 +6,8 @@ from modules import Notion
 
 class Exporter:
 
-    def __init__(self):
-        self.notion = Notion.Notion(os.getenv('NOTION_API_TOKEN'))
+    def __init__(self, notion_apikey):
+        self.notion = Notion.Notion(notion_apikey)
 
     def GetCSVfile(self, debug=False):
         epochstr = str(math.floor(time.time()))
@@ -16,10 +16,16 @@ class Exporter:
         destpath = os.path.join(os.getcwd(), "archives", epochstr, "archive.csv")
 
         assets_id = self.notion.getDatabaseId("Assets")
+        if assets_id is None:
+            print("Error: Assets database not found")
+            return None
         entities = self.notion.getNotionDatabaseEntities(assets_id)
         assets = self.notion.getEntitiesFromAssets(entities)
 
         dashboard_id = self.notion.getDatabaseId("Dashboard")
+        if dashboard_id is None:
+            print("Error: Dashboard database not found")
+            return None
         entities = self.notion.getNotionDatabaseEntities(dashboard_id)
         dashboard = self.notion.getEntitiesFromDashboard(entities)
 

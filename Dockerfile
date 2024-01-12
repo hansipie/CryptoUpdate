@@ -1,5 +1,5 @@
 # Utilisez une image Python officielle comme image de base
-FROM python:3.11.6-slim
+FROM python:3-slim
 
 # Create a new user and group
 RUN groupadd -r docker -g 1000 && useradd -r -g docker -u 1000 -m -d /home/docker docker
@@ -12,6 +12,9 @@ USER docker
 
 # Définissez le répertoire de travail
 WORKDIR /home/docker
+
+# Exposez le port 8080
+EXPOSE 8080
 
 # Add directoty to the PATH
 ENV PATH="/home/docker/.local/bin:${PATH}"
@@ -27,4 +30,4 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
 # Définissez la commande pour exécuter votre application
-CMD ["python", "main.py"]
+CMD ["streamlit", "run", "0_Home.py", "--server.port", "8080"]

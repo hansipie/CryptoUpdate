@@ -18,7 +18,7 @@ def display_as_pie(df):
 @st.cache_data
 def make_sum() -> pd.DataFrame:
     print("Make sum df")
-    con = sqlite3.connect('./outputs/db.sqlite3')
+    con = sqlite3.connect('./data/db.sqlite3')
     df_timestamp = pd.read_sql_query("SELECT DISTINCT timestamp from Database ORDER BY timestamp", con)
     df = pd.DataFrame(columns=['datetime', 'value'])
     for mytime in df_timestamp['timestamp']:
@@ -32,7 +32,7 @@ def make_sum() -> pd.DataFrame:
 @st.cache_data
 def get_balances() -> pd.DataFrame:
     print("Get balances df")
-    con = sqlite3.connect('./outputs/db.sqlite3')
+    con = sqlite3.connect('./data/db.sqlite3')
     df_result  = pd.DataFrame()
     df_tokens = pd.read_sql_query("select DISTINCT token from Database", con)
     for token in df_tokens['token']:
@@ -48,7 +48,7 @@ def get_balances() -> pd.DataFrame:
 @st.cache_data
 def get_tokencount() -> pd.DataFrame:
     print("Get tokencount df")
-    con = sqlite3.connect('./outputs/db.sqlite3')
+    con = sqlite3.connect('./data/db.sqlite3')
     df_result  = pd.DataFrame()
     df_tokens = pd.read_sql_query("select DISTINCT token from Database", con)
     for token in df_tokens['token']:
@@ -64,7 +64,7 @@ def get_tokencount() -> pd.DataFrame:
 @st.cache_data
 def get_market() -> pd.DataFrame:
     print("Get market df")
-    con = sqlite3.connect('./outputs/db.sqlite3')
+    con = sqlite3.connect('./data/db.sqlite3')
     df_result  = pd.DataFrame()
     df_tokens = pd.read_sql_query("select DISTINCT token from Database", con)
     for token in df_tokens['token']:

@@ -1,23 +1,19 @@
 import os
-from dotenv import load_dotenv
+import configparser
 from modules import Exporter, Updater
 
 if __name__ == "__main__":
-    load_dotenv()
+    #read config
+    config = configparser.ConfigParser()
+    config.read('./data/settings.ini')
 
-    if os.getenv('MY_COINMARKETCAP_APIKEY') is None:
-        print("Please set your Coinmarketcap API key in the .env file")
-        quit()
-    if os.getenv('NOTION_API_TOKEN') is None:
-        print("Please set your Notion API key in the .env file")
-        quit()
 
     #update database with current market values
-    Updater.Updater().UpdateCrypto()
+    Updater.Updater(config["DEFAULT"]["coinmarketcap_token"], config["DEFAULT"]["notion_token"]).UpdateCrypto()
 
     #export database to csv file. 
     # destination: ./archives/[epoch]/*.csv
-    csvfile = Exporter.Exporter().GetCSVfile()
+    csvfile = Exporter.Exporter(config["DEFAULT"]["notion_token"]).GetCSVfile()
     print("Output file: ", csvfile)
 
     print("Done.")
