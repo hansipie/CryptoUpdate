@@ -5,6 +5,7 @@ import configparser
 import streamlit as st
 import traceback
 from modules.Exporter import Exporter
+from modules.Notion import Notion
 from modules.Updater import Updater
 from modules.process import getDateFrame, dropDuplicate
 
@@ -34,7 +35,12 @@ with st.form(key="update_database"):
 
         with st.spinner("Getting current marketprices..."):
             try:
-                updater = Updater(config["DEFAULT"]["coinmarketcap_token"], config["DEFAULT"]["notion_token"])
+                notion = Notion(config["DEFAULT"]["notion_token"])
+                db_id = notion.getObjectId(config["Notion"]["database"], "database", config["Notion"]["parent_page"])
+                if db_id == None:
+                    st.error("Error: Database not found")
+                    st.stop()
+                updater = Updater(config["DEFAULT"]["coinmarketcap_token"], config["DEFAULT"]["notion_token"], db_id)
                 updater.getCryptoPrices(debug=debugflag)                                                        
             except KeyError as ke:
                 st.error("Error: " + type(ke).__name__ + " - " + str(ke))
@@ -63,7 +69,7 @@ with st.form(key="update_database"):
         with st.spinner("Exporting database..."): 
             try:
                 exporter = Exporter(config["DEFAULT"]["notion_token"])
-                csvfile = exporter.GetCSVfile(debug=debugflag)
+                csvfile = exporter.GetCSVfile(config["Notion"]["database"])
             except KeyError as ke:
                 st.error("Error: " + type(ke).__name__ + " - " + str(ke))
                 st.error("Please set your settings in the settings page")
@@ -76,6 +82,9 @@ with st.form(key="update_database"):
             st.write("Output file: ", csvfile)
 
 archivedir = "./archives/"
+# create archive dir if not exists
+if not os.path.exists(archivedir):
+    os.makedirs(archivedir)
 # lambda function to filter archivedir to only folders
 archivedirs = list(filter(lambda x: os.path.isdir(os.path.join(archivedir, x)), os.listdir(archivedir)))
 
@@ -92,10 +101,7 @@ with st.form(key="process_archives"):
             st.warning("No archives found.")
         else:
             st.write("Found archives: ", archivedirs)
-            if debugflag:
-                dbfile = "./data/db_debug.sqlite3"
-            else:
-                dbfile = "./data/db.sqlite3"
+            dbfile = "./data/db.sqlite3"
             conn = sqlite3.connect(dbfile)
 
             st.write("Migrating archives...")
@@ -105,13 +111,8 @@ with st.form(key="process_archives"):
                 count += 1
                 print(f"Migrating {folder}")
                 migrate_bar.progress(int((100 * count)/ len(archivedirs)), text=f"Migrating {folder}")
-                if folder.isnumeric() or debugflag:
-                    # remove _debug from folder name
-                    if debugflag:
-                        debugfolder = folder.replace("_debug", "")
-                        epoch = int(debugfolder)
-                    else:
-                        epoch = int(folder)
+                if folder.isnumeric():
+                    epoch = int(folder)
                     forderpath = os.path.join(archivedir, folder)
                     for file in os.listdir(forderpath):
                         if file.endswith("_all.csv"):

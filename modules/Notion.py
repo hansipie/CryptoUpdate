@@ -1,6 +1,8 @@
 import time
+import traceback
 import requests
 from alive_progress import alive_bar
+
 
 class Notion:
     def __init__(self, apikey, version="2022-06-28"):
@@ -8,31 +10,121 @@ class Notion:
         self.version = version
         self.base_url = "https://api.notion.com"
 
-    def getDatabaseId(self, name):
+    def getObjectId(self, name, type, parent=None):
         """
-        Get the database ID of the Notion database
+        Get the database/page ID of the Notion object
         """
         url = f"{self.base_url}/v1/search"
         headers = {
-            'Notion-Version': str(self.version),
-            'Authorization': 'Bearer ' + str(self.apikey)
+            "Notion-Version": str(self.version),
+            "Authorization": "Bearer " + str(self.apikey),
         }
-        body = {"query": name}
+        body = {"query": name, "filter": {"value": type, "property": "object"}}
+        print(f"Get {type} {name} id... {body}")
 
         count = 0
         while True:
             response = requests.post(url, headers=headers, json=body)
             if response.status_code == 200:
-                print(f"Get database {name} id successfully: {response.json()['results'][0]['id']}")
-                return response.json()["results"][0]["id"]
+                try:
+                    result_id = None
+                    results = response.json()["results"]
+                    for result in results:
+                        if result["object"] == "database":
+                            if result["title"][0]["text"]["content"] != name:
+                                continue;
+                        elif result["object"] == "page":
+                            # check if title is in properties
+                            if "title" not in result["properties"] or result["properties"]["title"]["title"][0]["text"]["content"] != name:
+                                continue;
+                        else:
+                            continue
+                        if parent is not None:
+                            if result["parent"]["type"] == "page_id":
+                                parent_json = self.getNotionPage(result["parent"]["page_id"])
+                                if parent_json["properties"]["title"]["title"][0]["text"]["content"] == parent:
+                                    result_id = result["id"]
+                            else:
+                                continue
+                        else:
+                            result_id = result["id"]
+                            break
+                    print (f"Returned {type} {name} id: {result_id}")
+                    return result_id
+                except:
+                    traceback.print_exc()   
+                    print(f"Error getting {type} {name} id.")
+                    return None
             else:
-                print(f"Error getting database {name} id. code: {response.status_code}")
+                print(f"Error getting {type} {name} id. code: {response.status_code}")
                 count += 1
                 if count > 5:
                     print("Max retry reached. Exit.")
                     return None
                 time.sleep(1)
-                print("Retry getting database id. code:", response.status_code)
+                print(f"Retry getting {type} id. code:{response.status_code}")
+
+    def createDatabase(self, name, parent):
+        """
+        Create a Notion database
+        """
+
+        page_id = self.getObjectId(parent, "page")
+        if page_id is None:
+            print("Error: Parent page not found")
+            return None
+        
+        db_id = self.getObjectId(name, "database", parent)
+        if db_id is not None:
+            print("Error: Database already exists")
+            return "exists"
+
+        url = f"{self.base_url}/v1/databases"
+        headers = {
+            "Notion-Version": str(self.version),
+            "Authorization": "Bearer " + str(self.apikey),
+        }
+        body = {
+            "parent": {"type": "page_id", "page_id": page_id},
+            "title": [
+                {"type": "text", "text": {"content": name, "link": None}}
+            ],
+            "properties": {
+                "Token": {"id": "title", "name": "Token", "type": "title", "title": {}},
+                "Price/Coin": {
+                    "name": "Price/Coin",
+                    "type": "number",
+                    "number": {"format": "number"},
+                },
+                "Coins in wallet": {
+                    "name": "Coins in wallet",
+                    "type": "number",
+                    "number": {"format": "number"},
+                },
+                "Wallet Value (€)": {
+                    "name": "Wallet Value (€)",
+                    "type": "formula",
+                    "formula": {
+                        "expression": 'multiply(prop("Price/Coin"), prop("Coins in wallet"))'
+                    },
+                },
+            },
+        }
+
+        count = 0
+        while True:
+            response = requests.post(url, headers=headers, json=body)
+            if response.status_code == 200:
+                print(f"Create database {name} successfully.")
+                return response.json()["id"]
+            else:
+                print(f"Error creating database {name}. code: {response.status_code}")
+                count += 1
+                if count > 5:
+                    print("Max retry reached. Exit.")
+                    return None
+                time.sleep(1)
+                print("Retry creating database. code:", response.status_code)
 
     def getNotionDatabaseEntities(self, database_id):
         """
@@ -40,14 +132,16 @@ class Notion:
         """
         url = f"{self.base_url}/v1/databases/{database_id}/query"
         headers = {
-            'Notion-Version': str(self.version),
-            'Authorization': 'Bearer ' + str(self.apikey)
+            "Notion-Version": str(self.version),
+            "Authorization": "Bearer " + str(self.apikey),
         }
         count = 0
         while True:
             response = requests.post(url, headers=headers)
             if response.status_code == 200:
-                print(f"Get database entities successfully. Total: {len(response.json()['results'])}")
+                print(
+                    f"Get database entities successfully. Total: {len(response.json()['results'])}"
+                )
                 return response.json()["results"]
             else:
                 print("Error getting database entities. code:", response.status_code)
@@ -57,15 +151,15 @@ class Notion:
                     return None
                 time.sleep(1)
                 print("Retry getting database entities. code:", response.status_code)
-    
+
     def getNotionPage(self, page_id):
         """
-        Get all the Notion database entities and their properties
+        Get a Notion page and its properties
         """
         url = f"{self.base_url}/v1/pages/{page_id}"
         headers = {
-            'Notion-Version': str(self.version),
-            'Authorization': 'Bearer ' + str(self.apikey)
+            "Notion-Version": str(self.version),
+            "Authorization": "Bearer " + str(self.apikey),
         }
         count = 0
         while True:
@@ -81,16 +175,16 @@ class Notion:
                     return None
                 time.sleep(1)
                 print("Retry getting page. code:", response.status_code)
-        
+
     def patchNotionPage(self, page_id, properties):
         """
         Patch a Notion page with new properties
         """
         url = f"{self.base_url}/v1/pages/{page_id}"
         headers = {
-            'Notion-Version': str(self.version),
-            'Authorization': 'Bearer ' + str(self.apikey),
-            'Content-Type': 'application/json'
+            "Notion-Version": str(self.version),
+            "Authorization": "Bearer " + str(self.apikey),
+            "Content-Type": "application/json",
         }
 
         count = 0
@@ -107,12 +201,12 @@ class Notion:
                     return None
                 time.sleep(1)
                 print("Retry patching page. code:", response.status_code)
-    
+
     def getNotionFormlaValue(self, page_id, formula_id):
         url = f"{self.base_url}/v1/pages/{page_id}/properties/{formula_id}"
         headers = {
-            'Notion-Version': str(self.version),
-            'Authorization': 'Bearer ' + str(self.apikey)    
+            "Notion-Version": str(self.version),
+            "Authorization": "Bearer " + str(self.apikey),
         }
 
         count = 0
@@ -122,17 +216,28 @@ class Notion:
                 print(f"Get formula value in page {page_id} successfully.")
                 return response.json()["formula"]["number"]
             else:
-                print("Error getting formula value in page {page_id}. code:", response.status_code)
+                print(
+                    "Error getting formula value in page {page_id}. code:",
+                    response.status_code,
+                )
                 count += 1
                 if count > 5:
                     print("Max retry reached. Exit.")
                     return None
                 time.sleep(1)
-                print("Retry getting formula value in page {page_id}. code:", response.status_code)
-        
+                print(
+                    "Retry getting formula value in page {page_id}. code:",
+                    response.status_code,
+                )
+
     def getEntitiesFromDashboard(self, entities) -> dict:
         ret = {}
-        with alive_bar(len(entities), title='Get market prices', force_tty=True, stats='(eta:{eta})') as bar:
+        with alive_bar(
+            len(entities),
+            title="Get market prices",
+            force_tty=True,
+            stats="(eta:{eta})",
+        ) as bar:
             for entry in entities:
                 properties = entry["properties"]
                 try:
@@ -144,17 +249,27 @@ class Notion:
                     price = 0
                 else:
                     price = float(properties["Price/Coin"]["number"])
+                
+                if properties["Coins in wallet"]["type"] == "number":
+                    count = float(properties["Coins in wallet"]["number"])
+                elif properties["Coins in wallet"]["type"] == "rollup":
+                    count = float(properties["Coins in wallet"]["rollup"]["number"])
+                else:
+                    count = -1
 
-                #print(f"Token: {token}, Price: {price}")
+                # print(f"Token: {token}, Price: {price}")
                 ret[token] = {}
                 ret[token]["Price/Coin"] = price
+                ret[token]["Coins in wallet"] = count
                 bar()
         return ret
 
     def getEntitiesFromAssets(self, entities) -> dict:
         sum_formula_id = None
         ret = {}
-        with alive_bar(len(entities), title='Get token counts', force_tty=True, stats='(eta:{eta})') as bar:
+        with alive_bar(
+            len(entities), title="Get token counts", force_tty=True, stats="(eta:{eta})"
+        ) as bar:
             for entry in entities:
                 properties = entry["properties"]
                 try:
@@ -165,9 +280,9 @@ class Notion:
 
                 if sum_formula_id is None:
                     sum_formula_id = properties["Sum"]["id"]
-                sum= self.getNotionFormlaValue(entry["id"], sum_formula_id)
+                sum = self.getNotionFormlaValue(entry["id"], sum_formula_id)
 
-                #print(f"Token: {token}, Sum: {sum}")
+                # print(f"Token: {token}, Sum: {sum}")
                 ret[token] = {}
                 ret[token]["sum"] = sum
                 bar()

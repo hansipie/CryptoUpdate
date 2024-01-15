@@ -48,7 +48,8 @@ def get_balances() -> pd.DataFrame:
 @st.cache_data
 def get_tokencount() -> pd.DataFrame:
     print("Get tokencount df")
-    con = sqlite3.connect('./data/db.sqlite3')
+    dbfile = "./data/db.sqlite3"
+    con = sqlite3.connect(dbfile)
     df_result  = pd.DataFrame()
     df_tokens = pd.read_sql_query("select DISTINCT token from Database", con)
     for token in df_tokens['token']:
@@ -64,7 +65,10 @@ def get_tokencount() -> pd.DataFrame:
 @st.cache_data
 def get_market() -> pd.DataFrame:
     print("Get market df")
-    con = sqlite3.connect('./data/db.sqlite3')
+    if debugflag:
+        con = sqlite3.connect('./data/db_debug.sqlite3')
+    else:
+        con = sqlite3.connect('./data/db.sqlite3')
     df_result  = pd.DataFrame()
     df_tokens = pd.read_sql_query("select DISTINCT token from Database", con)
     for token in df_tokens['token']:

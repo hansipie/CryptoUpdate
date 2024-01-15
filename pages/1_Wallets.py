@@ -1,9 +1,13 @@
+import configparser
+import os
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
 from modules.data import Data
 
 def display_as_pie(df):
+    if df.empty:
+        return None
     values = df.values.tolist()[0]
     labels = df.columns.tolist()
     plt.figure(figsize=(10,10), facecolor='white')
@@ -32,10 +36,19 @@ def build_tabs(df):
         st.error('End date must be after start date')  
 
 st.set_page_config(layout="wide")
-db_path = './data/db.sqlite3'
+
+configfilepath = "./data/settings.ini"
+if not os.path.exists(configfilepath):
+    st.error("Please set your settings in the settings page")
+    st.stop()
+
+config = configparser.ConfigParser()
+config.read(configfilepath)
+
+dbfile = "./data/db.sqlite3"
 
 with st.spinner('Extracting data...'):
-    data = Data(db_path)
+    data = Data(dbfile)
     df_sum = data.df_sum
     df_balances = data.df_balance
     df_count = data.df_tokencount
@@ -57,8 +70,8 @@ if add_selectbox == 'Global':
     st.title("Global")
 
     # get last values
-    last = df_balances.tail(1)
-    balance = last.sum(axis=1).values[0]
+    last = df_balances.tail(5)
+    balance = (last.sum(axis=1).values[0] if not last.empty else 0)
     balance = round(balance, 2)
     
     # show wallet value

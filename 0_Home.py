@@ -16,7 +16,12 @@ show_pages(
 st.set_page_config(layout="wide")
 add_page_title("WalletVision")
 
-db_path = os.path.join(os.path.dirname(__file__), "./data/db.sqlite3")
+configfilepath = "./data/settings.ini"
+if not os.path.exists(configfilepath):
+    st.error("Please set your settings in the settings page")
+    st.stop()
+    
+db_path = "./data/db.sqlite3"
 
 # get dataframes from archives
 
@@ -33,7 +38,7 @@ if "options_save" not in st.session_state:
 
 # get last values
 last = df_balances.tail(1)
-balance = last.sum(axis=1).values[0]
+balance = (last.sum(axis=1).values[0] if not last.empty else 0)
 balance = round(balance, 2)
 
 # show wallet value

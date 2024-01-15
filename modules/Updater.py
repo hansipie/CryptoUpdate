@@ -7,12 +7,12 @@ from dotenv import load_dotenv
 from modules import Notion
 
 class Updater:
-    def __init__(self, coinmarketcap_token: str, notion_token: str):
+    def __init__(self, coinmarketcap_token: str, notion_token: str, database_id: str):
         self.notion_entries = {}
         self.notion = Notion.Notion(notion_token)
         self.coinmarketcap_token = coinmarketcap_token
-        self.database_id = self.notion.getDatabaseId("Dashboard")
-        self.lastupdate_id = self.notion.getDatabaseId("LastUpdate")
+        self.database_id = database_id
+        self.lastupdate_id = self.notion.getObjectId("LastUpdate", "database")
         self.notion_entries = self.getNotionDatabaseEntries()
 
     def getNotionDatabaseEntries(self):
@@ -96,20 +96,24 @@ class Updater:
         Update the Notion database with the current time
         """
 
-        resp = self.notion.getNotionDatabaseEntities(self.lastupdate_id)
-        pageId = resp[0]["id"]
+        if self.lastupdate_id is None:
+            print("Warning: LastUpdate database not found")
+        else:
+            print("Updating last update...")
+            resp = self.notion.getNotionDatabaseEntities(self.lastupdate_id)
+            pageId = resp[0]["id"]
 
-        properties = json.dumps(
-            {
-                "properties": {
-                    "date": {
-                        "type": "date",
-                        "date": {"start": str(time.strftime("%Y-%m-%d %H:%M:%S"))},
+            properties = json.dumps(
+                {
+                    "properties": {
+                        "date": {
+                            "type": "date",
+                            "date": {"start": str(time.strftime("%Y-%m-%d %H:%M:%S"))},
+                        }
                     }
                 }
-            }
-        )
-        self.notion.patchNotionPage(pageId, properties)
+            )
+            self.notion.patchNotionPage(pageId, properties)
 
     def updateNotionDatabase(self, pageId, coinPrice):
         """

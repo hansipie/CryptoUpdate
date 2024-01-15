@@ -1,3 +1,4 @@
+import os
 import sqlite3
 import pandas as pd
 import streamlit as st
@@ -6,11 +7,20 @@ class Data:
 
     def __init__(self, db_path, version="2022-06-28"):
         self.db_path = db_path
+        self.initDatabase()
         self.df_balance  = pd.DataFrame()
         self.df_tokencount  = pd.DataFrame()
         self.df_market  = pd.DataFrame()
         self.df_sum = pd.DataFrame()
         self.sum = self.make_data()
+
+    def initDatabase(self):
+        print("Init database", __file__, __name__)
+        con = sqlite3.connect(self.db_path)
+        cur = con.cursor()
+        cur.execute("CREATE TABLE IF NOT EXISTS Database (timestamp INTEGER, token TEXT, price REAL, count REAL)")
+        con.commit()
+        con.close()
 
     def make_data(self):
         print("Make dataframes")
