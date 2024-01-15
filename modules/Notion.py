@@ -30,17 +30,19 @@ class Notion:
                     result_id = None
                     results = response.json()["results"]
                     for result in results:
+                        #check Object type
                         if result["object"] == "database":
                             if result["title"][0]["text"]["content"] != name:
                                 continue;
                         elif result["object"] == "page":
-                            # check if title is in properties
                             if "title" not in result["properties"] or result["properties"]["title"]["title"][0]["text"]["content"] != name:
                                 continue;
                         else:
                             continue
+
                         if parent is not None:
                             if result["parent"]["type"] == "page_id":
+                                #check parent page
                                 parent_json = self.getNotionPage(result["parent"]["page_id"])
                                 if parent_json["properties"]["title"]["title"][0]["text"]["content"] == parent:
                                     result_id = result["id"]
@@ -77,7 +79,7 @@ class Notion:
         db_id = self.getObjectId(name, "database", parent)
         if db_id is not None:
             print("Error: Database already exists")
-            return "exists"
+            return "DB_EXISTS"
 
         url = f"{self.base_url}/v1/databases"
         headers = {
@@ -111,20 +113,13 @@ class Notion:
             },
         }
 
-        count = 0
-        while True:
-            response = requests.post(url, headers=headers, json=body)
-            if response.status_code == 200:
-                print(f"Create database {name} successfully.")
-                return response.json()["id"]
-            else:
-                print(f"Error creating database {name}. code: {response.status_code}")
-                count += 1
-                if count > 5:
-                    print("Max retry reached. Exit.")
-                    return None
-                time.sleep(1)
-                print("Retry creating database. code:", response.status_code)
+        response = requests.post(url, headers=headers, json=body)
+        if response.status_code == 200:
+            print(f"Create database {name} successfully.")
+            return response.json()["id"]
+        else:
+            print(f"Error creating database {name}. code: {response.status_code}")
+            return None
 
     def getNotionDatabaseEntities(self, database_id):
         """
@@ -135,22 +130,16 @@ class Notion:
             "Notion-Version": str(self.version),
             "Authorization": "Bearer " + str(self.apikey),
         }
-        count = 0
-        while True:
-            response = requests.post(url, headers=headers)
-            if response.status_code == 200:
-                print(
-                    f"Get database entities successfully. Total: {len(response.json()['results'])}"
-                )
-                return response.json()["results"]
-            else:
-                print("Error getting database entities. code:", response.status_code)
-                count += 1
-                if count > 5:
-                    print("Max retry reached. Exit.")
-                    return None
-                time.sleep(1)
-                print("Retry getting database entities. code:", response.status_code)
+
+        response = requests.post(url, headers=headers)
+        if response.status_code == 200:
+            print(
+                f"Get database entities successfully. Total: {len(response.json()['results'])}"
+            )
+            return response.json()["results"]
+        else:
+            print("Error getting database entities. code:", response.status_code)
+            return None
 
     def getNotionPage(self, page_id):
         """
@@ -161,20 +150,15 @@ class Notion:
             "Notion-Version": str(self.version),
             "Authorization": "Bearer " + str(self.apikey),
         }
-        count = 0
-        while True:
-            response = requests.get(url, headers=headers)
-            if response.status_code == 200:
-                print(f"Get page {page_id} successfully.")
-                return response.json()
-            else:
-                print("Error getting page. code:", response.status_code)
-                count += 1
-                if count > 5:
-                    print("Max retry reached. Exit.")
-                    return None
-                time.sleep(1)
-                print("Retry getting page. code:", response.status_code)
+
+        response = requests.get(url, headers=headers)
+        if response.status_code == 200:
+            print(f"Get page {page_id} successfully.")
+            return response.json()
+        else:
+            print("Error getting page. code:", response.status_code)
+            return None
+
 
     def patchNotionPage(self, page_id, properties):
         """
@@ -187,21 +171,14 @@ class Notion:
             "Content-Type": "application/json",
         }
 
-        count = 0
-        while True:
-            response = requests.patch(url, headers=headers, data=properties)
-            if response.status_code == 200:
-                print(f"Patch page {page_id} successfully.")
-                return response.json()
-            else:
-                print("Error patching page. code:", response.status_code)
-                count += 1
-                if count > 5:
-                    print("Max retry reached. Exit.")
-                    return None
-                time.sleep(1)
-                print("Retry patching page. code:", response.status_code)
-
+        response = requests.patch(url, headers=headers, data=properties)
+        if response.status_code == 200:
+            print(f"Patch page {page_id} successfully.")
+            return response.json()
+        else:
+            print("Error patching page. code:", response.status_code)
+            return None
+        
     def getNotionFormlaValue(self, page_id, formula_id):
         url = f"{self.base_url}/v1/pages/{page_id}/properties/{formula_id}"
         headers = {
@@ -209,26 +186,17 @@ class Notion:
             "Authorization": "Bearer " + str(self.apikey),
         }
 
-        count = 0
-        while True:
-            response = requests.get(url, headers=headers)
-            if response.status_code == 200:
-                print(f"Get formula value in page {page_id} successfully.")
-                return response.json()["formula"]["number"]
-            else:
-                print(
-                    "Error getting formula value in page {page_id}. code:",
-                    response.status_code,
-                )
-                count += 1
-                if count > 5:
-                    print("Max retry reached. Exit.")
-                    return None
-                time.sleep(1)
-                print(
-                    "Retry getting formula value in page {page_id}. code:",
-                    response.status_code,
-                )
+
+        response = requests.get(url, headers=headers)
+        if response.status_code == 200:
+            print(f"Get formula value in page {page_id} successfully.")
+            return response.json()["formula"]["number"]
+        else:
+            print(
+                "Error getting formula value in page {page_id}. code:",
+                response.status_code,
+            )
+            return None
 
     def getEntitiesFromDashboard(self, entities) -> dict:
         ret = {}

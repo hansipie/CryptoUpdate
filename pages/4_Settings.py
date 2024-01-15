@@ -74,7 +74,7 @@ with notion_tab:
                 dbid = notion.createDatabase(db_name, parentpage_name)
                 if dbid is None:
                     st.error("Database not created. Please check your settings.")
-                elif dbid == "exists":
+                elif dbid == "DB_EXISTS":
                     st.warning("Database already exists: " + db_name)
                 else:
                     st.success("Database created: " + dbid)

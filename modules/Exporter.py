@@ -10,6 +10,7 @@ class Exporter:
         self.notion = Notion.Notion(notion_apikey)
 
     def GetCSVfile(self, database_name):
+        """Get the dashboard data from notion and save it to a csv file"""
         epochstr = str(math.floor(time.time()))
         destpath = os.path.join(os.getcwd(), "archives", epochstr, "archive.csv")
 
