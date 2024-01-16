@@ -70,7 +70,7 @@ if add_selectbox == 'Global':
     st.title("Global")
 
     # get last values
-    last = df_balances.tail(5)
+    last = df_balances.tail(1)
     balance = (last.sum(axis=1).values[0] if not last.empty else 0)
     balance = round(balance, 2)
     
@@ -80,12 +80,12 @@ if add_selectbox == 'Global':
 
     # show last values"
     st.header("Last values")
-    last_u = last.astype(str) + " €"
+    last_u = df_balances.tail(5).astype(str) + " €"
     st.write(last_u)
 
     # draw pie
     st.header("Tokens repartition")
-    display_as_pie(last)
+    display_as_pie(df_balances.tail(5))
 
 if add_selectbox == 'Assets Value':
     print("Assets Value")
