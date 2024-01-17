@@ -12,7 +12,7 @@ class Data:
         self.df_tokencount = pd.DataFrame()
         self.df_market = pd.DataFrame()
         self.df_sum = pd.DataFrame()
-        self.sum = self.make_data()
+        self.make_data()
 
     def initDatabase(self):
         print("Init database")

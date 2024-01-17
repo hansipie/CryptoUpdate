@@ -5,6 +5,11 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from modules.data import Data
 
+@st.cache_data(show_spinner=False)
+def getData():
+    dbfile = "./data/db.sqlite3"
+    return Data(dbfile)
+
 def display_as_pie(df):
     if df.empty:
         return None
@@ -45,10 +50,8 @@ if not os.path.exists(configfilepath):
 config = configparser.ConfigParser()
 config.read(configfilepath)
 
-dbfile = "./data/db.sqlite3"
-
 with st.spinner('Extracting data...'):
-    data = Data(dbfile)
+    data = getData()
     df_sum = data.df_sum
     df_balances = data.df_balance
     df_count = data.df_tokencount
