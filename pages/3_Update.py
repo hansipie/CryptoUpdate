@@ -136,3 +136,4 @@ with st.form(key="process_archives"):
 
             dropDuplicate(conn)
             conn.close()
+            st.cache_data.clear()
