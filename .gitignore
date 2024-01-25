@@ -18,3 +18,4 @@ syncArchives.py
 
 # Dev Container
 .devcontainer/devcontainer.json
+.github/dependabot.yml
