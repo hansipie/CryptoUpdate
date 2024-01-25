@@ -38,3 +38,4 @@ README.md
 **/inputs
 **/notebooks
 settings.ini
+.env
