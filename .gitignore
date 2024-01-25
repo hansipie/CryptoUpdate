@@ -13,3 +13,5 @@ settings.ini
 
 # files not ready to diffuse
 syncArchives.py
+.github/dependabot.yml
+.devcontainer/devcontainer.json
