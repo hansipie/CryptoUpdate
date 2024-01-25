@@ -56,7 +56,10 @@ class Data:
                 con,
             )
             df.set_index("datetime", inplace=True)
-            self.df_balance = pd.concat([self.df_balance, df], axis=1)
+            if self.df_balance.empty:
+                self.df_balance = df
+            else:
+                self.df_balance = self.df_balance.join(df, how="outer")
 
             df = pd.read_sql_query(
                 f"SELECT DATETIME(timestamp, 'unixepoch') AS datetime, count AS {token} FROM Database WHERE token = '"
@@ -65,7 +68,10 @@ class Data:
                 con,
             )
             df.set_index("datetime", inplace=True)
-            self.df_tokencount = pd.concat([self.df_tokencount, df], axis=1)
+            if self.df_tokencount.empty:
+                self.df_tokencount = df
+            else:
+                self.df_tokencount = self.df_tokencount.join(df, how="outer")
 
             df = pd.read_sql_query(
                 f"SELECT DATETIME(timestamp, 'unixepoch') AS datetime, price AS {token} FROM Database WHERE token = '"
@@ -74,7 +80,10 @@ class Data:
                 con,
             )
             df.set_index("datetime", inplace=True)
-            self.df_market = pd.concat([self.df_market, df], axis=1)
+            if self.df_market.empty:
+                self.df_market = df
+            else:
+                self.df_market = self.df_market.join(df, how="outer")
 
         self.df_balance = self.df_balance.fillna(0)
         self.df_tokencount = self.df_tokencount.fillna(0)
