@@ -34,11 +34,13 @@ class Updater:
         """
         Get the price of the cryptocurrencies from the Coinmarketcap API
         """
-        names = ""
-        for name in self.notion_entries:
-            if len(names) > 0:
-                names += ","
-            names += name
+        # names = ""
+        # for name in self.notion_entries:
+        #     if len(names) > 0:
+        #         names += ","
+        #     names += name
+        names = str(",").join(self.notion_entries)
+        ##
         print("Request tokens current prices for", names)
         if debug:
             print(
