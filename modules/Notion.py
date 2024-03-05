@@ -1,8 +1,8 @@
 import time
 import traceback
 import requests
+import logging
 from alive_progress import alive_bar
-
 
 class Notion:
     def __init__(self, apikey, version="2022-06-28"):
@@ -20,7 +20,7 @@ class Notion:
             "Authorization": "Bearer " + str(self.apikey),
         }
         body = {"query": name, "filter": {"value": type, "property": "object"}}
-        print(f"Get {type} {name} id... {body}")
+        logging.info(f"Get {type} {name} id... {body}")
 
         count = 0
         while True:
@@ -51,20 +51,20 @@ class Notion:
                         else:
                             result_id = result["id"]
                             break
-                    print (f"Returned {type} {name} id: {result_id}")
+                    logging.debug(f"Returned {type} {name} id: {result_id}")
                     return result_id
                 except:
                     traceback.print_exc()   
-                    print(f"Error getting {type} {name} id.")
+                    logging.error(f"Error getting {type} {name} id.")
                     return None
             else:
-                print(f"Error getting {type} {name} id. code: {response.status_code}")
+                logging.error(f"Error getting {type} {name} id. code: {response.status_code}")
                 count += 1
                 if count > 5:
-                    print("Max retry reached. Exit.")
+                    logging.warning("Max retry reached. Exit.")
                     return None
                 time.sleep(1)
-                print(f"Retry getting {type} id. code:{response.status_code}")
+                logging.warning(f"Retry getting {type} id. code:{response.status_code}")
 
     def createDatabase(self, name, parent):
         """
@@ -73,12 +73,12 @@ class Notion:
 
         page_id = self.getObjectId(parent, "page")
         if page_id is None:
-            print("Error: Parent page not found")
+            logging.error("Error: Parent page not found")
             return None
         
         db_id = self.getObjectId(name, "database", parent)
         if db_id is not None:
-            print("Error: Database already exists")
+            logging.error("Error: Database already exists")
             return "DB_EXISTS"
 
         url = f"{self.base_url}/v1/databases"
@@ -93,8 +93,8 @@ class Notion:
             ],
             "properties": {
                 "Token": {"id": "title", "name": "Token", "type": "title", "title": {}},
-                "Price/Coin": {
-                    "name": "Price/Coin",
+                "Price/Coin (€)": {
+                    "name": "Price/Coin (€)",
                     "type": "number",
                     "number": {"format": "number"},
                 },
@@ -107,7 +107,7 @@ class Notion:
                     "name": "Wallet Value (€)",
                     "type": "formula",
                     "formula": {
-                        "expression": 'multiply(prop("Price/Coin"), prop("Coins in wallet"))'
+                        "expression": 'multiply(prop("Price/Coin (€)"), prop("Coins in wallet"))'
                     },
                 },
             },
@@ -115,10 +115,10 @@ class Notion:
 
         response = requests.post(url, headers=headers, json=body)
         if response.status_code == 200:
-            print(f"Create database {name} successfully.")
+            logging.debug(f"Create database {name} successfully.")
             return response.json()["id"]
         else:
-            print(f"Error creating database {name}. code: {response.status_code}")
+            logging.error(f"Error creating database {name}. code: {response.status_code}")
             return None
 
     def getNotionDatabaseEntities(self, database_id):
@@ -133,12 +133,12 @@ class Notion:
 
         response = requests.post(url, headers=headers)
         if response.status_code == 200:
-            print(
+            logging.info(
                 f"Get database entities successfully. Total: {len(response.json()['results'])}"
             )
             return response.json()["results"]
         else:
-            print("Error getting database entities. code:", response.status_code)
+            logging.error(f"Error getting database entities. code: {response.status_code}")
             return None
 
     def getNotionPage(self, page_id):
@@ -153,10 +153,10 @@ class Notion:
 
         response = requests.get(url, headers=headers)
         if response.status_code == 200:
-            print(f"Get page {page_id} successfully.")
+            logging.info(f"Get page {page_id} successfully.")
             return response.json()
         else:
-            print("Error getting page. code:", response.status_code)
+            logging.error("Error getting page. code: {response.status_code}")
             return None
 
 
@@ -173,10 +173,10 @@ class Notion:
 
         response = requests.patch(url, headers=headers, data=properties)
         if response.status_code == 200:
-            print(f"Patch page {page_id} successfully.")
+            logging.debug(f"Patch page {page_id} successfully.")
             return response.json()
         else:
-            print("Error patching page. code:", response.status_code)
+            logging.error(f"Error getting page. code: {response.status_code}")
             return None
         
     def getNotionFormlaValue(self, page_id, formula_id):
@@ -185,16 +185,13 @@ class Notion:
             "Notion-Version": str(self.version),
             "Authorization": "Bearer " + str(self.apikey),
         }
-
-
         response = requests.get(url, headers=headers)
         if response.status_code == 200:
-            print(f"Get formula value in page {page_id} successfully.")
+            logging.info(f"Get formula value in page {page_id} successfully.")
             return response.json()["formula"]["number"]
         else:
-            print(
-                "Error getting formula value in page {page_id}. code:",
-                response.status_code,
+            logging.error(
+                f"Error getting formula value in page {page_id}. code: {response.status_code}"
             )
             return None
 
@@ -211,13 +208,14 @@ class Notion:
                 try:
                     token = properties["Token"]["title"][0]["text"]["content"]
                 except:
-                    print("Invalid token entry in Dashboard: ", entry["id"])
+                    logging.error(f"Invalid token entry in Dashboard: {entry["id"]}")
                     continue
-                if properties["Price/Coin"]["number"] is None:
+                if properties["Price/Coin (€)"]["number"] is None:
                     price = 0
                 else:
-                    price = float(properties["Price/Coin"]["number"])
+                    price = float(properties["Price/Coin (€)"]["number"])
                 
+                logging.debug(f"Coins in wallet: {properties["Coins in wallet"]}")
                 if properties["Coins in wallet"]["type"] == "number":
                     count = float(properties["Coins in wallet"]["number"])
                 elif properties["Coins in wallet"]["type"] == "rollup":
@@ -225,9 +223,9 @@ class Notion:
                 else:
                     count = -1
 
-                # print(f"Token: {token}, Price: {price}")
+                logging.debug(f"Token: {token}, Price: {price}, Count: {count}")
                 ret[token] = {}
-                ret[token]["Price/Coin"] = price
+                ret[token]["Price/Coin (€)"] = price
                 ret[token]["Coins in wallet"] = count
                 bar()
         return ret
@@ -243,14 +241,14 @@ class Notion:
                 try:
                     token = properties["Token"]["title"][0]["text"]["content"]
                 except:
-                    print("Invalid token entry in Assets: ", entry["id"])
+                    logging.error(f"Invalid token entry in Assets: {entry["id"]}")
                     continue
 
                 if sum_formula_id is None:
                     sum_formula_id = properties["Sum"]["id"]
                 sum = self.getNotionFormlaValue(entry["id"], sum_formula_id)
 
-                # print(f"Token: {token}, Sum: {sum}")
+                logging.debug(f"Token: {token}, Sum: {sum}")
                 ret[token] = {}
                 ret[token]["sum"] = sum
                 bar()

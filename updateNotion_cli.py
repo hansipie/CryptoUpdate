@@ -1,8 +1,11 @@
-import os
 import configparser
+import logging
 from modules.Exporter import Exporter
 from modules.Notion import Notion
 from modules.Updater import Updater
+
+#logging
+logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
 
 if __name__ == "__main__":
 
@@ -17,14 +20,14 @@ if __name__ == "__main__":
         parent_page = config["Notion"]["parent_page"]
 
     except KeyError as ke:
-        print("Error: " + type(ke).__name__ + " - " + str(ke))
-        print("Please set your settings in the settings file")
+        logging.error("Error: " + type(ke).__name__ + " - " + str(ke))
+        logging.error("Please set your settings in the settings file")
         quit()
 
     notion = Notion(notion_api_token)
     db_id = notion.getObjectId(database, "database", parent_page)
     if db_id == None:
-        print("Error: Database not found")
+        logging.error("Error: Database not found")
         quit()
             
     #update database with current market values
@@ -33,6 +36,6 @@ if __name__ == "__main__":
     #export database to csv file. 
     # destination: ./archives/[epoch]/*.csv
     csvfile = Exporter(notion_api_token).GetCSVfile(database)
-    print("Output file: ", csvfile)
-    print("Done.")
+    logging.info(f"Output file: {csvfile}")
+    logging.info("Done.")
 

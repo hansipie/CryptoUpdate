@@ -4,6 +4,10 @@ import sqlite3
 import pandas as pd
 from alive_progress import alive_bar
 from modules import process
+import logging
+
+#logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 if __name__ == "__main__":
 
@@ -15,7 +19,7 @@ if __name__ == "__main__":
     archivedirs = list(filter(lambda x: os.path.isdir(os.path.join(archivedir, x)), os.listdir(archivedir)))
     count = len(archivedirs)
     if count == 0:
-        print("No archives found. Exiting...")
+        logging.error("No archives found. Exiting...")
         exit()
     with alive_bar(count, title='Migrate archives', force_tty=True, stats='(eta:{eta})') as bar:
         for folder in archivedirs:

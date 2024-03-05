@@ -1,8 +1,13 @@
 import os
+import logging
 import streamlit as st
 from st_pages import Page, add_page_title, show_pages
 from modules.data import Data
  
+
+#logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
 @st.cache_data(show_spinner=False)
 def getData():
     db_path = "./data/db.sqlite3"

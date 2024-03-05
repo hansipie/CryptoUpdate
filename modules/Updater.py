@@ -2,6 +2,7 @@ import json
 import time
 import traceback
 import requests
+import logging
 from alive_progress import alive_bar
 from dotenv import load_dotenv
 from modules import Notion
@@ -21,12 +22,13 @@ class Updater:
             try:
                 text = v["properties"]["Token"]["title"][0]["text"]["content"]
             except:
-                print("Invalid entry in Dashboard: ", v["id"])
+                logging.error("Invalid entry in Dashboard: ", v["id"])
                 continue
-            if v["properties"]["Price/Coin"]["number"] is None:
+            logging.debug(f"Found entry: {text}")
+            if v["properties"]["Price/Coin (€)"]["number"] is None:
                 price = 0
             else:
-                price = float(v["properties"]["Price/Coin"]["number"])
+                price = float(v["properties"]["Price/Coin (€)"]["number"])
             resp.update({text: {"page": v["id"], "price": price}})
         return resp
 
@@ -41,9 +43,9 @@ class Updater:
         #     names += name
         names = str(",").join(self.notion_entries)
         ##
-        print("Request tokens current prices for", names)
+        logging.info("Request tokens current prices for", names)
         if debug:
-            print(
+            logging.debug(
                 "Debug mode: use sandbox-api.coinmarketcap.com instead of pro-api.coinmarketcap.com"
             )
             url = (
@@ -62,7 +64,7 @@ class Updater:
         response = requests.get(url, headers=headers, params=params)
         if response.status_code == 200:
             content = response.json()
-            print("Get current maket prices form Coinmarketcap successfully")
+            logging.info("Get current maket prices form Coinmarketcap successfully")
             for name in content["data"]:
                 try:
                     if content["data"][name][0]["quote"]["EUR"]["price"] is None:
@@ -72,24 +74,24 @@ class Updater:
                             "quote"
                         ]["EUR"]["price"]
                 except:
-                    print(
+                    logging.error(
                         "Error getting current coins values (", name, "). Set to null."
                     )
                     self.notion_entries[name]["price"] = 0
         else:
-            print("Error getting current coins values. code: ", response.status_code)
+            logging.error(f"Error getting current coins values. code: {response.status_code}")
             quit()
 
     def UpdateDBHandleError(self, response):
-        print("Error updating Notion database. code: ", response.status_code)
+        logging.error("Error updating Notion database. code: ", response.status_code)
         if response.status_code == 429:
-            print(" - Rate limit exceeded. Retry after ", retry_after, " seconds")
+            logging.warning(" - Rate limit exceeded. Retry after ", retry_after, " seconds")
             retry_after = int(response.headers["Retry-After"])
         elif response.status_code == 522:
-            print(" - Connection timed out. Retry.")
+            logging.warning(" - Connection timed out. Retry.")
             retry_after = 2
         else:
-            print(" - Unknown error updating Notion database. Quit.")
+            logging.error(" - Unknown error updating Notion database. Quit.")
             quit()
         time.sleep(retry_after)
 
@@ -99,9 +101,9 @@ class Updater:
         """
 
         if self.lastupdate_id is None:
-            print("Warning: LastUpdate database not found")
+            logging.warning("Warning: LastUpdate database not found")
         else:
-            print("Updating last update...")
+            logging.info("Updating last update...")
             resp = self.notion.getNotionDatabaseEntities(self.lastupdate_id)
             pageId = resp[0]["id"]
 
@@ -125,7 +127,7 @@ class Updater:
         properties = json.dumps(
             {
                 "properties": {
-                    "Price/Coin": {"type": "number", "number": float(coinPrice)}
+                    "Price/Coin (€)": {"type": "number", "number": float(coinPrice)}
                 }
             }
         )

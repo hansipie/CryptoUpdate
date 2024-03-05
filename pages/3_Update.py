@@ -4,6 +4,7 @@ import sqlite3
 import configparser
 import streamlit as st
 import traceback
+import logging
 from modules.Exporter import Exporter
 from modules.Notion import Notion
 from modules.Updater import Updater
