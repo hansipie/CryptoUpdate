@@ -25,10 +25,10 @@ class Updater:
                 logging.error("Invalid entry in Dashboard: ", v["id"])
                 continue
             logging.debug(f"Found entry: {text}")
-            if v["properties"]["Price/Coin (€)"]["number"] is None:
+            if v["properties"]["Price/Coin"]["number"] is None:
                 price = 0
             else:
-                price = float(v["properties"]["Price/Coin (€)"]["number"])
+                price = float(v["properties"]["Price/Coin"]["number"])
             resp.update({text: {"page": v["id"], "price": price}})
         return resp
 
@@ -43,7 +43,7 @@ class Updater:
         #     names += name
         names = str(",").join(self.notion_entries)
         ##
-        logging.info("Request tokens current prices for", names)
+        logging.info(f"Request tokens current prices for {names}")
         if debug:
             logging.debug(
                 "Debug mode: use sandbox-api.coinmarketcap.com instead of pro-api.coinmarketcap.com"
@@ -127,17 +127,17 @@ class Updater:
         properties = json.dumps(
             {
                 "properties": {
-                    "Price/Coin (€)": {"type": "number", "number": float(coinPrice)}
+                    "Price/Coin": {"type": "number", "number": float(coinPrice)}
                 }
             }
         )
         self.notion.patchNotionPage(pageId, properties)
 
-    def UpdateCrypto(self):
+    def UpdateCrypto(self, debug=False):
         """
         Update the Notion database with the current price of the cryptocurrency
         """
-        self.getCryptoPrices()
+        self.getCryptoPrices(debug=debug)
 
         count = len(self.notion_entries)
         with alive_bar(

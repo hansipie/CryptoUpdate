@@ -93,8 +93,8 @@ class Notion:
             ],
             "properties": {
                 "Token": {"id": "title", "name": "Token", "type": "title", "title": {}},
-                "Price/Coin (€)": {
-                    "name": "Price/Coin (€)",
+                "Price/Coin": {
+                    "name": "Price/Coin",
                     "type": "number",
                     "number": {"format": "number"},
                 },
@@ -107,7 +107,7 @@ class Notion:
                     "name": "Wallet Value (€)",
                     "type": "formula",
                     "formula": {
-                        "expression": 'multiply(prop("Price/Coin (€)"), prop("Coins in wallet"))'
+                        "expression": 'multiply(prop("Price/Coin"), prop("Coins in wallet"))'
                     },
                 },
             },
@@ -179,21 +179,29 @@ class Notion:
             logging.error(f"Error getting page. code: {response.status_code}")
             return None
         
-    def getNotionFormlaValue(self, page_id, formula_id):
-        url = f"{self.base_url}/v1/pages/{page_id}/properties/{formula_id}"
+    def getNotionPageProperties(self, page_id : str, property_id : str) -> dict:
+        url = f"{self.base_url}/v1/pages/{page_id}/properties/{property_id}"
         headers = {
             "Notion-Version": str(self.version),
             "Authorization": "Bearer " + str(self.apikey),
         }
         response = requests.get(url, headers=headers)
-        if response.status_code == 200:
-            logging.info(f"Get formula value in page {page_id} successfully.")
-            return response.json()["formula"]["number"]
-        else:
+        if response.status_code != 200:
             logging.error(
                 f"Error getting formula value in page {page_id}. code: {response.status_code}"
             )
             return None
+        logging.debug(f"Page {page_id} type: {response.json()["type"]}")
+        return response.json()
+
+    def getSumFromAsset(self, page_id : str) -> float:
+        logging.debug(f"Get Sum from asset page {page_id}")
+        page_json = self.getNotionPage(page_id)
+        for key in page_json["properties"]:
+            if key == "Sum":
+                sum_formula_value = page_json["properties"][key]["formula"]["number"]
+                logging.debug(f"Sum formula value: {sum_formula_value}")
+                return sum_formula_value
 
     def getEntitiesFromDashboard(self, entities) -> dict:
         ret = {}
@@ -205,32 +213,54 @@ class Notion:
         ) as bar:
             for entry in entities:
                 properties = entry["properties"]
+
+                # token
                 try:
                     token = properties["Token"]["title"][0]["text"]["content"]
                 except:
                     logging.error(f"Invalid token entry in Dashboard: {entry["id"]}")
                     continue
-                if properties["Price/Coin (€)"]["number"] is None:
+
+                # price
+                if properties["Price/Coin"]["number"] is None:
                     price = 0
                 else:
-                    price = float(properties["Price/Coin (€)"]["number"])
+                    price = float(properties["Price/Coin"]["number"])
                 
-                logging.debug(f"Coins in wallet: {properties["Coins in wallet"]}")
+                # coins in wallet
+                logging.debug(f"Coins in wallet type: {properties["Coins in wallet"]["type"]}")
                 if properties["Coins in wallet"]["type"] == "number":
                     count = float(properties["Coins in wallet"]["number"])
                 elif properties["Coins in wallet"]["type"] == "rollup":
-                    count = float(properties["Coins in wallet"]["rollup"]["number"])
+                    page_json = self.getNotionPageProperties(entry["id"], properties["Coins in wallet"]["id"])
+                    if page_json["type"] == "property_item":
+                        logging.debug(f"Property results: {page_json["results"]}")
+                        if not page_json["results"]:
+                            logging.error(f"Invalid property results: empty")
+                            count = 0
+                        elif page_json["results"][0]["type"] == "relation":
+                            asset_pageid = page_json["results"][0]["relation"]["id"]
+                            count = self.getSumFromAsset(asset_pageid)
+                        elif page_json["results"][0]["type"] == "formula":
+                            count = page_json["results"][0]["formula"]["number"]
+                        else:
+                            logging.error(f"Invalid property results type {page_json["results"][0]["type"]}. Type expected : relation or formula")
+                            continue
+                    else:
+                        logging.error(f"Invalid property type {page_json["type"]}. Type expected : property_item")
+                        continue
                 else:
                     count = -1
 
-                logging.debug(f"Token: {token}, Price: {price}, Count: {count}")
+                logging.debug(f"Token: {token}, Price/Coin: {price}, Coins in wallet: {count}")
                 ret[token] = {}
-                ret[token]["Price/Coin (€)"] = price
+                ret[token]["Price/Coin"] = price
                 ret[token]["Coins in wallet"] = count
                 bar()
         return ret
 
-    def getEntitiesFromAssets(self, entities) -> dict:
+
+"""     def getEntitiesFromAssets(self, entities) -> dict:
         sum_formula_id = None
         ret = {}
         with alive_bar(
@@ -246,10 +276,10 @@ class Notion:
 
                 if sum_formula_id is None:
                     sum_formula_id = properties["Sum"]["id"]
-                sum = self.getNotionFormlaValue(entry["id"], sum_formula_id)
+                sum = self.getNotionValueFromPage(entry["id"], sum_formula_id)
 
                 logging.debug(f"Token: {token}, Sum: {sum}")
                 ret[token] = {}
                 ret[token]["sum"] = sum
                 bar()
-        return ret
+        return ret """

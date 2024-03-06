@@ -18,6 +18,7 @@ if __name__ == "__main__":
         coinmarketcap_api_token = config["DEFAULT"]["coinmarketcap_token"]
         database = config["Notion"]["database"]
         parent_page = config["Notion"]["parent_page"]
+        debug = (True if config["DEFAULT"]["debug"] == "True" else False)
 
     except KeyError as ke:
         logging.error("Error: " + type(ke).__name__ + " - " + str(ke))
@@ -31,7 +32,7 @@ if __name__ == "__main__":
         quit()
             
     #update database with current market values
-    Updater(coinmarketcap_api_token, notion_api_token, db_id).UpdateCrypto()
+    Updater(coinmarketcap_api_token, notion_api_token, db_id).UpdateCrypto(debug=debug)
 
     #export database to csv file. 
     # destination: ./archives/[epoch]/*.csv
