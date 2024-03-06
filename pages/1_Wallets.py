@@ -2,6 +2,7 @@ import configparser
 import os
 import streamlit as st
 import pandas as pd
+import logging
 import matplotlib.pyplot as plt
 from modules.data import Data
 
@@ -11,10 +12,13 @@ def getData():
     return Data(dbfile)
 
 def display_as_pie(df):
+    logging.debug(f"Display as pie: {df}")
     if df.empty:
         return None
-    values = df.values.tolist()[0]
+    values = df.values.tolist()[-1]
     labels = df.columns.tolist()
+    logging.info(f"Pie labels: {labels}")
+    logging.info(f"Pie values: {values}")
     plt.figure(figsize=(10,10), facecolor='white')
     ax1 = plt.subplot()
     ax1.pie(values, labels=labels)

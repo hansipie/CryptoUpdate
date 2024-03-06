@@ -5,8 +5,8 @@ from st_pages import Page, add_page_title, show_pages
 from modules.data import Data
  
 
-#logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+#logging to file
+logging.basicConfig(filename='./data/trace.log', level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 @st.cache_data(show_spinner=False)
 def getData():

@@ -236,7 +236,7 @@ class Notion:
                     if page_json["type"] == "property_item":
                         logging.debug(f"Property results: {page_json["results"]}")
                         if not page_json["results"]:
-                            logging.error(f"Invalid property results: empty")
+                            logging.error(f"Invalid property results for {token}: empty")
                             count = 0
                         elif page_json["results"][0]["type"] == "relation":
                             asset_pageid = page_json["results"][0]["relation"]["id"]
