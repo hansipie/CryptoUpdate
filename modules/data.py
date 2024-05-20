@@ -36,8 +36,7 @@ class Data:
         self.df_sum = pd.DataFrame(columns=["datetime", "value"])
         for mytime in df_temp["timestamp"]:
             dftmp = pd.read_sql_query(
-                "SELECT ROUND(sum(price*(CASE WHEN count IS NOT NULL THEN count ELSE 0 END)), 2) as value, DATETIME(timestamp, 'unixepoch') AS datetime from Database WHERE timestamp = "
-                + str(mytime),
+                f"SELECT ROUND(sum(price*(CASE WHEN count IS NOT NULL THEN count ELSE 0 END)), 2) as value, DATETIME(timestamp, 'unixepoch') AS datetime from Database WHERE timestamp = {str(mytime)};",
                 con,
             )
             self.df_sum.loc[len(self.df_sum)] = [
@@ -50,9 +49,7 @@ class Data:
         df_tokens = pd.read_sql_query("select DISTINCT token from Database", con)
         for token in df_tokens["token"]:
             df = pd.read_sql_query(
-                f"SELECT DATETIME(timestamp, 'unixepoch') AS datetime, ROUND(price*(CASE WHEN count IS NOT NULL THEN count ELSE 0 END), 2) AS {token} FROM Database WHERE token = '"
-                + token
-                + "' ORDER BY timestamp;",
+                f"SELECT DATETIME(timestamp, 'unixepoch') AS datetime, ROUND(price*(CASE WHEN count IS NOT NULL THEN count ELSE 0 END), 2) AS '{token}' FROM Database WHERE token = '{token}' ORDER BY timestamp;",
                 con,
             )
             df.set_index("datetime", inplace=True)
@@ -62,9 +59,7 @@ class Data:
                 self.df_balance = self.df_balance.join(df, how="outer")
 
             df = pd.read_sql_query(
-                f"SELECT DATETIME(timestamp, 'unixepoch') AS datetime, count AS {token} FROM Database WHERE token = '"
-                + token
-                + "' ORDER BY timestamp;",
+                f"SELECT DATETIME(timestamp, 'unixepoch') AS datetime, count AS '{token}' FROM Database WHERE token = '{token}' ORDER BY timestamp;",
                 con,
             )
             df.set_index("datetime", inplace=True)
@@ -74,9 +69,7 @@ class Data:
                 self.df_tokencount = self.df_tokencount.join(df, how="outer")
 
             df = pd.read_sql_query(
-                f"SELECT DATETIME(timestamp, 'unixepoch') AS datetime, price AS {token} FROM Database WHERE token = '"
-                + token
-                + "' ORDER BY timestamp;",
+                f"SELECT DATETIME(timestamp, 'unixepoch') AS datetime, price AS '{token}' FROM Database WHERE token = '{token}' ORDER BY timestamp;",
                 con,
             )
             df.set_index("datetime", inplace=True)
