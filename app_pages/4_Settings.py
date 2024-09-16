@@ -5,7 +5,6 @@ import traceback
 
 from modules.Notion import Notion 
 
-st.set_page_config(layout="wide")
 st.title("Settings")
 
 if not os.path.exists("./data"):

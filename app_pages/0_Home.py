@@ -1,30 +1,13 @@
 import os
-import logging
 import streamlit as st
-from st_pages import Page, add_page_title, show_pages
 from modules.data import Data
- 
-
-#logging to file
-logging.basicConfig(filename='./data/trace.log', level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 @st.cache_data(show_spinner=False)
 def getData():
     db_path = "./data/db.sqlite3"
     return Data(db_path)
 
-show_pages(
-    [
-        Page("0_Home.py", "Home", "🏠"),
-        Page("pages/1_Wallets.py", "Wallets", "💰"),
-        Page("pages/2_Import.py", "Import", "📥"),
-        Page("pages/3_Update.py", "Update", "🔄"),
-        Page("pages/4_Settings.py", "Settings", "⚙️")
-    ]
-)
-
-st.set_page_config(layout="wide")
-add_page_title("WalletVision")
+st.title("WalletVision")
 
 configfilepath = "./data/settings.ini"
 if not os.path.exists(configfilepath):

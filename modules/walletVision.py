@@ -3,10 +3,12 @@ import json
 import argparse
 import io
 import traceback
+import logging
 from dotenv import load_dotenv
 from openai import OpenAI
 from PIL import Image
 
+logger = logging.getLogger(__name__)
 
 def get_image_type(image: bytes):
     try:
@@ -14,7 +16,7 @@ def get_image_type(image: bytes):
         with Image.open(image_file) as img:
             return img.format.lower()
     except IOError as e:
-        print(e)
+        logger.debug(e)
         return None
 
 
@@ -25,10 +27,10 @@ def extract_crypto(bytes_data, api_key):
 
     type_image = get_image_type(bytes_data)
     if type_image is None:
-        print("Invalid image.")
+        logger.debug("Invalid image.")
         return None, None
     else:
-        print(f"Image type: {type_image}")
+        logger.debug(f"Image type: {type_image}")
 
     base64_image = base64.b64encode(bytes_data).decode("utf-8")
 
@@ -51,7 +53,7 @@ def extract_crypto(bytes_data, api_key):
     ]
 
     try:
-        print("Processing image...")
+        logger.debug("Processing image...")
         response = model.chat.completions.create(
             model="gpt-4-vision-preview",
             messages=messages,
@@ -64,10 +66,10 @@ def extract_crypto(bytes_data, api_key):
     message = response.choices[0].message
     nbr_tokens = response.usage.total_tokens
     total_tokens += nbr_tokens
-    print(f"Number of tokens used: {nbr_tokens}")
+    logger.debug(f"Number of tokens used: {nbr_tokens}")
 
     if "NO_DATA" in message.content:
-        print("Invalid image.")
+        logger.debug("Invalid image.")
         return None, None
 
     messages = [{"role": "assistant", "content": message.content}]
@@ -77,7 +79,7 @@ def extract_crypto(bytes_data, api_key):
     )
 
     try:
-        print("Converting to JSON...")
+        logger.debug("Converting to JSON...")
         response = model.chat.completions.create(
             model="gpt-3.5-turbo-1106",
             messages=messages,
@@ -91,7 +93,7 @@ def extract_crypto(bytes_data, api_key):
     message = response.choices[0].message
     nbr_tokens = response.usage.total_tokens
     total_tokens += nbr_tokens
-    print(f"Number of tokens used: {nbr_tokens}")
+    logger.debug(f"Number of tokens used: {nbr_tokens}")
 
     message_json = json.loads(message.content)
 
@@ -112,5 +114,5 @@ if __name__ == "__main__":
 
     with open(args.file, "rb") as f:
         message_json, tokens = extract_crypto(f.read())
-        print(f"Ouput: {message_json}")
-        print(f"Tokens used: {tokens}")
+        logger.debug(f"Ouput: {message_json}")
+        logger.debug(f"Tokens used: {tokens}")

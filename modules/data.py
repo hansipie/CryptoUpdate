@@ -1,9 +1,8 @@
-import os
 import sqlite3
 import pandas as pd
-import streamlit as st
+import logging
 
-
+logger = logging.getLogger(__name__)
 class Data:
     def __init__(self, db_path):
         self.db_path = db_path
@@ -15,7 +14,7 @@ class Data:
         self.make_data()
 
     def initDatabase(self):
-        print("Init database")
+        logger.debug("Init database")
         con = sqlite3.connect(self.db_path)
         cur = con.cursor()
         cur.execute(
@@ -25,7 +24,7 @@ class Data:
         con.close()
 
     def make_data(self):
-        print("Make dataframes")
+        logger.debug("Make dataframes")
 
         con = sqlite3.connect(self.db_path)
 
@@ -87,4 +86,4 @@ class Data:
         self.df_market.sort_index()
 
         con.close()
-        print("Dataframes loaded")
+        logger.debug("Dataframes loaded")

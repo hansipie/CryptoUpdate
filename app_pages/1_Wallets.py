@@ -6,26 +6,28 @@ import logging
 import matplotlib.pyplot as plt
 from modules.data import Data
 
+logger = logging.getLogger(__name__)
+
 @st.cache_data(show_spinner=False)
 def getData():
     dbfile = "./data/db.sqlite3"
     return Data(dbfile)
 
 def display_as_pie(df):
-    logging.debug(f"Display as pie: {df}")
+    logger.debug(f"Display as pie: {df}")
     if df.empty:
         return None
     values = df.values.tolist()[-1]
     labels = df.columns.tolist()
-    logging.info(f"Pie labels: {labels}")
-    logging.info(f"Pie values: {values}")
+    logger.info(f"Pie labels: {labels}")
+    logger.info(f"Pie values: {values}")
     plt.figure(figsize=(10,10), facecolor='white')
     ax1 = plt.subplot()
     ax1.pie(values, labels=labels)
     st.pyplot(plt)
 
 def build_tabs(df):
-    print("Build tabs")
+    logger.debug("Build tabs")
     if startdate < enddate:
         tokens=list(df.columns)
         st.session_state.options = st.multiselect("Select Tokens to display", tokens)
@@ -43,8 +45,6 @@ def build_tabs(df):
         st.session_state.options_save = options
     else:
         st.error('End date must be after start date')  
-
-st.set_page_config(layout="wide")
 
 configfilepath = "./data/settings.ini"
 if not os.path.exists(configfilepath):
@@ -73,7 +73,7 @@ if add_selectbox != 'Global':
     enddate = st.sidebar.date_input('End date', value=pd.to_datetime('today'))
 
 if add_selectbox == 'Global':
-    print("Global")
+    logger.debug("Global")
     st.title("Global")
 
     # get last values
@@ -95,17 +95,17 @@ if add_selectbox == 'Global':
     display_as_pie(df_balances.tail(5))
 
 if add_selectbox == 'Assets Value':
-    print("Assets Value")
+    logger.debug("Assets Value")
     st.title("Assets Value")
     build_tabs(df_balances)
 
 if add_selectbox == 'Assets Count':
-    print("Assets Count")
+    logger.debug("Assets Count")
     st.title("Assets Count")
     build_tabs(df_count)
 
 if add_selectbox == 'Market':
-    print("Market")
+    logger.debug("Market")
     st.title("Market")
     build_tabs(df_market)
 

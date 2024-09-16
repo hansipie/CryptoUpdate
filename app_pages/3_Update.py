@@ -10,7 +10,7 @@ from modules.Notion import Notion
 from modules.Updater import Updater
 from modules.process import getDateFrame, dropDuplicate
 
-st.set_page_config(layout="centered")
+logger = logging.getLogger(__name__)
 
 configfilepath = "./data/settings.ini"
 if not os.path.exists(configfilepath):
@@ -110,7 +110,7 @@ with st.form(key="process_archives"):
             count = 0
             for folder in archivedirs:
                 count += 1
-                print(f"Migrating {folder}")
+                logger.debug(f"Migrating {folder}")
                 migrate_bar.progress(int((100 * count)/ len(archivedirs)), text=f"Migrating {folder}")
                 if folder.isnumeric():
                     epoch = int(folder)

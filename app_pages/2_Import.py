@@ -3,38 +3,23 @@ import streamlit as st
 import io
 import os
 import configparser
+import logging
 from modules import walletVision
 from PIL import Image
 
+logger = logging.getLogger(__name__)
 
-def processImg(image_bytes) -> bytes:
+def decodeImg(image_bytes) -> bytes:
     image_file = io.BytesIO(image_bytes)
-    with Image.open(image_file) as img:
+    with processImg.open(image_file) as img:
         maxsize = 1280
-        img.thumbnail((maxsize, maxsize), Image.LANCZOS)
+        img.thumbnail((maxsize, maxsize), processImg.LANCZOS)
         img_bytes = io.BytesIO()
         img.save(img_bytes, format="PNG")
         return img_bytes.getvalue()
 
-configfilepath = "./data/settings.ini"
-if not os.path.exists(configfilepath):
-    st.error("Please set your settings in the settings page")
-    st.stop()
-
-config = configparser.ConfigParser()
-config.read(configfilepath)
-
-try:
-    debugflag = (True if config["DEFAULT"]["debug"] == "True" else False)
-except KeyError:
-    debugflag = False
-
-st.set_page_config(layout="wide")
-st.title("Import")
-
-file = st.file_uploader("Upload a file", type=["png", "jpg", "jpeg"])
-if file is not None:
-    imagefile = processImg(file.getvalue())
+def processImg(file):
+    imagefile = decodeImg(file.getvalue())
     with st.form(key="my_form"):
         col_img, col_json = st.columns(2)
         with col_img:
@@ -74,3 +59,33 @@ if file is not None:
                 
                 st.write(message_json)
                 st.balloons()
+
+def processCSV(file) -> str:
+    st.write(file.getvalue().decode("utf-8"))
+
+configfilepath = "./data/settings.ini"
+if not os.path.exists(configfilepath):
+    st.error("Please set your settings in the settings page")
+    st.stop()
+
+config = configparser.ConfigParser()
+config.read(configfilepath)
+
+try:
+    debugflag = (True if config["DEFAULT"]["debug"] == "True" else False)
+except KeyError:
+    debugflag = False
+
+st.title("Import")
+
+file = st.file_uploader("Upload a file", type=["png", "jpg", "jpeg", "csv"])
+
+if file is not None:
+    logger.debug(f"File: {file} - file type: {file.type}")
+    if file.type == "application/vnd.ms-excel":
+        st.write("CSV file detected")
+        processCSV(file)
+    else:
+        st.write("Image file detected")
+        processImg(file)
+

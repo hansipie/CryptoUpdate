@@ -1,12 +1,12 @@
-import os
 import sqlite3
-import time
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
+import logging
 
-st.set_page_config(layout="wide")
-
+logger = logging.getLogger(__name__)
+debugflag = True
+ 
 def display_as_pie(df):
     values = df.values.tolist()[0]
     labels = df.columns.tolist()
@@ -17,7 +17,7 @@ def display_as_pie(df):
 
 @st.cache_data
 def make_sum() -> pd.DataFrame:
-    print("Make sum df")
+    logger.debug("Make sum df")
     con = sqlite3.connect('./data/db.sqlite3')
     df_timestamp = pd.read_sql_query("SELECT DISTINCT timestamp from Database ORDER BY timestamp", con)
     df = pd.DataFrame(columns=['datetime', 'value'])
@@ -26,12 +26,12 @@ def make_sum() -> pd.DataFrame:
         df.loc[len(df)] = [dftmp['datetime'][0], dftmp['value'][0]]
     df.set_index('datetime', inplace=True)
     con.close()
-    print("Archive loaded")
+    logger.debug("Archive loaded")
     return df
 
 @st.cache_data
 def get_balances() -> pd.DataFrame:
-    print("Get balances df")
+    logger.debug("Get balances df")
     con = sqlite3.connect('./data/db.sqlite3')
     df_result  = pd.DataFrame()
     df_tokens = pd.read_sql_query("select DISTINCT token from Database", con)
@@ -41,13 +41,13 @@ def get_balances() -> pd.DataFrame:
         df_result = pd.concat([df_result, df], axis=1)   
     df_result = df_result.fillna(0)
     df_result.sort_index()
-    print(df_result.tail(1))
+    logger.debug(df_result.tail(1))
     con.close()
     return df_result
 
 @st.cache_data
 def get_tokencount() -> pd.DataFrame:
-    print("Get tokencount df")
+    logger.debug("Get tokencount df")
     dbfile = "./data/db.sqlite3"
     con = sqlite3.connect(dbfile)
     df_result  = pd.DataFrame()
@@ -58,13 +58,13 @@ def get_tokencount() -> pd.DataFrame:
         df_result = pd.concat([df_result, df], axis=1)   
     df_result = df_result.fillna(0)
     df_result.sort_index()
-    print(df_result.tail(1))
+    logger.debug(df_result.tail(1))
     con.close()
     return df_result
 
 @st.cache_data
 def get_market() -> pd.DataFrame:
-    print("Get market df")
+    logger.debug("Get market df")
     if debugflag:
         con = sqlite3.connect('./data/db_debug.sqlite3')
     else:
@@ -77,12 +77,12 @@ def get_market() -> pd.DataFrame:
         df_result = pd.concat([df_result, df], axis=1)   
     df_result = df_result.fillna(0)
     df_result.sort_index()
-    print(df_result.tail(1))
+    logger.debug(df_result.tail(1))
     con.close()
     return df_result
 
 def build_tabs(df):
-    print("Build tabs")
+    logger.debug("Build tabs")
     if startdate < enddate:
         tokens=list(df.columns)
         st.session_state.options = st.multiselect("Select Tokens to display", tokens)
@@ -125,7 +125,7 @@ if 'options_save' not in st.session_state:
     st.session_state.options_save = []
 
 if add_selectbox == 'Global':
-    print("Global")
+    logger.debug("Global")
     st.title("Global")
 
     # get last values
@@ -147,17 +147,17 @@ if add_selectbox == 'Global':
     display_as_pie(last)
 
 if add_selectbox == 'Assets Value':
-    print("Assets Value")
+    logger.debug("Assets Value")
     st.title("Assets Value")
     build_tabs(df_balances)
 
 if add_selectbox == 'Assets Count':
-    print("Assets Count")
+    logger.debug("Assets Count")
     st.title("Assets Count")
     build_tabs(df_count)
 
 if add_selectbox == 'Market':
-    print("Market")
+    logger.debug("Market")
     st.title("Market")
     build_tabs(df_market)
 

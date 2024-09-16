@@ -15,3 +15,4 @@ settings.ini
 syncArchives.py
 .github/dependabot.yml
 .devcontainer/devcontainer.json
+backend/db.sqlite3

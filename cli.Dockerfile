@@ -30,4 +30,4 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
 # Définissez la commande pour exécuter votre application
-CMD python updateNotion.py
+CMD python updateNotion_cli.py

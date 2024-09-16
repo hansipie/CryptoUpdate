@@ -1,0 +1,12 @@
+requests
+alive_progress
+pandas
+dash
+streamlit
+st_pages
+matplotlib
+python-dotenv
+pillow
+openai
+django
+typer
