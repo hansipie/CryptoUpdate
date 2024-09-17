@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import logging
 
 logger = logging.getLogger(__name__)
-debugflag = True
+debugflag = False
  
 def display_as_pie(df):
     values = df.values.tolist()[0]
@@ -36,7 +36,7 @@ def get_balances() -> pd.DataFrame:
     df_result  = pd.DataFrame()
     df_tokens = pd.read_sql_query("select DISTINCT token from Database", con)
     for token in df_tokens['token']:
-        df = pd.read_sql_query(f"SELECT DATETIME(timestamp, 'unixepoch') AS datetime, ROUND(price*(CASE WHEN count IS NOT NULL THEN count ELSE 0 END), 2) AS {token} FROM Database WHERE token = '"+token+"' ORDER BY timestamp;", con)
+        df = pd.read_sql_query(f"SELECT DATETIME(timestamp, 'unixepoch') AS datetime, ROUND(price*(CASE WHEN count IS NOT NULL THEN count ELSE 0 END), 2) AS '{token}' FROM Database WHERE token = '"+token+"' ORDER BY timestamp;", con)
         df.set_index('datetime', inplace=True)
         df_result = pd.concat([df_result, df], axis=1)   
     df_result = df_result.fillna(0)
@@ -53,7 +53,7 @@ def get_tokencount() -> pd.DataFrame:
     df_result  = pd.DataFrame()
     df_tokens = pd.read_sql_query("select DISTINCT token from Database", con)
     for token in df_tokens['token']:
-        df = pd.read_sql_query(f"SELECT DATETIME(timestamp, 'unixepoch') AS datetime, count AS {token} FROM Database WHERE token = '"+token+"' ORDER BY timestamp;", con)
+        df = pd.read_sql_query(f"SELECT DATETIME(timestamp, 'unixepoch') AS datetime, count AS '{token}' FROM Database WHERE token = '"+token+"' ORDER BY timestamp;", con)
         df.set_index('datetime', inplace=True)
         df_result = pd.concat([df_result, df], axis=1)   
     df_result = df_result.fillna(0)
@@ -70,7 +70,7 @@ def get_market() -> pd.DataFrame:
     else:
         con = sqlite3.connect('./data/db.sqlite3')
     df_result  = pd.DataFrame()
-    df_tokens = pd.read_sql_query("select DISTINCT token from Database", con)
+    df_tokens = pd.read_sql_query("SELECT DISTINCT token FROM Database", con)
     for token in df_tokens['token']:
         df = pd.read_sql_query(f"SELECT DATETIME(timestamp, 'unixepoch') AS datetime, price AS {token} FROM Database WHERE token = '"+token+"' ORDER BY timestamp;", con)
         df.set_index('datetime', inplace=True)

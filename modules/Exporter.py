@@ -8,9 +8,10 @@ from modules import Notion
 
 class Exporter:
 
-    def __init__(self, notion_apikey):
+    def __init__(self, notion_apikey, archive_path):
         self.notion = Notion.Notion(notion_apikey)
         self.epochstr = str(math.floor(time.time()))
+        self.archive_path = archive_path
 
     def __getDashboardData(self, database_name):
         """Get the dashboard data from notion"""
@@ -24,7 +25,7 @@ class Exporter:
 
     def GetCSVfile(self, database_name):
         
-        destpath = os.path.join(os.getcwd(), "archives", f"{self.epochstr}.csv")
+        destpath = os.path.join(self.archive_path, f"{self.epochstr}.csv")
         dashboard = self.__getDashboardData(database_name)
 
         #save dict to csv file
