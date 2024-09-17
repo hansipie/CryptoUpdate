@@ -1,16 +1,18 @@
 import configparser
 import logging
+import typer
+from enum import Enum
 from modules.Exporter import Exporter
 from modules.Notion import Notion
 from modules.Updater import Updater
 
 #logging
-logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-if __name__ == "__main__":
-
+def updateNotion(inifile: str):
+ 
     config = configparser.ConfigParser()
-    config.read('./data/settings.ini')
+    config.read(inifile)
 
     try:
         #read config
@@ -34,9 +36,12 @@ if __name__ == "__main__":
     #update database with current market values
     Updater(coinmarketcap_api_token, notion_api_token, db_id).UpdateCrypto(debug=debug)
 
-    #export database to csv file. 
+    #export database to file. 
     # destination: ./archives/[epoch]/*.csv
-    csvfile = Exporter(notion_api_token).GetCSVfile(database)
-    logging.info(f"Output file: {csvfile}")
+    file = Exporter(notion_api_token).GetCSVfile(database)
+
+    logging.info(f"Output file: {file}")
     logging.info("Done.")
 
+if __name__ == "__main__":
+    typer.run(updateNotion)

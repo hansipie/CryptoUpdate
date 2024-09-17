@@ -16,13 +16,12 @@ def dropDuplicate(conn):
         df.drop_duplicates(inplace=True)
         df.to_sql('Database', conn, if_exists='replace', index=False)
 
-def getDateFrame(inputfile, epoch):
+def getDateFrame(inputfile):
     logger.debug(f"Reading {inputfile}")
     df = pd.read_csv(inputfile)
     df.fillna(0, inplace=True)
-    dftemp = df[["Token","Price/Coin","Coins in wallet"]]
-    dftemp.columns = ["token","price","count"]
+    dftemp = df[["Token","Price/Coin","Coins in wallet", "Timestamp"]]
+    dftemp.columns = ["token","price","count", "timestamp"]
     dfret = dftemp.copy()
-    dfret['timestamp'] = epoch
     logger.debug(f"Found {len(dfret)} rows")
     return dfret

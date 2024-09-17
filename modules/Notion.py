@@ -218,7 +218,7 @@ class Notion:
                 try:
                     token = properties["Token"]["title"][0]["text"]["content"]
                 except:
-                    logging.error(f"Invalid token entry in Dashboard: {entry["id"]}")
+                    logging.warning(f"Invalid token entry in Dashboard: {entry["id"]}")
                     continue
 
                 # price
@@ -236,7 +236,7 @@ class Notion:
                     if page_json["type"] == "property_item":
                         logging.debug(f"Property results: {page_json["results"]}")
                         if not page_json["results"]:
-                            logging.error(f"Invalid property results for {token}: empty")
+                            logging.debug(f"Property 'results' is empty for {token}")
                             count = 0
                         elif page_json["results"][0]["type"] == "relation":
                             asset_pageid = page_json["results"][0]["relation"]["id"]
@@ -244,10 +244,10 @@ class Notion:
                         elif page_json["results"][0]["type"] == "formula":
                             count = page_json["results"][0]["formula"]["number"]
                         else:
-                            logging.error(f"Invalid property results type {page_json["results"][0]["type"]}. Type expected : relation or formula")
+                            logging.warning(f"Invalid property results type {page_json["results"][0]["type"]}. Type expected : relation or formula")
                             continue
                     else:
-                        logging.error(f"Invalid property type {page_json["type"]}. Type expected : property_item")
+                        logging.warning(f"Invalid property type {page_json["type"]}. Type expected : property_item")
                         continue
                 else:
                     count = -1
@@ -258,28 +258,3 @@ class Notion:
                 ret[token]["Coins in wallet"] = count
                 bar()
         return ret
-
-
-"""     def getEntitiesFromAssets(self, entities) -> dict:
-        sum_formula_id = None
-        ret = {}
-        with alive_bar(
-            len(entities), title="Get token counts", force_tty=True, stats="(eta:{eta})"
-        ) as bar:
-            for entry in entities:
-                properties = entry["properties"]
-                try:
-                    token = properties["Token"]["title"][0]["text"]["content"]
-                except:
-                    logging.error(f"Invalid token entry in Assets: {entry["id"]}")
-                    continue
-
-                if sum_formula_id is None:
-                    sum_formula_id = properties["Sum"]["id"]
-                sum = self.getNotionValueFromPage(entry["id"], sum_formula_id)
-
-                logging.debug(f"Token: {token}, Sum: {sum}")
-                ret[token] = {}
-                ret[token]["sum"] = sum
-                bar()
-        return ret """

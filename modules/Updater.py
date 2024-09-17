@@ -36,16 +36,10 @@ class Updater:
         """
         Get the price of the cryptocurrencies from the Coinmarketcap API
         """
-        # names = ""
-        # for name in self.notion_entries:
-        #     if len(names) > 0:
-        #         names += ","
-        #     names += name
         names = str(",").join(self.notion_entries)
-        ##
         logging.info(f"Request tokens current prices for {names}")
         if debug:
-            logging.debug(
+            logging.info(
                 "Debug mode: use sandbox-api.coinmarketcap.com instead of pro-api.coinmarketcap.com"
             )
             url = (
