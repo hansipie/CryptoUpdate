@@ -7,7 +7,7 @@ def getData():
     db_path = "./data/db.sqlite3"
     return Data(db_path)
 
-st.title("WalletVision")
+st.title("Crypto Update")
 
 configfilepath = "./data/settings.ini"
 if not os.path.exists(configfilepath):

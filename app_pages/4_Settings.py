@@ -85,13 +85,13 @@ with apikeys_tab:
             col1, col2 = st.columns(2)
             with col1:
                 st.subheader("Notion")
-                notion_token = st.text_input("Notion API token", value=config["DEFAULT"]["notion_token"])
+                notion_token = st.text_input("Notion API token", value=config["DEFAULT"]["notion_token"], type="password")
             with col2:
                 st.subheader("Coinmarketcap")
-                coinmarketcap_token = st.text_input("Coinmarketcap API token", value=config["DEFAULT"]["coinmarketcap_token"])
+                coinmarketcap_token = st.text_input("Coinmarketcap API token", value=config["DEFAULT"]["coinmarketcap_token"], type="password")
             with col1:
                 st.subheader("OpenAI")
-                openai_token = st.text_input("OpenAI API token", value=config["DEFAULT"]["openai_token"])
+                openai_token = st.text_input("OpenAI API token", value=config["DEFAULT"]["openai_token"], type="password")
             with col2:
                 st.subheader("Debug")
                 debug = st.checkbox("Debug", value=(True if config["DEFAULT"]["debug"] == "True" else False))

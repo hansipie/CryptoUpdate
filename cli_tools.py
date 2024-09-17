@@ -21,25 +21,6 @@ logger = logging.getLogger(__name__)
 
 app = typer.Typer()
 
-def __listfilesrecursive(directory, fileslist=None):
-    # list all files in directory recurcively
-
-    if fileslist is None:
-        fileslist = []
-
-    items = os.listdir(directory)
-    logger.debug(f"list directory {directory}: {items}")
-    for item in items:
-        path = os.path.join(directory, item)
-        if os.path.isdir(path):
-            logger.debug(f"{path} is a directory.")
-            __listfilesrecursive(path, fileslist)
-        else:
-            logger.debug(f"Add file {path}")
-            fileslist.append(path)
-    logger.debug(f"Return {fileslist}")
-    return fileslist
-
 @app.command()
 def addTimestamps(inifile: str):
     """
@@ -64,7 +45,7 @@ def addTimestamps(inifile: str):
         logging.error("Please set your settings in the settings file")
         quit()
 
-    listdirs = os.listdir(directory)
+    listdirs = list(filter(lambda x : os.path.isdir(os.path.join(directory, x)), os.listdir(directory)))
     count = len(listdirs)
     with alive_bar(
         count, title="Add timestamp", force_tty=True, stats="(eta:{eta})"
@@ -122,7 +103,7 @@ def saveToDB(inifile):
 
     conn = sqlite3.connect(dbfile)
 
-    archiveFiles = __listfilesrecursive(archive_path)
+    archiveFiles = process.listfilesrecursive(archive_path)
     count = len(archiveFiles)
     with alive_bar(
         count, title="Insert in database", force_tty=True, stats="(eta:{eta})"

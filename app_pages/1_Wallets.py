@@ -14,13 +14,23 @@ def getData():
     return Data(dbfile)
 
 def display_as_pie(df):
-    logger.debug(f"Display as pie: {df}")
-    if df.empty:
-        return None
-    values = df.values.tolist()[-1]
+    df = df.iloc[[-1]] # on ne prend que la derniere ligne
+    
+    # find value of 1% of the total
+    total = df.sum(axis=1).values[0]
+    limit = (1 * total)/100
+    logger.debug(f"1% of {total} is {limit}")
+
+    # Group token representing less then 1% of total value
+    dfothers = df.loc[:, (df < limit).all(axis=0)]
+    df = df.loc[:, (df >= limit).all(axis=0)]
+    df['Others'] = dfothers.sum(axis=1)
+
     labels = df.columns.tolist()
+    values = df.values.tolist()[0]
     logger.info(f"Pie labels: {labels}")
     logger.info(f"Pie values: {values}")
+
     plt.figure(figsize=(10,10), facecolor='white')
     ax1 = plt.subplot()
     ax1.pie(values, labels=labels)

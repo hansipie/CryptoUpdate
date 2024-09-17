@@ -1,5 +1,6 @@
 import pandas as pd
 import logging
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -25,3 +26,22 @@ def getDateFrame(inputfile):
     dfret = dftemp.copy()
     logger.debug(f"Found {len(dfret)} rows")
     return dfret
+
+def listfilesrecursive(directory, fileslist=None):
+    # list all files in directory recurcively
+
+    if fileslist is None:
+        fileslist = []
+
+    items = os.listdir(directory)
+    #logger.debug(f"list directory {directory}: {items}")
+    for item in items:
+        path = os.path.join(directory, item)
+        if os.path.isdir(path):
+            #logger.debug(f"{path} is a directory.")
+            listfilesrecursive(path, fileslist)
+        else:
+            #logger.debug(f"Add file {path}")
+            fileslist.append(path)
+    #logger.debug(f"Return {fileslist}")
+    return fileslist
