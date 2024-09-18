@@ -5,7 +5,7 @@ import sys
 st.set_page_config(layout="wide", page_title="CryptoUpdate", page_icon="📈")
 
 logging.basicConfig(
-    level=logging.DEBUG,
+    level=logging.INFO,
     format="%(asctime)s - %(levelname)s - %(name)s - %(pathname)s:%(lineno)d - %(message)s",
     handlers=[logging.StreamHandler(sys.stdout)],  # Configurer pour écrire sur stdout
 )

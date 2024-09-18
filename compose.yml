@@ -1,0 +1,17 @@
+services:
+  cryptoupdate:
+    container_name: cryptoupdate
+    build:
+      context: .
+    develop:
+      watch:
+        - action: sync
+          path: .
+          target: /home/docker/
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./archives:/home/docker/archives
+      - ./data:/home/docker/data
+    restart: unless-stopped
+    

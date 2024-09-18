@@ -30,4 +30,4 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
 # Définissez la commande pour exécuter votre application
-CMD streamlit run 0_Home.py --server.port 8080
+ENTRYPOINT streamlit run app.py --server.port 8080

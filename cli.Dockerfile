@@ -13,9 +13,6 @@ USER docker
 # Définissez le répertoire de travail
 WORKDIR /home/docker
 
-# Exposez le port 8080
-EXPOSE 8080
-
 # Add directoty to the PATH
 ENV PATH="/home/docker/.local/bin:${PATH}"
 
@@ -30,4 +27,4 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
 # Définissez la commande pour exécuter votre application
-CMD python updateNotion_cli.py
+ENTRYPOINT python cli_tools.py updatenotion ./data/settings.ini
