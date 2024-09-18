@@ -4,8 +4,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.cli
+    image: chrysalide/cryptoupdate_cli:1.2.0
     volumes:
       - ./archives:/home/docker/app/archives
       - ./data:/home/docker/app/data
-
-    
+    restart: "no"
