@@ -1,0 +1,9 @@
+services:
+  cryptoupdate:
+    container_name: cryptoupdate_cli
+    build:
+      context: .
+      dockerfile: Dockerfile.cli
+    restart: "no"
+
+    
