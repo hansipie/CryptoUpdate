@@ -1,9 +1,11 @@
 services:
-  cryptoupdate:
+  cryptoupdate_cli:
     container_name: cryptoupdate_cli
     build:
       context: .
       dockerfile: Dockerfile.cli
-    restart: "no"
+    volumes:
+      - ./archives:/home/docker/app/archives
+      - ./data:/home/docker/app/data
 
     

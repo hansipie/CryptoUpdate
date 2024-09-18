@@ -3,6 +3,7 @@ services:
     container_name: cryptoupdate
     build:
       context: .
+    image: chrysalide/cryptoupdate:1.2.0
     develop:
       watch:
         - action: sync
@@ -14,4 +15,16 @@ services:
       - ./archives:/home/docker/app/archives
       - ./data:/home/docker/app/data
     restart: unless-stopped
+
+  cryptoupdate_cli:
+    container_name: cryptoupdate_cli
+    build:
+      context: .
+      dockerfile: Dockerfile.cli
+    image: chrysalide/cryptoupdate_cli:1.2.0
+    profiles:
+      - cli
+    volumes:
+      - ./archives:/home/docker/app/archives
+      - ./data:/home/docker/app/data
     
