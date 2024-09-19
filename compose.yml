@@ -3,7 +3,7 @@ services:
     container_name: cryptoupdate
     build:
       context: .
-    image: chrysalide/cryptoupdate:1.2.0
+    image: hansipie/cryptoupdate:1.2.0
     develop:
       watch:
         - action: sync
@@ -21,7 +21,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.cli
-    image: chrysalide/cryptoupdate_cli:1.2.0
+    image: hansipie/cryptoupdate_cli:1.2.0
     profiles:
       - cli
     volumes:
