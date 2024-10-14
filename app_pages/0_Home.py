@@ -1,6 +1,8 @@
 import os
 import streamlit as st
 from modules.data import Data
+from modules.plotter import plot_as_graph
+
 
 @st.cache_data(show_spinner=False)
 def getData():
@@ -32,7 +34,8 @@ balance = round(balance, 2)
 
 # show wallet value
 st.header("Wallet value : " + str(balance) + " €")
-st.line_chart(data.df_sum)
+
+plot_as_graph(data.df_sum)
 
 # show last values
 st.header("Last values")

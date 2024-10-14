@@ -3,8 +3,8 @@ import os
 import streamlit as st
 import pandas as pd
 import logging
-import matplotlib.pyplot as plt
 from modules.data import Data
+from modules.plotter import plot_as_graph, plot_as_pie
 
 logger = logging.getLogger(__name__)
 
@@ -12,29 +12,6 @@ logger = logging.getLogger(__name__)
 def getData():
     dbfile = "./data/db.sqlite3"
     return Data(dbfile)
-
-def display_as_pie(df):
-    df = df.iloc[[-1]] # on ne prend que la derniere ligne
-    
-    # find value of 1% of the total
-    total = df.sum(axis=1).values[0]
-    limit = (1 * total)/100
-    logger.debug(f"1% of {total} is {limit}")
-
-    # Group token representing less then 1% of total value
-    dfothers = df.loc[:, (df < limit).all(axis=0)]
-    df = df.loc[:, (df >= limit).all(axis=0)]
-    df['Others'] = dfothers.sum(axis=1)
-
-    labels = df.columns.tolist()
-    values = df.values.tolist()[0]
-    logger.info(f"Pie labels: {labels}")
-    logger.info(f"Pie values: {values}")
-
-    plt.figure(figsize=(10,10), facecolor='white')
-    ax1 = plt.subplot()
-    ax1.pie(values, labels=labels)
-    st.pyplot(plt)
 
 def build_tabs(df):
     logger.debug("Build tabs")
@@ -49,8 +26,10 @@ def build_tabs(df):
                 # print df indexes
                 df_view = df.loc[df.index>str(startdate)]
                 df_view = df_view.loc[df_view.index<str(enddate + pd.to_timedelta(1, unit='d'))]
-                tab.line_chart(df_view[options[count]])    
-                st.write(df_view[options[count]].tail(1))          
+
+                plot_as_graph(df_view, options, count, tab)
+                
+                tab.write(df_view[options[count]].tail(1))          
                 count += 1
         st.session_state.options_save = options
     else:
@@ -93,7 +72,8 @@ if add_selectbox == 'Global':
     
     # show wallet value
     st.header("Wallet value : " + str(balance) + " €")
-    st.line_chart(df_sum)
+    
+    plot_as_graph(df_sum)
 
     # show last values"
     st.header("Last values")
@@ -102,7 +82,7 @@ if add_selectbox == 'Global':
 
     # draw pie
     st.header("Tokens repartition")
-    display_as_pie(df_balances.tail(5))
+    plot_as_pie(df_balances.tail(5))
 
 if add_selectbox == 'Assets Value':
     logger.debug("Assets Value")
