@@ -3,7 +3,6 @@ services:
     container_name: cryptoupdate
     build:
       context: .
-    image: hansipie/cryptoupdate:1.2.0
     develop:
       watch:
         - action: sync

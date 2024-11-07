@@ -1,6 +1,8 @@
 # Utilisez une image Python officielle comme image de base
 FROM python:3-slim
 
+RUN apt update && apt update
+
 # Create a new user and group
 RUN groupadd -r docker -g 1000 && useradd -r -g docker -u 1000 -m -d /home/docker docker
 
@@ -27,6 +29,7 @@ COPY requirements.txt .
 
 # Installez les dépendances Python nécessaires
 RUN pip install --upgrade pip
+RUN pip install cmake --upgrade
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copiez le reste des fichiers du projet dans le répertoire de travail
