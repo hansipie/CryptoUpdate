@@ -16,3 +16,4 @@ syncArchives.py
 .github/dependabot.yml
 .devcontainer/devcontainer.json
 backend/db.sqlite3
+requirements.txt
