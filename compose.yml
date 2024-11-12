@@ -9,21 +9,9 @@ services:
           path: .
           target: /home/docker/app/
     ports:
-      - "8080:8080"
+      - "8042:8080"
     volumes:
       - ./archives:/home/docker/app/archives
       - ./data:/home/docker/app/data
     restart: unless-stopped
-
-  cryptoupdate_cli:
-    container_name: cryptoupdate_cli
-    build:
-      context: .
-      dockerfile: Dockerfile.cli
-    image: hansipie/cryptoupdate_cli:1.2.0
-    profiles:
-      - cli
-    volumes:
-      - ./archives:/home/docker/app/archives
-      - ./data:/home/docker/app/data
     

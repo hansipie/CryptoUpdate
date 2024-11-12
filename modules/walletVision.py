@@ -4,9 +4,11 @@ import argparse
 import io
 import traceback
 import logging
+import pandas as pd
 from dotenv import load_dotenv
 from openai import OpenAI
 from PIL import Image
+
 
 logger = logging.getLogger(__name__)
 
@@ -18,7 +20,6 @@ def get_image_type(image: bytes):
     except IOError as e:
         logger.debug(e)
         return None
-
 
 def extract_crypto(bytes_data, api_key):
     # Create an OpenAI object
@@ -35,12 +36,17 @@ def extract_crypto(bytes_data, api_key):
     base64_image = base64.b64encode(bytes_data).decode("utf-8")
 
     messages = [
+        {"role": "system", "content": "You are a data extraction model."},
         {
             "role": "user",
             "content": [
                 {
                     "type": "text",
-                    "text": "The image contains the content of a cryptocurrency wallet. Extract from the image the amount of each tokens and return the result as a raw json object without extra informations. If you can find any cryptocurrency data in the image, return the string 'NO_DATA'.",
+                    "text": (
+                        "The image contains the amount of a cryptocurrencies in a wallet.\n"
+                        "Extract from the image the amount of each token and/or value, and return the result as a raw json object without extra information.\n"
+                        'If you can not find cryptocurrencies data in the image, return only the string "NO_DATA".'
+                    ),
                 },
                 {
                     "type": "image_url",
@@ -49,13 +55,13 @@ def extract_crypto(bytes_data, api_key):
                     },
                 },
             ],
-        }
+        },
     ]
 
     try:
         logger.debug("Processing image...")
         response = model.chat.completions.create(
-            model="gpt-4-vision-preview",
+            model="gpt-4o-mini",
             messages=messages,
             max_tokens=1024,
         )
@@ -70,18 +76,28 @@ def extract_crypto(bytes_data, api_key):
 
     if "NO_DATA" in message.content:
         logger.debug("Invalid image.")
-        return None, None
+        return None, nbr_tokens
 
-    messages = [{"role": "assistant", "content": message.content}]
+    message_json, total_tokens = format_json_ai(message.content, api_key)
 
-    messages.append(
-        {"role": "user", "content": "Convert to a raw well formated JSON object."}
-    )
+    return message_json, total_tokens
+
+
+def format_json_ai(message, api_key):
+
+    model = OpenAI(api_key=api_key)
+    total_tokens = 0
+
+    messages = [
+        {"role": "system", "content": "You are a data formatting model."},
+        {"role": "assistant", "content": message},
+        {"role": "user", "content": "Convert to a raw well formated JSON object."},
+    ]
 
     try:
         logger.debug("Converting to JSON...")
         response = model.chat.completions.create(
-            model="gpt-3.5-turbo-1106",
+            model="gpt-4o-mini",
             messages=messages,
             max_tokens=1024,
             response_format={"type": "json_object"},
