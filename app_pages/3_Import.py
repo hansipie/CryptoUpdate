@@ -20,12 +20,18 @@ def decodeImg(image_bytes) -> bytes:
         img.save(img_bytes, format="PNG")
     return img_bytes.getvalue()
 
-def extract_gui(input: any):
+def extract_gui(input: any, ioutput: pd.DataFrame = None) -> pd.DataFrame:
     submit_button = st.form_submit_button(
         label="Extract data",
         help="Extract data from the image.",
         use_container_width=True,
     )
+
+    if ioutput is not None:
+        st.dataframe(ioutput, use_container_width=True)
+        st.balloons()
+        return ioutput
+    
     if submit_button:
         with st.spinner("Extracting data..."):
             try:
@@ -33,12 +39,12 @@ def extract_gui(input: any):
                     message_json, _ = aiprocessing.extract_from_img(
                         input, config["DEFAULT"]["openai_token"]
                     )
-                    st.session_state.import_output = pd.DataFrame.from_dict(loads(message_json).get("assets"))
+                    output = pd.DataFrame.from_dict(loads(message_json).get("assets"))
                 elif isinstance(input, pd.DataFrame):
                     message_json, _ = aiprocessing.extract_from_df(
                         input, config["DEFAULT"]["openai_token"]
                     )
-                    st.session_state.import_output = pd.DataFrame.from_dict(loads(message_json).get("assets"))
+                    output = pd.DataFrame.from_dict(loads(message_json).get("assets"))
                 else:
                     raise ValueError("Invalid input type")
             except KeyError as ke:
@@ -51,31 +57,17 @@ def extract_gui(input: any):
                 traceback.print_exc()
                 st.stop()
         
-        st.dataframe(st.session_state.import_output, use_container_width=True)
+        st.dataframe(output, use_container_width=True)
         st.balloons()
+        return output
 
 
-def processImg(file):
-    imagefile = decodeImg(file.getvalue())
-    st.session_state.import_input = imagefile
-    st.session_state.import_output = None
+def processImg(file) -> bytes:
+    return decodeImg(file.getvalue())
 
-    with st.form(key="extract_form"):
-        col_img, col_json = st.columns(2)
-        with col_img:
-            st.image(imagefile)
-        with col_json:
-            extract_gui(imagefile)
-
-def processCSV(file) -> str:
-    st.session_state.import_input = pd.read_csv(file)
+def processCSV(file) -> pd.DataFrame:
+    return pd.read_csv(file)
     
-    with st.form(key="extract_form"):
-        col_input, col_output = st.columns(2)
-        with col_input:
-            st.dataframe(st.session_state.import_input, use_container_width=True)
-        with col_output:
-            extract_gui(st.session_state.import_input)
 
 # session state variable
 if "import_input" not in st.session_state:
@@ -104,28 +96,37 @@ file = st.file_uploader("Upload a file", type=["png", "jpg", "jpeg", "csv"])
 
 if file is not None:
     logger.debug(f"File: {file} - file type: {file.type}")
-    st.session_state.import_type = file.type
 
-    if st.session_state.import_type == "application/vnd.ms-excel":
+    if file.type == "application/vnd.ms-excel":
         logger.debug("CSV file detected")
-        processCSV(file)
+        input = processCSV(file)
     else:
         logger.debug("Image file detected")
-        processImg(file)
-
-elif st.session_state.import_input is not None:
+        input = processImg(file)
+    st.session_state.import_type = file.type
+    st.session_state.import_input = input
 
     with st.form(key="extract_form"):
         col_input, col_output = st.columns(2)
         with col_input:
-            if st.session_state.import_type == "application/vnd.ms-excel":
-                st.dataframe(st.session_state.import_input, use_container_width=True)
+            if file.type == "application/vnd.ms-excel":
+                st.dataframe(input, use_container_width=True)
             else:
-                st.image(st.session_state.import_input)
+                st.image(input)
         with col_output:
-            extract_gui(st.session_state.import_input)
-
-
+            output = extract_gui(input)
+            st.session_state.import_output = output
+else:
+    if st.session_state.import_input is not None:
+        with st.form(key="extract_form"):
+            col_input, col_output = st.columns(2)
+            with col_input:
+                if st.session_state.import_type == "application/vnd.ms-excel":
+                    st.dataframe(st.session_state.import_input, use_container_width=True)
+                else:
+                    st.image(st.session_state.import_input)
+            with col_output:
+                extract_gui(st.session_state.import_input, st.session_state.import_output)
 
 
 # Display session state variables

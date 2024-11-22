@@ -13,11 +13,13 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 home_page = st.Page("app_pages/0_Home.py", title="Home", icon="🏠", default=True)
-wallets_page = st.Page("app_pages/1_Wallets.py", title="Wallets", icon="💰")
-import_page = st.Page("app_pages/2_Import.py", title="Import", icon="📥")
-update_page = st.Page("app_pages/3_Update.py", title="Update", icon="🔄")
-settings_page = st.Page("app_pages/4_Settings.py", title="Settings", icon="⚙️")
+pfolio_page = st.Page("app_pages/1_Portfolio.py", title="Portfolio", icon="📊")
+wallets_page = st.Page("app_pages/2_Wallets.py", title="Wallets", icon="💰")
+import_page = st.Page("app_pages/3_Import.py", title="Import", icon="📥")
+update_page = st.Page("app_pages/4_Update.py", title="Update", icon="🔄")
+settings_page = st.Page("app_pages/5_Settings.py", title="Settings", icon="⚙️")
 
-pg = st.navigation([home_page, wallets_page, import_page, update_page, settings_page])
+
+pg = st.navigation([home_page, pfolio_page, wallets_page, import_page, update_page, settings_page])
 
 pg.run()
