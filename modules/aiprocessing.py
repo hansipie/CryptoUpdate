@@ -4,6 +4,10 @@ import io
 import traceback
 import logging
 import pandas as pd
+
+logging.getLogger("openai").setLevel(logging.WARNING)
+logging.getLogger("PIL").setLevel(logging.WARNING)
+logging.getLogger("httpcore").setLevel(logging.WARNING)
 from openai import OpenAI
 from PIL import Image
 
@@ -28,9 +32,10 @@ def extract_from_df(df: pd.DataFrame, api_key: str):
                         "The data is a JSON dump of a cryptocurrency portfolio.\n"
                         "Analyse it and identifying individual assets details.\n"
                         "Extract the following informations:\n"
-                        "- Asset name\n"
-                        "- Asset amount with unit (if applicable)\n"
-                        "- Asset fiat value (€)(if applicable)\n"
+                        "- Asset's name\n"
+                        "- Asset's numeric amount, without symbol (if applicable)\n"
+                        "- Asset's cryptocurrency symbol\n"
+                        "- Asset's fiat value (if applicable)\n"
                         "Format the extracted data into a well-structured JSON format, ensuring that each asset is represented as an object within an array.\n"
                         "If you can not find cryptocurrencies data in the image, return only the string \"NO_DATA\"."
                     ),
@@ -60,9 +65,10 @@ def extract_from_img(bytes_data: bytes, api_key:str):
                         "The image is a screenshot of a cryptocurrency portfolio.\n"
                         "Analyse it and identifying individual assets details.\n"
                         "Extract the following informations:\n"
-                        "- Asset name\n"
-                        "- Asset amount with unit (if applicable)\n"
-                        "- Asset fiat value (€)(if applicable)\n"
+                        "- Asset's name\n"
+                        "- Asset's numeric amount, without symbol (if applicable)\n"
+                        "- Asset's cryptocurrency symbol\n"
+                        "- Asset's fiat value (if applicable)\n"
                         "Format the extracted data into a well-structured JSON format, ensuring that each asset is represented as an object within an array.\n"
                         "If you can not find cryptocurrencies data in the image, return only the string \"NO_DATA\"."
                     ),
