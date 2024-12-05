@@ -2,7 +2,6 @@ import math
 import os
 import time
 import csv
-import json
 import logging
 from modules import Notion
 
@@ -20,6 +19,9 @@ class Exporter:
             logging.debug(f"Error: {database_name} database not found")
             return None
         entities = self.notion.getNotionDatabaseEntities(dashboard_id)
+        if entities is None:
+            logging.warning(f"Warning: {database_name} database is empty")
+            return None
         dashboard = self.notion.getEntitiesFromDashboard(entities)
         return dashboard
 
