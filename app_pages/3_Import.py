@@ -97,16 +97,19 @@ def saveData(df: pd.DataFrame, portfolio: str = None, action: str = "Set"):
     if portfolio is None:
         st.error("Please select a portfolio")
         return
+    if not action:
+        st.error("Please select an action")
+        return
     for i, row in df.iterrows():
         if row["select"]:
             data = row.to_dict()
             st.toast(
                 f"{action} data to {portfolio} - {data['symbol']}: {data['amount']}"
             )
-            # if action == "Set":
-            #     pfini.setPortfolio(portfolio, row.to_dict())
-            # elif action == "Add":
-            #     pfini.addPortfolio(portfolio, row.to_dict())
+            if action == "Set":
+                g_pf.set_token(portfolio, data["symbol"], data["amount"])
+            elif action == "Add":
+                g_pf.add_token(portfolio, data["symbol"], data["amount"])
 
 
 def processImg(file) -> bytes:

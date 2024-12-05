@@ -19,7 +19,7 @@ class Portfolio:
         if "portfolios" not in self.portfolios:
             self.portfolios["portfolios"] = {}
         logger.debug(f"Portfolios from JSON: {self.portfolios}")
-            
+
         st.session_state.portfolios = self.portfolios["portfolios"]
         logger.debug(f"Session state portfolios: {st.session_state.portfolios}")
 
@@ -38,14 +38,26 @@ class Portfolio:
     def delete(self, name: str):
         st.session_state.portfolios.pop(name)
         self.save()
-    
-    def add_token(self, name: str, token: str, amount: float):
+
+    def set_token(self, name: str, token: str, amount: float):
         if name not in st.session_state.portfolios:
             st.session_state.portfolios[name] = {}
         st.session_state.portfolios[name][token] = {"amount": amount}
         self.save()
-    
+
+    def add_token(self, name: str, token: str, amount: float):
+        if name not in st.session_state.portfolios:
+            st.session_state.portfolios[name] = {}
+        st.session_state.portfolios[name][token] = {
+            "amount": float(st.session_state.portfolios[name][token]["amount"])
+            + float(amount)
+        }
+        self.save()
+
     def delete_token(self, name: str, token: str):
-        if name in st.session_state.portfolios and token in st.session_state.portfolios[name]:
+        if (
+            name in st.session_state.portfolios
+            and token in st.session_state.portfolios[name]
+        ):
             st.session_state.portfolios[name].pop(token)
             self.save()
