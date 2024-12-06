@@ -1,13 +1,7 @@
 import os
 import streamlit as st
-from modules.data import Data
 from modules.plotter import plot_as_graph
 
-
-@st.cache_data(show_spinner=False)
-def getData():
-    db_path = "./data/db.sqlite3"
-    return Data(db_path)
 
 st.title("Crypto Update")
 
@@ -16,11 +10,6 @@ if not os.path.exists(configfilepath):
     st.error("Please set your settings in the settings page")
     st.stop()
 
-# get dataframes from archives
-
-with st.spinner("Extracting data..."):
-    data = getData()
-
 # session state variable
 if "options" not in st.session_state:
     st.session_state.options = []
@@ -28,14 +17,14 @@ if "options_save" not in st.session_state:
     st.session_state.options_save = []
 
 # get last values
-last = data.df_balance.tail(1)
-balance = (last.sum(axis=1).values[0] if not last.empty else 0)
+last = st.session_state.database["balance"].tail(1)
+balance = last.sum(axis=1).values[0] if not last.empty else 0
 balance = round(balance, 2)
 
 # show wallet value
 st.header("Wallet value : " + str(balance) + " €")
 
-plot_as_graph(data.df_sum)
+plot_as_graph(st.session_state.database["sum"])
 
 # show last values
 st.header("Last values")

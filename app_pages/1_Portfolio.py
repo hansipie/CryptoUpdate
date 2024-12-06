@@ -48,9 +48,7 @@ def add_token(name: str):
 @st.dialog("Delete Token")
 def delete_token(name: str):
     st.write(f"Delete token from {name}")
-    token = st.selectbox(
-        "Token", list(st.session_state.portfolios[name].keys())
-    )
+    token = st.selectbox("Token", list(st.session_state.portfolios[name].keys()))
     if st.button("Submit"):
         g_portfolios.delete_token(name, token)
         # Close dialog
@@ -70,12 +68,12 @@ def portfolioUI(tabs: list):
             updated_data = tab.data_editor(df)
             if not updated_data.equals(df):
                 # Convert updated DataFrame back to storage format
-                st.session_state.portfolios[tabs[i]] = updated_data.to_dict(orient="index")
+                st.session_state.portfolios[tabs[i]] = updated_data.to_dict(
+                    orient="index"
+                )
                 g_portfolios.save()
                 logger.debug("## Rerun ##")
                 st.rerun()
-            else:
-                logger.debug("## No Rerun ##")
         else:
             tab.write("No data available")
 
@@ -107,7 +105,6 @@ def portfolioUI(tabs: list):
                 danger_zone(tabs[i])
     st.write(st.session_state)
 
-logger.debug("#### Start Render ####")
 
 g_portfolios = pf.Portfolio()
 
@@ -127,5 +124,3 @@ if len(tabs) > 0:
         portfolioUI(tabs)
     except Exception as e:
         st.error(f"Error: {str(e)}")
-
-logger.debug("#### End Render ####")

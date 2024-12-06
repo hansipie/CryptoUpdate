@@ -163,3 +163,6 @@ with st.form(key="process_archives"):
             # delete_bar.progress(100, text="Done")
 
             st.cache_data.clear()
+
+st.divider()
+st.write(st.session_state.database)
