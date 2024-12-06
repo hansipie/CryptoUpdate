@@ -32,21 +32,14 @@ def getPortfolios() -> list:
     logger.debug("Getting portfolios")
     return list(st.session_state.portfolios.keys())
 
-
 @st.fragment
 def dataUI(df: pd.DataFrame) -> pd.DataFrame:
     # add column for portfolios
     logger.debug("Displaying data")
-    output = st.data_editor(
+    st.session_state.import_page["output"] = st.data_editor(
         df,
         use_container_width=True,
     )
-    if not output.equals(df):
-        logger.debug("Data edited")
-        st.session_state.import_page["output"] = output
-    else:
-        logger.debug("Data not edited")
-        st.session_state.import_page["output"] = df
 
     col_pfolios, col_action = st.columns([0.8, 0.2], vertical_alignment="center")
     with col_pfolios:
@@ -54,10 +47,10 @@ def dataUI(df: pd.DataFrame) -> pd.DataFrame:
     with col_action:
         action = st.segmented_control("Actions", ["Set", "Add"], default="Set")
     if st.button("Save", key="save", icon=":material/save:"):
-        saveData(output, portfolios, action)
+        saveData(st.session_state.import_page["output"], portfolios, action)
 
-    st.json(output.to_json(orient="records"), expanded=False)
-    return output
+    st.json(st.session_state.import_page["output"].to_json(orient="records"), expanded=False)
+    logger.debug("Fragment ended")
 
 
 def extract(input: any) -> pd.DataFrame:
@@ -86,7 +79,6 @@ def extract(input: any) -> pd.DataFrame:
             st.error("Error: " + str(e))
             traceback.print_exc()
             st.stop()
-        st.balloons()
 
     output["select"] = False
     return output

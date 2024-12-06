@@ -13,6 +13,7 @@ from PIL import Image
 
 logger = logging.getLogger(__name__)
 
+
 def get_image_type(image: bytes):
     try:
         image_file = io.BytesIO(image)
@@ -22,6 +23,7 @@ def get_image_type(image: bytes):
         logger.debug(e)
         return None
 
+
 def extract_from_df(df: pd.DataFrame, api_key: str):
     messages = [
         {"role": "system", "content": "You are a data extraction model."},
@@ -29,21 +31,22 @@ def extract_from_df(df: pd.DataFrame, api_key: str):
         {
             "role": "user",
             "content": (
-                        "The data is a JSON dump of a cryptocurrency portfolio.\n"
-                        "Analyse it and identifying individual assets details.\n"
-                        "Extract the following informations:\n"
-                        "- Asset's name\n"
-                        "- Asset's numeric amount, without symbol (if applicable)\n"
-                        "- Asset's cryptocurrency symbol\n"
-                        "- Asset's fiat value (if applicable)\n"
-                        "Format the extracted data into a well-structured JSON format, ensuring that each asset is represented as an object within an array.\n"
-                        "If you can not find cryptocurrencies data in the image, return only the string \"NO_DATA\"."
-                    ),
-        }
+                "The data is a JSON dump of a cryptocurrency portfolio.\n"
+                "Analyse it and identifying individual assets details.\n"
+                "Extract the following informations:\n"
+                "- Asset's name\n"
+                "- Asset's numeric amount, without symbol (if applicable)\n"
+                "- Asset's cryptocurrency symbol\n"
+                "- Asset's fiat value (if applicable)\n"
+                "Format the extracted data into a well-structured JSON format, ensuring that each asset is represented as an object within an array.\n"
+                'If you can not find cryptocurrencies data in the image, return only the string "NO_DATA".'
+            ),
+        },
     ]
     return call_ai(messages, api_key)
 
-def extract_from_img(bytes_data: bytes, api_key:str):
+
+def extract_from_img(bytes_data: bytes, api_key: str):
 
     type_image = get_image_type(bytes_data)
     if type_image is None:
@@ -70,7 +73,7 @@ def extract_from_img(bytes_data: bytes, api_key:str):
                         "- Asset's cryptocurrency symbol\n"
                         "- Asset's fiat value (if applicable)\n"
                         "Format the extracted data into a well-structured JSON format, ensuring that each asset is represented as an object within an array.\n"
-                        "If you can not find cryptocurrencies data in the image, return only the string \"NO_DATA\"."
+                        'If you can not find cryptocurrencies data in the image, return only the string "NO_DATA".'
                     ),
                 },
                 {
@@ -83,6 +86,7 @@ def extract_from_img(bytes_data: bytes, api_key:str):
         },
     ]
     return call_ai(messages, api_key)
+
 
 def call_ai(messages: list, api_key: str):
     # Create an OpenAI object
