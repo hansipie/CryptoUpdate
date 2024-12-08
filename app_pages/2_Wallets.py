@@ -92,5 +92,3 @@ if add_selectbox == "Market":
     st.title("Market")
     build_tabs(st.session_state.database["market"])
 
-if st.checkbox("Clear cache"):
-    st.cache_data.clear()

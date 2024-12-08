@@ -164,5 +164,5 @@ with st.form(key="process_archives"):
 
             st.cache_data.clear()
 
-st.divider()
-st.write(st.session_state.database)
+with st.expander("Debug"):
+    st.write(st.session_state)

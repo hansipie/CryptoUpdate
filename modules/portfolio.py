@@ -1,6 +1,7 @@
 import streamlit as st
 import logging
 import json
+from modules.process import clean_price
 
 logger = logging.getLogger(__name__)
 
@@ -25,10 +26,19 @@ class Portfolio:
 
     def save(self):
         logger.debug(f"Saving portfolio to {self.file}")
-        self.portfolios["portfolios"] = st.session_state.portfolios
+        # Format the portfolios data
+        formatted_portfolios = {
+            portfolio_name: {
+                token: {"amount": clean_price(token_data["amount"])}
+                for token, token_data in portfolio_data.items()
+            }
+            for portfolio_name, portfolio_data in st.session_state.portfolios.items()
+        }
+
+        self.portfolios["portfolios"] = formatted_portfolios
         logger.debug(f"Portfolios to save: {self.portfolios}")
         with open(self.file, "w") as file:
-            json.dump(self.portfolios, file)
+            json.dump(self.portfolios, file, indent=2)
         logger.debug(f"Portfolio saved done.")
 
     def add(self, name: str):

@@ -31,5 +31,3 @@ st.header("Last values")
 last_u = last.astype(str) + " €"
 st.write(last_u)
 
-if st.checkbox("Clear cache"):
-    st.cache_data.clear()

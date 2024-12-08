@@ -1,9 +1,8 @@
 import streamlit as st
-import os
-import configparser
 import pandas as pd
 import logging
 from modules import portfolio as pf
+from modules.process import clean_price, get_current_price
 
 
 logger = logging.getLogger(__name__)
@@ -55,55 +54,75 @@ def delete_token(name: str):
         st.rerun()
 
 
+@st.cache_data
+def makedf(data: dict) -> pd.DataFrame:
+    logger.debug(f"makedf - Data: {data}")
+    df = pd.DataFrame(data).T
+    df.index.name = "Token"
+    # rename column amount and convert to float
+    df.rename(columns={"amount": "Amount"}, inplace=True)
+    df["Amount"] = df.apply(lambda row: clean_price(row["Amount"]), axis=1)
+    # Ajouter une colonne "Value" basée sur le cours actuel
+    df["Value(€)"] = df.apply(
+        lambda row: round(clean_price(row["Amount"]) * get_current_price(row.name), 2),
+        axis=1,
+    )
+
+    return df
+
+
 def portfolioUI(tabs: list):
     logger.debug(f"portfolioUI - Tabs: {tabs}")
 
     tabs_widget = st.tabs(tabs)
 
     for i, tab in enumerate(tabs_widget):
-        data = st.session_state.portfolios[tabs[i]]
-        logger.debug(f"Data: {data}")
-        if data:  # Only create DataFrame if data exists
-            df = pd.DataFrame.from_dict(data, orient="index")
-            updated_data = tab.data_editor(df)
-            if not updated_data.equals(df):
-                # Convert updated DataFrame back to storage format
-                st.session_state.portfolios[tabs[i]] = updated_data.to_dict(
-                    orient="index"
-                )
-                g_portfolios.save()
-                logger.debug("## Rerun ##")
-                st.rerun()
-        else:
-            tab.write("No data available")
+        with tab:
+            data = st.session_state.portfolios[tabs[i]]
+            logger.debug(f"Data: {data}")
+            if data:  # Only create DataFrame if data exists
+                df = makedf(data)
+                updated_data = st.data_editor(df, use_container_width=True)
+                if not updated_data.equals(df):
+                    # Convert updated DataFrame back to storage format
+                    st.session_state.portfolios[tabs[i]] = updated_data.to_dict(
+                        orient="index"
+                    )
+                    g_portfolios.save()
+                    logger.debug("## Rerun ##")
+                    st.rerun()
+            else:
+                st.write("No data available")
 
-        buttons_col1, buttons_col2, buttons_col3 = tab.columns(3)
-        with buttons_col1:
-            if st.button(
-                "Add Token",
-                key=f"addT_{i}",
-                use_container_width=True,
-                icon=":material/add:",
-            ):
-                add_token(tabs[i])
-        with buttons_col2:
-            if st.button(
-                "Delete Token",
-                key=f"deleteT_{i}",
-                use_container_width=True,
-                icon=":material/delete:",
-            ):
-                delete_token(tabs[i])
-        with buttons_col3:
-            if st.button(
-                "Danger Zone",
-                key=f"dangerZ_{i}",
-                use_container_width=True,
-                type="primary",
-                icon=":material/destruction:",
-            ):
-                danger_zone(tabs[i])
-    st.write(st.session_state)
+            buttons_col1, buttons_col2, buttons_col3 = st.columns(3)
+            with buttons_col1:
+                if st.button(
+                    "Add Token",
+                    key=f"addT_{i}",
+                    use_container_width=True,
+                    icon=":material/add:",
+                ):
+                    add_token(tabs[i])
+            with buttons_col2:
+                if st.button(
+                    "Delete Token",
+                    key=f"deleteT_{i}",
+                    use_container_width=True,
+                    icon=":material/delete:",
+                ):
+                    delete_token(tabs[i])
+            with buttons_col3:
+                if st.button(
+                    "Danger Zone",
+                    key=f"dangerZ_{i}",
+                    use_container_width=True,
+                    type="primary",
+                    icon=":material/destruction:",
+                ):
+                    danger_zone(tabs[i])
+
+    with st.expander("Debug"):
+        st.write(st.session_state)
 
 
 g_portfolios = pf.Portfolio()

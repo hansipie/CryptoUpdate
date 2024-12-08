@@ -127,6 +127,7 @@ pandas==2.2.3
     # via
     #   -r .\requirements.in
     #   streamlit
+    #   streamlit-aggrid
 pillow==11.0.0
     # via
     #   matplotlib
@@ -151,6 +152,8 @@ python-dateutil==2.9.0.post0
     # via
     #   matplotlib
     #   pandas
+python-decouple==3.8
+    # via streamlit-aggrid
 python-dotenv==1.0.1
     # via -r .\requirements.in
 pytz==2024.2
@@ -192,6 +195,9 @@ streamlit==1.40.0
     # via
     #   -r .\requirements.in
     #   st-pages
+    #   streamlit-aggrid
+streamlit-aggrid==0.3.4.post3
+    # via -r .\requirements.in
 tenacity==9.0.0
     # via
     #   plotly

@@ -85,7 +85,6 @@ def extract(input: any) -> pd.DataFrame:
 
 
 def saveData(df: pd.DataFrame, portfolio: str = None, action: str = "Set"):
-    st.toast(f"{action} data to {portfolio}")
     if portfolio is None:
         st.error("Please select a portfolio")
         return
@@ -95,9 +94,6 @@ def saveData(df: pd.DataFrame, portfolio: str = None, action: str = "Set"):
     for i, row in df.iterrows():
         if row["select"]:
             data = row.to_dict()
-            st.toast(
-                f"{action} data to {portfolio} - {data['symbol']}: {data['amount']}"
-            )
             if action == "Set":
                 g_pf.set_token(portfolio, data["symbol"], data["amount"])
             elif action == "Add":
@@ -209,6 +205,7 @@ else:
     drawUI()
 
 
-st.write(st.session_state)
+with st.expander("Debug"):                  
+    st.write(st.session_state)
 
 logger.debug("## ended ##")
