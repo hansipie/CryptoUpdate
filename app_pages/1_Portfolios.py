@@ -31,6 +31,14 @@ def danger_zone(name: str):
         st.rerun()
 
 @st.fragment
+@st.dialog("Rename portfolio")
+def rename_portfolio(name: str):
+    new_name = st.text_input("New name")
+    if st.button("Submit"):
+        g_portfolios.rename(name, new_name)
+        st.rerun()
+
+@st.fragment
 @st.dialog("Add Token")
 def add_token(name: str):
     st.write(f"Add token to {name}")
@@ -94,7 +102,7 @@ def portfolioUI(tabs: list):
             else:
                 st.write("No data available")
 
-            buttons_col1, buttons_col2, buttons_col3 = st.columns(3)
+            buttons_col1, buttons_col2, buttons_col3, buttons_col4 = st.columns(4)
             with buttons_col1:
                 if st.button(
                     "Add Token",
@@ -112,6 +120,14 @@ def portfolioUI(tabs: list):
                 ):
                     delete_token(tabs[i])
             with buttons_col3:
+                if st.button(
+                    "Rename Portfolio",
+                    key=f"rename_{i}",
+                    use_container_width=True,
+                    icon=":material/edit:",
+                ):
+                    rename_portfolio(tabs[i])
+            with buttons_col4:
                 if st.button(
                     "Danger Zone",
                     key=f"dangerZ_{i}",
