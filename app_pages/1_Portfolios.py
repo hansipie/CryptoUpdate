@@ -7,7 +7,7 @@ from modules.process import clean_price, get_current_price
 
 logger = logging.getLogger(__name__)
 
-st.title("Portfolio")
+st.title("Portfolios")
 
 
 @st.fragment
@@ -15,6 +15,7 @@ st.title("Portfolio")
 def add_new_portfolio():
     name = st.text_input("Name")
     if st.button("Submit"):
+        logger.debug(f"Adding portfolio {name}")
         g_portfolios.add(name)
         # Close dialog
         st.rerun()
@@ -28,7 +29,6 @@ def danger_zone(name: str):
     if st.button("Delete") and confirm == "delete":
         g_portfolios.delete(name)
         st.rerun()
-
 
 @st.fragment
 @st.dialog("Add Token")
@@ -124,8 +124,7 @@ def portfolioUI(tabs: list):
     with st.expander("Debug"):
         st.write(st.session_state)
 
-
-g_portfolios = pf.Portfolio()
+g_portfolios = pf.Portfolios()
 
 # Add new portfolio dialog
 if st.sidebar.button(

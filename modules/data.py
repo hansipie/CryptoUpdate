@@ -4,7 +4,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 class Data:
-    def __init__(self, db_path):
+    def __init__(self, db_path: str = "./data/db.sqlite3"):
         self.db_path = db_path
         self.initDatabase()
         self.df_balance = pd.DataFrame()

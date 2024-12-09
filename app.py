@@ -15,8 +15,7 @@ logger = logging.getLogger(__name__)
 
 @st.cache_data(show_spinner=False)
 def getData():
-    db_path = "./data/db.sqlite3"
-    return Data(db_path)
+    return Data()
 
 logger.debug("### Start Render ###")
 
@@ -32,14 +31,14 @@ st.session_state.database["tokencount"] = data.df_tokencount
 st.session_state.database["market"] = data.df_market
 
 home_page = st.Page("app_pages/0_Home.py", title="Home", icon="🏠", default=True)
-pfolio_page = st.Page("app_pages/1_Portfolio.py", title="Portfolio", icon="📊")
+pfolios_page = st.Page("app_pages/1_Portfolios.py", title="Portfolios", icon="📊")
 wallets_page = st.Page("app_pages/2_Wallets.py", title="Wallets", icon="💰")
 import_page = st.Page("app_pages/3_Import.py", title="Import", icon="📥")
 update_page = st.Page("app_pages/4_Update.py", title="Update", icon="🔄")
 settings_page = st.Page("app_pages/5_Settings.py", title="Settings", icon="⚙️")
 
 
-pg = st.navigation([home_page, pfolio_page, wallets_page, import_page, update_page, settings_page])
+pg = st.navigation([home_page, pfolios_page, wallets_page, import_page, update_page, settings_page])
 
 pg.run()
 

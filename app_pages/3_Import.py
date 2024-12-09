@@ -43,7 +43,7 @@ def dataUI(df: pd.DataFrame) -> pd.DataFrame:
 
     col_pfolios, col_action = st.columns([0.8, 0.2], vertical_alignment="center")
     with col_pfolios:
-        portfolios = st.selectbox("Portfolios", getPortfolios())
+        portfolios = st.selectbox("Portfolios", getPortfolios(), index=None, placeholder="Select a portfolio")
     with col_action:
         action = st.segmented_control("Actions", ["Set", "Add"], default="Set")
     if st.button("Save", key="save", icon=":material/save:"):
@@ -95,9 +95,9 @@ def saveData(df: pd.DataFrame, portfolio: str = None, action: str = "Set"):
         if row["select"]:
             data = row.to_dict()
             if action == "Set":
-                g_pf.set_token(portfolio, data["symbol"], data["amount"])
+                g_portfolio.set_token(portfolio, data["symbol"], data["amount"])
             elif action == "Add":
-                g_pf.add_token(portfolio, data["symbol"], data["amount"])
+                g_portfolio.add_token(portfolio, data["symbol"], data["amount"])
 
 
 def processImg(file) -> bytes:
@@ -173,7 +173,7 @@ try:
 except KeyError:
     debugflag = False
 
-g_pf = pf.Portfolio()
+g_portfolio = pf.Portfolios()
 
 st.title("Import")
 
