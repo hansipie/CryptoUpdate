@@ -49,8 +49,8 @@ This is the general structure of the database processed:
 			"type": "title",
 			"title": {}
 		},
-		"Price/Coin": {
-			"name": "Price/Coin",
+		"Market Price": {
+			"name": "Market Price",
 			"type": "number",
 			"number": {
 				"format": "number"
@@ -67,7 +67,7 @@ This is the general structure of the database processed:
 			"name": "Wallet Value (€)",
 			"type": "formula",
 			"formula": {
-				"expression": "multiply(prop(\"Price/Coin\"), prop(\"Coins in wallet\"))"
+				"expression": "multiply(prop(\"Market Price\"), prop(\"Coins in wallet\"))"
 			}
 		}
 	}

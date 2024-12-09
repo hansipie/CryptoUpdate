@@ -35,9 +35,9 @@ class Exporter:
             os.makedirs(os.path.dirname(destpath))
         with open(destpath, "w", newline='', encoding='utf-8') as f:
             writer = csv.writer(f)
-            writer.writerow(["Token", "Price/Coin", "Coins in wallet", "Timestamp"])
+            writer.writerow(["Token", "Market Price", "Coins in wallet", "Timestamp"])
             for token in dashboard:
-                writer.writerow([token, dashboard[token]["Price/Coin"], dashboard[token]["Coins in wallet"], self.epochstr])
+                writer.writerow([token, dashboard[token]["Market Price"], dashboard[token]["Coins in wallet"], self.epochstr])
 
         return(destpath)
 

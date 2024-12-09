@@ -93,8 +93,8 @@ class Notion:
             ],
             "properties": {
                 "Token": {"id": "title", "name": "Token", "type": "title", "title": {}},
-                "Price/Coin": {
-                    "name": "Price/Coin",
+                "Market Price": {
+                    "name": "Market Price",
                     "type": "number",
                     "number": {"format": "number"},
                 },
@@ -107,7 +107,7 @@ class Notion:
                     "name": "Wallet Value (€)",
                     "type": "formula",
                     "formula": {
-                        "expression": 'multiply(prop("Price/Coin"), prop("Coins in wallet"))'
+                        "expression": 'multiply(prop("Market Price"), prop("Coins in wallet"))'
                     },
                 },
             },
@@ -222,10 +222,10 @@ class Notion:
                     continue
 
                 # price
-                if properties["Price/Coin"]["number"] is None:
+                if properties["Market Price"]["number"] is None:
                     price = 0
                 else:
-                    price = float(properties["Price/Coin"]["number"])
+                    price = float(properties["Market Price"]["number"])
                 
                 # coins in wallet
                 logging.debug(f"Coins in wallet type: {properties["Coins in wallet"]["type"]}")
@@ -252,9 +252,9 @@ class Notion:
                 else:
                     count = -1
 
-                logging.debug(f"Token: {token}, Price/Coin: {price}, Coins in wallet: {count}")
+                logging.debug(f"Token: {token}, Market Price: {price}, Coins in wallet: {count}")
                 ret[token] = {}
-                ret[token]["Price/Coin"] = price
+                ret[token]["Market Price"] = price
                 ret[token]["Coins in wallet"] = count
                 bar()
         return ret

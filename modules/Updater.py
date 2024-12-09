@@ -25,10 +25,10 @@ class Updater:
                 logging.error("Invalid entry in Dashboard: ", v["id"])
                 continue
             logging.debug(f"Found entry: {text}")
-            if v["properties"]["Price/Coin"]["number"] is None:
+            if v["properties"]["Market Price"]["number"] is None:
                 price = 0
             else:
-                price = float(v["properties"]["Price/Coin"]["number"])
+                price = float(v["properties"]["Market Price"]["number"])
             resp.update({text: {"page": v["id"], "price": price}})
         return resp
 
@@ -121,7 +121,7 @@ class Updater:
         properties = json.dumps(
             {
                 "properties": {
-                    "Price/Coin": {"type": "number", "number": float(coinPrice)}
+                    "Market Price": {"type": "number", "number": float(coinPrice)},
                 }
             }
         )

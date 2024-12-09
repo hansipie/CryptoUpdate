@@ -135,33 +135,6 @@ with st.form(key="process_archives"):
             dropDuplicate(conn)
             conn.close()
 
-            # st.write("Clear archives...")
-            # # lambda function to filter archivedir to only folders
-            # archivedirsitems = list(
-            #     filter(
-            #         lambda x: (x.endswith(".csv") or x.isnumeric()),
-            #         os.listdir(archive_path),
-            #     )
-            # )
-            # logger.debug(f"Delete list: {archivedirsitems}")
-            # delete_bar = st.progress(0)
-            # count = 0
-            # for item in archivedirsitems:
-            #     delete_bar.progress(
-            #         count / len(archivedirsitems), text=f"Deleting {item}"
-            #     )
-            #     itempath = os.path.join(archive_path, item)
-            #     if os.path.isdir(itempath):
-            #         shutil.rmtree(itempath, ignore_errors=True)
-            #     else:
-            #         try:
-            #             os.remove(itempath)
-            #         except Exception as e:
-            #             logger.debug(f"Exception: {e}")
-            #     count += 1
-
-            # delete_bar.progress(100, text="Done")
-
             st.cache_data.clear()
 
 with st.expander("Debug"):

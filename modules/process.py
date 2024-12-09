@@ -22,7 +22,7 @@ def getDateFrame(inputfile):
     logger.debug(f"Reading {inputfile}")
     df = pd.read_csv(inputfile)
     df.fillna(0, inplace=True)
-    dftemp = df[["Token","Price/Coin","Coins in wallet", "Timestamp"]]
+    dftemp = df[["Token","Market Price","Coins in wallet", "Timestamp"]]
     dftemp.columns = ["token","price","count", "timestamp"]
     dfret = dftemp.copy()
     logger.debug(f"Found {len(dfret)} rows")
