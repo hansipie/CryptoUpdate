@@ -30,6 +30,7 @@ def danger_zone(name: str):
         g_portfolios.delete(name)
         st.rerun()
 
+
 @st.fragment
 @st.dialog("Rename portfolio")
 def rename_portfolio(name: str):
@@ -37,6 +38,7 @@ def rename_portfolio(name: str):
     if st.button("Submit"):
         g_portfolios.rename(name, new_name)
         st.rerun()
+
 
 @st.fragment
 @st.dialog("Add Token")
@@ -66,13 +68,11 @@ def delete_token(name: str):
 def makedf(data: dict) -> pd.DataFrame:
     logger.debug(f"makedf - Data: {data}")
     df = pd.DataFrame(data).T
-    df.index.name = "Token"
-    # rename column amount and convert to float
-    df.rename(columns={"amount": "Amount"}, inplace=True)
-    df["Amount"] = df.apply(lambda row: clean_price(row["Amount"]), axis=1)
+    df.index.name = "token"
+    df["amount"] = df.apply(lambda row: clean_price(row["amount"]), axis=1)
     # Ajouter une colonne "Value" basée sur le cours actuel
-    df["Value(€)"] = df.apply(
-        lambda row: round(clean_price(row["Amount"]) * get_current_price(row.name), 2),
+    df["value(€)"] = df.apply(
+        lambda row: round(clean_price(row["amount"]) * get_current_price(row.name), 2),
         axis=1,
     )
 
@@ -87,9 +87,9 @@ def portfolioUI(tabs: list):
     for i, tab in enumerate(tabs_widget):
         with tab:
             data = st.session_state.portfolios[tabs[i]]
-            logger.debug(f"Data: {data}")
             if data:  # Only create DataFrame if data exists
                 df = makedf(data)
+                logger.debug(f"Dataframe:\n{df}")
                 updated_data = st.data_editor(df, use_container_width=True)
                 if not updated_data.equals(df):
                     # Convert updated DataFrame back to storage format
@@ -99,6 +99,8 @@ def portfolioUI(tabs: list):
                     g_portfolios.save()
                     logger.debug("## Rerun ##")
                     st.rerun()
+                else:
+                    logger.debug("## No Rerun ##")
             else:
                 st.write("No data available")
 
@@ -139,6 +141,7 @@ def portfolioUI(tabs: list):
 
     with st.expander("Debug"):
         st.write(st.session_state)
+
 
 g_portfolios = pf.Portfolios()
 

@@ -32,6 +32,7 @@ def getPortfolios() -> list:
     logger.debug("Getting portfolios")
     return list(st.session_state.portfolios.keys())
 
+
 @st.fragment
 def dataUI(df: pd.DataFrame) -> pd.DataFrame:
     # add column for portfolios
@@ -43,13 +44,17 @@ def dataUI(df: pd.DataFrame) -> pd.DataFrame:
 
     col_pfolios, col_action = st.columns([0.8, 0.2], vertical_alignment="center")
     with col_pfolios:
-        portfolios = st.selectbox("Portfolios", getPortfolios(), index=None, placeholder="Select a portfolio")
+        portfolios = st.selectbox(
+            "Portfolios", getPortfolios(), index=None, placeholder="Select a portfolio"
+        )
     with col_action:
         action = st.segmented_control("Actions", ["Set", "Add"], default="Set")
     if st.button("Save", key="save", icon=":material/save:"):
         saveData(st.session_state.import_page["output"], portfolios, action)
 
-    st.json(st.session_state.import_page["output"].to_json(orient="records"), expanded=False)
+    st.json(
+        st.session_state.import_page["output"].to_json(orient="records"), expanded=False
+    )
     logger.debug("Fragment ended")
 
 
@@ -91,13 +96,15 @@ def saveData(df: pd.DataFrame, portfolio: str = None, action: str = "Set"):
     if not action:
         st.error("Please select an action")
         return
-    for i, row in df.iterrows():
+    for _, row in df.iterrows():
         if row["select"]:
             data = row.to_dict()
+            logger.debug(f"Saving data: {data}")
             if action == "Set":
                 g_portfolio.set_token(portfolio, data["symbol"], data["amount"])
             elif action == "Add":
                 g_portfolio.add_token(portfolio, data["symbol"], data["amount"])
+    st.toast("Data saved", icon=":material/check:")
 
 
 def processImg(file) -> bytes:
@@ -205,7 +212,7 @@ else:
     drawUI()
 
 
-with st.expander("Debug"):                  
+with st.expander("Debug"):
     st.write(st.session_state)
 
 logger.debug("## ended ##")

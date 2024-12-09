@@ -48,6 +48,7 @@ def listfilesrecursive(directory, fileslist=None):
     return fileslist
 
 def clean_price(price: str) -> float:
+    logger.debug(f"Clean price: {price}")
     cleaned_price = str(price).replace("$", "").replace("€", "").replace(",", ".").replace(" ", "")
     return float(cleaned_price)
 
