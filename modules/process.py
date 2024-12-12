@@ -75,3 +75,18 @@ def prefix(input : str, flag = False) -> str:
     if flag:
         return f"debug_{input}"
     return input
+
+def loadSettings(settings: dict):
+    logger.debug("Loading settings")
+    if "settings" not in st.session_state:
+        st.session_state.settings = {}
+    st.session_state.settings["notion_token"] = settings["Notion"]["token"]
+    st.session_state.settings["notion_database"] = settings["Notion"]["database"]
+    st.session_state.settings["notion_parentpage"] = settings["Notion"]["parentpage"]
+    st.session_state.settings["coinmarketcap_token"] = settings["Coinmarketcap"]["token"]
+    st.session_state.settings["openai_token"] = settings["OpenAI"]["token"]
+    st.session_state.settings["debug_flag"] = True if settings["Debug"]["flag"] == "True" else False
+ 
+    st.session_state.archive_path = os.path.join(os.getcwd(), prefix(settings["Local"]["archive_path"], st.session_state.settings["debug_flag"]))
+    st.session_state.data_path = os.path.join(os.getcwd(), settings["Local"]["data_path"])
+    st.session_state.dbfile = os.path.join(st.session_state.data_path, prefix(settings["Local"]["sqlite_file"], st.session_state.settings["debug_flag"]))

@@ -1,6 +1,7 @@
 import streamlit as st
 import logging
 import sys
+from modules import process
 from modules.data import Data
 from modules.configuration import configuration as Configuration
 
@@ -21,6 +22,13 @@ def getData(dbfile):
 logger.debug("### Start Render ###")
 
 config = Configuration()
+try:
+    config.readConfig()
+except FileNotFoundError:
+    st.error("Settings file not found. Please check your settings.")
+    st.stop()
+
+process.loadSettings(config.conf)
 
 # get dataframes from archives
 with st.spinner("Extracting data..."):
@@ -41,7 +49,7 @@ update_page = st.Page("app_pages/4_Update.py", title="Update", icon="🔄")
 settings_page = st.Page("app_pages/5_Settings.py", title="Settings", icon="⚙️")
 
 pg = st.navigation([home_page, pfolios_page, wallets_page, import_page, update_page, settings_page])
-if st.session_state.debug_flag == True:
+if st.session_state.settings["debug_flag"]:
     st.write("Debug mode is ON")
 pg.run()
 

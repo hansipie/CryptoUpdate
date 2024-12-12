@@ -1,7 +1,5 @@
 import os
-import shutil
 import sqlite3
-import configparser
 import streamlit as st
 import traceback
 import logging
@@ -23,13 +21,14 @@ with st.form(key="update_database"):
 
         with st.spinner("Getting current marketprices..."):
             try:
-                notion = Notion(st.session_state.notion_token)
-                db_id = notion.getObjectId(st.session_state.notion_database, "database", st.session_state.notion_parentpage)
+                notion = Notion(st.session_state.settings["notion_token"])
+                db_id = notion.getObjectId(st.session_state.settings["notion_database"], "database", st.session_state.settings["notion_parentpage"])
                 if db_id == None:
                     st.error("Error: Database not found")
                     st.stop()
-                updater = Updater(st.session_state.coinmarketcap_token, st.session_state.notion_token, db_id)
-                updater.getCryptoPrices(debug=st.session_state.debug_flag)
+                else:
+                    updater = Updater(st.session_state.settings["coinmarketcap_token"], st.session_state.settings["notion_token"], db_id)
+                    updater.getCryptoPrices(debug=st.session_state.settings["debug_flag"])
             except KeyError as ke:
                 st.error("Error: " + type(ke).__name__ + " - " + str(ke))
                 st.error("Please set your settings in the settings page")
@@ -55,8 +54,8 @@ with st.form(key="update_database"):
 
         with st.spinner("Exporting database..."):
             try:
-                exporter = Exporter(st.session_state.notion_token, st.session_state.archive_path)
-                csvfile = exporter.GetCSVfile(st.session_state.notion_database)
+                exporter = Exporter(st.session_state.settings["notion_token"], st.session_state.archive_path)
+                csvfile = exporter.GetCSVfile(st.session_state.settings["notion_database"])
             except KeyError as ke:
                 st.error("Error: " + type(ke).__name__ + " - " + str(ke))
                 st.error("Please set your settings in the settings page")

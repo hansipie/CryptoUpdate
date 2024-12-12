@@ -233,6 +233,9 @@ class Notion:
                     count = float(properties["Coins in wallet"]["number"])
                 elif properties["Coins in wallet"]["type"] == "rollup":
                     page_json = self.getNotionPageProperties(entry["id"], properties["Coins in wallet"]["id"])
+                    if page_json == None:
+                        logging.warning(f"Invalid property id {properties["Coins in wallet"]["id"]}")
+                        continue
                     if page_json["type"] == "property_item":
                         logging.debug(f"Property results: {page_json["results"]}")
                         if not page_json["results"]:

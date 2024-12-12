@@ -33,15 +33,6 @@ def build_tabs(df):
     else:
         st.error("End date must be after start date")
 
-
-configfilepath = "./data/settings.ini"
-if not os.path.exists(configfilepath):
-    st.error("Please set your settings in the settings page")
-    st.stop()
-
-config = configparser.ConfigParser()
-config.read(configfilepath)
-
 add_selectbox = st.sidebar.selectbox(
     "Assets View", ("Global", "Assets Value", "Assets Count", "Market")
 )

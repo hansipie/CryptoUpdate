@@ -5,11 +5,6 @@ from modules.plotter import plot_as_graph
 
 st.title("Crypto Update")
 
-configfilepath = "./data/settings.ini"
-if not os.path.exists(configfilepath):
-    st.error("Please set your settings in the settings page")
-    st.stop()
-
 # session state variable
 if "options" not in st.session_state:
     st.session_state.options = []
