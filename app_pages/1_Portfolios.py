@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 import logging
-from modules import portfolio as pf
+from modules import portfolios as pf
 from modules.process import clean_price, get_current_price
 
 

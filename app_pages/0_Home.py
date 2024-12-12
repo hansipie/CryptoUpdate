@@ -31,3 +31,4 @@ st.header("Last values")
 last_u = last.astype(str) + " €"
 st.write(last_u)
 
+st.write(st.session_state)

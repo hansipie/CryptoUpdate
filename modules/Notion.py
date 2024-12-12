@@ -5,12 +5,12 @@ import logging
 from alive_progress import alive_bar
 
 class Notion:
-    def __init__(self, apikey, version="2022-06-28"):
+    def __init__(self, apikey: str, version: str = "2022-06-28"):
         self.apikey = apikey
         self.version = version
         self.base_url = "https://api.notion.com"
 
-    def getObjectId(self, name, type, parent=None):
+    def getObjectId(self, name: str, type: str, parent: str = None) -> str | None:
         """
         Get the database/page ID of the Notion object
         """
@@ -153,7 +153,7 @@ class Notion:
 
         response = requests.get(url, headers=headers)
         if response.status_code == 200:
-            logging.info(f"Get page {page_id} successfully.")
+            logging.debug(f"Get page {page_id} successfully.")
             return response.json()
         else:
             logging.error("Error getting page. code: {response.status_code}")
@@ -176,7 +176,7 @@ class Notion:
             logging.debug(f"Patch page {page_id} successfully.")
             return response.json()
         else:
-            logging.error(f"Error getting page. code: {response.status_code}")
+            logging.error(f"Error patching page. code: {response.status_code}")
             return None
         
     def getNotionPageProperties(self, page_id : str, property_id : str) -> dict:

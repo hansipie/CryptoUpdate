@@ -167,3 +167,20 @@ class Portfolios:
                 raise ValueError(f"Un portfolio nommé '{new_name}' existe déjà")
         else:
             raise ValueError(f"Le portfolio '{old_name}' n'existe pas")
+
+    def get_consolidated_tokens(self) -> dict:
+        """
+        Retourne un dictionnaire avec la somme totale de chaque token à travers tous les portfolios.
+        Returns:
+            dict: {token: montant_total}
+        """
+        consolidated = {}
+        for portfolio in st.session_state.portfolios.values():
+            for token, token_data in portfolio.items():
+                if token not in consolidated:
+                    consolidated[token] = 0
+                consolidated[token] += float(token_data["amount"])
+        
+        # Convertir les totaux en strings pour la cohérence avec le reste de l'application
+        return {token: str(amount) for token, amount in consolidated.items()}
+

@@ -12,34 +12,6 @@ from modules.process import getDateFrame, dropDuplicate, listfilesrecursive
 
 logger = logging.getLogger(__name__)
 
-configfilepath = "./data/settings.ini"
-if not os.path.exists(configfilepath):
-    st.error("Please set your settings in the settings page")
-    st.stop()
-
-config = configparser.ConfigParser()
-config.read(configfilepath)
-
-try:
-    # read config
-    notion_api_token = config["DEFAULT"]["notion_token"]
-    coinmarketcap_api_token = config["DEFAULT"]["coinmarketcap_token"]
-    database = config["Notion"]["database"]
-    parent_page = config["Notion"]["parent_page"]
-    debug = True if config["DEFAULT"]["debug"] == "True" else False
-    archive_path = config["Local"]["archive_path"]
-    data_path = config["Local"]["data_path"]
-    dbfile = os.path.join(data_path, config["Local"]["sqlite_file"])
-except KeyError as ke:
-    st.error("Error: " + type(ke).__name__ + " - " + str(ke))
-    st.error("Please set your settings in the settings page")
-    traceback.print_exc()
-    st.stop()
-except Exception as e:
-    st.error("Error: " + type(e).__name__ + " - " + str(e))
-    traceback.print_exc()
-    st.stop()
-
 with st.form(key="update_database"):
     submit_button = st.form_submit_button(
         label="Update Notion database",
@@ -51,13 +23,13 @@ with st.form(key="update_database"):
 
         with st.spinner("Getting current marketprices..."):
             try:
-                notion = Notion(notion_api_token)
-                db_id = notion.getObjectId(database, "database", parent_page)
+                notion = Notion(st.session_state.notion_token)
+                db_id = notion.getObjectId(st.session_state.notion_database, "database", st.session_state.notion_parentpage)
                 if db_id == None:
                     st.error("Error: Database not found")
                     st.stop()
-                updater = Updater(coinmarketcap_api_token, notion_api_token, db_id)
-                updater.getCryptoPrices(debug=debug)
+                updater = Updater(st.session_state.coinmarketcap_token, st.session_state.notion_token, db_id)
+                updater.getCryptoPrices(debug=st.session_state.debug_flag)
             except KeyError as ke:
                 st.error("Error: " + type(ke).__name__ + " - " + str(ke))
                 st.error("Please set your settings in the settings page")
@@ -83,8 +55,8 @@ with st.form(key="update_database"):
 
         with st.spinner("Exporting database..."):
             try:
-                exporter = Exporter(notion_api_token, archive_path)
-                csvfile = exporter.GetCSVfile(database)
+                exporter = Exporter(st.session_state.notion_token, st.session_state.archive_path)
+                csvfile = exporter.GetCSVfile(st.session_state.notion_database)
             except KeyError as ke:
                 st.error("Error: " + type(ke).__name__ + " - " + str(ke))
                 st.error("Please set your settings in the settings page")
@@ -97,13 +69,13 @@ with st.form(key="update_database"):
             st.write("Output file: ", csvfile)
 
 # create archive dir if not exists
-if not os.path.exists(archive_path):
-    os.makedirs(archive_path)
+if not os.path.exists(st.session_state.archive_path):
+    os.makedirs(st.session_state.archive_path)
 
 with st.form(key="process_archives"):
     with st.spinner("Listing archives..."):
         archiveFiles = list(
-            filter(lambda x: x.endswith(".csv"), listfilesrecursive(archive_path))
+            filter(lambda x: x.endswith(".csv"), listfilesrecursive(st.session_state.archive_path))
         )
     st.write("Archives count:", len(archiveFiles))
 
@@ -117,7 +89,7 @@ with st.form(key="process_archives"):
             st.warning("No archives found.")
         else:
             st.write("Found in archives: ", archiveFiles)
-            conn = sqlite3.connect(dbfile)
+            conn = sqlite3.connect(st.session_state.dbfile)
             migrate_bar = st.progress(0)
             count = 0
             for item in archiveFiles:
@@ -127,6 +99,7 @@ with st.form(key="process_archives"):
                 )
                 if item.endswith(".csv"):
                     df = getDateFrame(item)
+                    logger.debug(f"Inserting {df}")
                     df.to_sql("Database", conn, if_exists="append", index=False)
                 else:
                     logger.debug(f"ignore: {item}")

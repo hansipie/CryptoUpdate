@@ -70,3 +70,8 @@ def get_current_price(token: str) -> float:
     except (ValueError, TypeError):
         logger.warning(f"Impossible de convertir le prix pour {token}: {raw_price}")
         return 0.0
+    
+def prefix(input : str, flag = False) -> str:
+    if flag:
+        return f"debug_{input}"
+    return input

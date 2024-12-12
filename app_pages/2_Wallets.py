@@ -3,8 +3,8 @@ import os
 import streamlit as st
 import pandas as pd
 import logging
-from modules.data import Data
 from modules.plotter import plot_as_graph, plot_as_pie
+from modules import portfolios as pf
 
 logger = logging.getLogger(__name__)
 
@@ -73,9 +73,18 @@ if add_selectbox == "Global":
     last_u = st.session_state.database["balance"].tail(5).astype(str) + " €"
     st.write(last_u)
 
-    # draw pie
-    st.header("Tokens repartition")
-    plot_as_pie(st.session_state.database["balance"].tail(5))
+    col_tbl, col_pie = st.columns(2)
+    with col_tbl:
+        # show all tokens
+        st.header("Tokens")
+        g_portfolios = pf.Portfolios()
+        table = g_portfolios.get_consolidated_tokens()
+        st.dataframe(table, use_container_width=True)
+
+    with col_pie:
+        # draw pie
+        st.header("Tokens repartition")
+        plot_as_pie(st.session_state.database["balance"].tail(5))
 
 if add_selectbox == "Assets Value":
     logger.debug("Assets Value")

@@ -7,7 +7,8 @@ import configparser
 import logging
 import pandas as pd
 from modules import aiprocessing
-from modules import portfolio as pf
+from modules import portfolios as pf
+from modules import cmc
 
 logging.getLogger("PIL").setLevel(logging.WARNING)
 from PIL import Image
@@ -52,9 +53,6 @@ def dataUI(df: pd.DataFrame) -> pd.DataFrame:
     if st.button("Save", key="save", icon=":material/save:"):
         saveData(st.session_state.import_page["output"], portfolios, action)
 
-    st.json(
-        st.session_state.import_page["output"].to_json(orient="records"), expanded=False
-    )
     logger.debug("Fragment ended")
 
 
@@ -65,12 +63,12 @@ def extract(input: any) -> pd.DataFrame:
         try:
             if isinstance(input, bytes):
                 message_json, _ = aiprocessing.extract_from_img(
-                    input, g_config["DEFAULT"]["openai_token"]
+                    input, g_config["APIKeys"]["openai_token"]
                 )
                 output = pd.DataFrame.from_dict(loads(message_json).get("assets"))
             elif isinstance(input, pd.DataFrame):
                 message_json, _ = aiprocessing.extract_from_df(
-                    input, g_config["DEFAULT"]["openai_token"]
+                    input, g_config["APIKeys"]["openai_token"]
                 )
                 output = pd.DataFrame.from_dict(loads(message_json).get("assets"))
             else:
@@ -96,14 +94,20 @@ def saveData(df: pd.DataFrame, portfolio: str = None, action: str = "Set"):
     if not action:
         st.error("Please select an action")
         return
+    tokens = {}
     for _, row in df.iterrows():
         if row["select"]:
             data = row.to_dict()
             logger.debug(f"Saving data: {data}")
+            tokens[data["symbol"]] = {"amount": data["amount"]}
             if action == "Set":
                 g_portfolio.set_token(portfolio, data["symbol"], data["amount"])
             elif action == "Add":
                 g_portfolio.add_token(portfolio, data["symbol"], data["amount"])
+
+    cmc_prices = cmc.cmc(g_config["APIKeys"]["coinmarketcap_token"])
+    tokens = cmc_prices.getCryptoPrices(tokens)
+
     st.toast("Data saved", icon=":material/check:")
 
 
@@ -176,7 +180,7 @@ g_config = configparser.ConfigParser()
 g_config.read(configfilepath)
 
 try:
-    debugflag = True if g_config["DEFAULT"]["debug"] == "True" else False
+    debugflag = True if g_config["APIKeys"]["debug"] == "True" else False
 except KeyError:
     debugflag = False
 

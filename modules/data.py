@@ -4,7 +4,8 @@ import logging
 
 logger = logging.getLogger(__name__)
 class Data:
-    def __init__(self, db_path: str = "./data/db.sqlite3"):
+    def __init__(self, db_path: str):
+        logger.debug("Init Data - Database: " + db_path)
         self.db_path = db_path
         self.initDatabase()
         self.df_balance = pd.DataFrame()
@@ -87,3 +88,25 @@ class Data:
 
         con.close()
         logger.debug("Dataframes loaded")
+
+    def add_data(self, timestamp: int, token: str, price: float, count: float):
+        con = sqlite3.connect(self.db_path)
+        cur = con.cursor()
+        cur.execute(
+            "INSERT INTO Database (timestamp, token, price, count) VALUES (?, ?, ?, ?)",
+            (timestamp, token, price, count),
+        )
+        con.commit()
+        con.close()
+
+    def add_data_df(self, tokens: dict):
+        logger.debug("Adding data to database")
+        timestamp = int(pd.Timestamp.now().timestamp())
+
+        df: pd.DataFrame = pd.DataFrame(columns=["timestamp", "token", "price", "count"])
+        for token, data in tokens.items():
+            df.loc[len(df)] = [timestamp, token, data["price"], data["count"]]
+        con = sqlite3.connect(self.db_path)
+        df.to_sql("Database", con, if_exists="append", index=False)
+        con.close()
+        self.make_data()

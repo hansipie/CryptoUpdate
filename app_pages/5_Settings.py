@@ -1,119 +1,124 @@
-import os
 import streamlit as st
-import configparser
 import traceback
+import logging
 
-from modules.Notion import Notion 
+from modules.Notion import Notion
+from modules.configuration import configuration as Configuration
+
+logger = logging.getLogger(__name__)
 
 st.title("Settings")
 
-if not os.path.exists("./data"):
-    os.makedirs("./data")
 
-configfilepath = "./data/settings.ini"
-
-config = configparser.ConfigParser()
-if not os.path.exists(configfilepath):
-    config['DEFAULT'] = {
-        'notion_token': '',
-        'coinmarketcap_token': '',
-        'openai_token': '',
-        'debug': 'False',
-    }
-    config['Notion'] = {
-        'database': '',
-        'parent_page': ''
-    }
-    with open(configfilepath, 'w') as configfile:
-        config.write(configfile)
-else:
-    config.read(configfilepath)
-
-sheduler_tab, notion_tab, apikeys_tab  = st.tabs(["Sheduler", "Notion Setup", "API Keys"])
-
-with sheduler_tab:
-    st.write("Sheduler")
-with notion_tab:
+@st.fragment
+def notionUI():
     st.write("Notion Setup")
     with st.form(key="notion_setup"):
         try:
-            notion = Notion(config["DEFAULT"]["notion_token"])
+            notion = Notion(st.session_state.notion_token)
         except Exception as e:
             st.error("Error: " + type(e).__name__ + " - " + str(e))
             st.error("Please set your Notion API Key")
             traceback.print_exc()
             st.stop()
-        try:
-            db_name = st.text_input("Database name", value=config["Notion"]["database"])
-        except Exception as e:
-            db_name = st.text_input("Database name", value="")
-        try:
-            parentpage_name = st.text_input("Parent page", value=config["Notion"]["parent_page"])
-        except Exception as e:
-            parentpage_name = st.text_input("Parent page", value="")
 
-        create = st.checkbox("Create Database", value=False) 
-
+        notion_database = st.text_input(
+            "Database name", key="notion_database", value=st.session_state.get("notion_database", "")
+        )
+        notion_parentpage = st.text_input(
+            "Parent page", key="notion_parentpage", value=st.session_state.get("notion_parentpage", "")
+        )
+        create = st.checkbox("Create Database", value=False)
         submit_button = st.form_submit_button(
             label="Save",
             help="Set Database from Notion.",
             use_container_width=True,
         )
         if submit_button:
-            config['Notion'] = {
-                'database': f'{db_name}',
-                'parent_page': f'{parentpage_name}',
-                'lastupdate_database': 'LastUpdate'
-            }
-            with open(configfilepath, 'w') as configfile:
-                config.write(configfile)
+            Configuration().saveConfig(st.session_state)
 
-        if db_name != "" and parentpage_name != "" and create:
+        if (
+            st.session_state.notion_database != ""
+            and st.session_state.notion_parentpage != ""
+            and create
+        ):
             with st.spinner("Creating database..."):
-                dbid = notion.createDatabase(db_name, parentpage_name)
+                dbid = notion.createDatabase(
+                    st.session_state.notion_database, st.session_state.notion_parentpage
+                )
                 if dbid is None:
                     st.error("Database not created. Please check your settings.")
                 elif dbid == "DB_EXISTS":
-                    st.warning("Database already exists: " + db_name)
+                    st.warning(
+                        "Database already exists: " + st.session_state.notion_database
+                    )
                 else:
                     st.success("Database created: " + dbid)
-            
 
-with apikeys_tab:
+
+@st.fragment
+def apikeyUI():
+    logger.debug("API Keys")
     with st.form(key="apikeys_setup"):
+        disabled = False
         try:
             col1, col2 = st.columns(2)
             with col1:
                 st.subheader("Notion")
-                notion_token = st.text_input("Notion API token", value=config["DEFAULT"]["notion_token"], type="password")
+                notion_token = st.text_input(
+                    "Notion API token",
+                    key="notion_token",
+                    type="password",
+                    value=st.session_state.get("notion_token", "")
+                )
             with col2:
                 st.subheader("Coinmarketcap")
-                coinmarketcap_token = st.text_input("Coinmarketcap API token", value=config["DEFAULT"]["coinmarketcap_token"], type="password")
+                coinmarketcap_token = st.text_input(
+                    "Coinmarketcap API token",
+                    key="coinmarketcap_token",
+                    type="password",
+                    value=st.session_state.get("coinmarketcap_token", "")
+                )
             with col1:
                 st.subheader("OpenAI")
-                openai_token = st.text_input("OpenAI API token", value=config["DEFAULT"]["openai_token"], type="password")
+                openai_token = st.text_input(
+                    "OpenAI API token",
+                    key="openai_token",
+                    type="password",
+                    value=st.session_state.get("openai_token", "")
+                )
             with col2:
                 st.subheader("Debug")
-                debug = st.checkbox("Debug", value=(True if config["DEFAULT"]["debug"] == "True" else False))
+                debug_flag = st.checkbox(
+                    "Debug",
+                    key="debug_flag",
+                    value=st.session_state.get("debug_flag", False)
+                )
 
-            submit_button = st.form_submit_button(
-                label="Save",
-                help="Save settings.",
-                use_container_width=True,
-            )
-            if submit_button:
-                config["DEFAULT"]["notion_token"] = notion_token
-                config["DEFAULT"]["coinmarketcap_token"] = coinmarketcap_token
-                config["DEFAULT"]["openai_token"] = openai_token
-                config["DEFAULT"]["debug"] = str(debug)
-                with open(configfilepath, 'w') as configfile:
-                    config.write(configfile)
         except Exception as e:
             st.error("Error: " + type(e).__name__ + " - " + str(e))
             traceback.print_exc()
-            submit_button = st.form_submit_button(
-                label="Save",
-                help="Save settings.",
-                use_container_width=True,
-                disabled=True
-            )
+            disabled = True
+        submitted = st.form_submit_button(
+            label="Save",
+            help="Save settings.",
+            use_container_width=True,
+            disabled=disabled,
+        )
+        if submitted:
+            logger.debug("Submitted")
+            Configuration().saveConfig(st.session_state)
+
+
+sheduler_tab, notion_tab, apikeys_tab = st.tabs(
+    ["Sheduler", "Notion Setup", "API Keys"]
+)
+
+with sheduler_tab:
+    st.write("Sheduler")
+with notion_tab:
+    notionUI()
+with apikeys_tab:
+    apikeyUI()
+
+st.write(st.session_state)

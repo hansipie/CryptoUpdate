@@ -92,9 +92,10 @@ def saveToDB(inifile):
 
     try:
         # Read config
-        archive_path = os.path.join(os.getcwd(), config["Local"]["archive_path"])
+        debug_flag = True if config["APIKeys"]["debug"] == "True" else False
+        archive_path = os.path.join(os.getcwd(), process.prefix(config["Local"]["archive_path"], debug_flag))
         data_path = os.path.join(os.getcwd(), config["Local"]["data_path"])
-        dbfile = os.path.join(data_path, config["Local"]["sqlite_file"])
+        dbfile = os.path.join(data_path, process.prefix(config["Local"]["sqlite_file"], debug_flag))
 
     except KeyError as ke:
         logging.error("Error: " + type(ke).__name__ + " - " + str(ke))
@@ -127,7 +128,7 @@ def updateNotion(inifile: str):
         inifile (str): Path to the configuration file.
 
     The configuration file should contain the following sections and keys:
-        [DEFAULT]
+        [APIKeys]
         notion_token = <your_notion_api_token>
         coinmarketcap_token = <your_coinmarketcap_api_token>
         debug = <True/False>
@@ -148,11 +149,11 @@ def updateNotion(inifile: str):
 
     try:
         # read config
-        notion_api_token = config["DEFAULT"]["notion_token"]
-        coinmarketcap_api_token = config["DEFAULT"]["coinmarketcap_token"]
+        notion_api_token = config["APIKeys"]["notion_token"]
+        coinmarketcap_api_token = config["APIKeys"]["coinmarketcap_token"]
         database = config["Notion"]["database"]
         parent_page = config["Notion"]["parent_page"]
-        debug = True if config["DEFAULT"]["debug"] == "True" else False
+        debug = True if config["APIKeys"]["debug"] == "True" else False
         archive_path = os.path.join(os.getcwd(), config["Local"]["archive_path"])
 
     except KeyError as ke:
