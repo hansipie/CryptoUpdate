@@ -26,4 +26,5 @@ st.header("Last values")
 last_u = last.astype(str) + " €"
 st.write(last_u)
 
-st.write(st.session_state)
+if st.session_state.settings["debug_flag"]:
+    st.write(st.session_state)

@@ -96,4 +96,5 @@ with st.form(key="settings_form"):
         ):
             createNotionDB()
 
-st.write(st.session_state)
+if st.session_state.settings["debug_flag"]:
+    st.write(st.session_state)

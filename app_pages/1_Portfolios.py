@@ -139,10 +139,6 @@ def portfolioUI(tabs: list):
                 ):
                     danger_zone(tabs[i])
 
-    with st.expander("Debug"):
-        st.write(st.session_state)
-
-
 g_portfolios = pf.Portfolios()
 
 # Add new portfolio dialog
@@ -161,3 +157,6 @@ if len(tabs) > 0:
         portfolioUI(tabs)
     except Exception as e:
         st.error(f"Error: {str(e)}")
+
+if st.session_state.settings["debug_flag"]:
+    st.write(st.session_state)

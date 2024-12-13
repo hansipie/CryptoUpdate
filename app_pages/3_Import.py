@@ -203,7 +203,7 @@ else:
     drawUI()
 
 
-with st.expander("Debug"):
+if st.session_state.settings["debug_flag"]:
     st.write(st.session_state)
 
 logger.debug("## ended ##")

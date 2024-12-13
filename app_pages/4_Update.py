@@ -109,5 +109,5 @@ with st.form(key="process_archives"):
 
             st.cache_data.clear()
 
-with st.expander("Debug"):
+if st.session_state.settings["debug_flag"]:
     st.write(st.session_state)

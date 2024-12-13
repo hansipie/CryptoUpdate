@@ -75,7 +75,10 @@ if add_selectbox == "Global":
     with col_pie:
         # draw pie
         st.header("Tokens repartition")
-        plot_as_pie(st.session_state.database["balance"].tail(5))
+        try:
+            plot_as_pie(st.session_state.database["balance"].tail(5))
+        except Exception as e:
+            st.write("Error: ", e)
 
 if add_selectbox == "Assets Value":
     logger.debug("Assets Value")
@@ -92,3 +95,5 @@ if add_selectbox == "Market":
     st.title("Market")
     build_tabs(st.session_state.database["market"])
 
+if st.session_state.settings["debug_flag"]:
+    st.write(st.session_state)
