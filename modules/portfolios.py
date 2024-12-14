@@ -1,7 +1,9 @@
 import streamlit as st
+import pandas as pd
 import logging
 import sqlite3
 from modules.process import clean_price
+from modules.process import get_current_price
 
 logger = logging.getLogger(__name__)
 
@@ -116,17 +118,16 @@ class Portfolios:
 
     def add(self, name: str):
         st.session_state.portfolios[name] = {}
-        self.save()
 
     def delete(self, name: str):
         st.session_state.portfolios.pop(name)
-        self.save()
+
 
     def set_token(self, name: str, token: str, amount: float):
         if name not in st.session_state.portfolios:
             st.session_state.portfolios[name] = {}
         st.session_state.portfolios[name][token] = {"amount": amount}
-        self.save()
+
 
     def add_token(self, name: str, token: str, amount: float):
         if name not in st.session_state.portfolios:
@@ -137,7 +138,7 @@ class Portfolios:
         st.session_state.portfolios[name][token] = {
             "amount": str(current_amount + float(amount))
         }
-        self.save()
+
 
     def delete_token(self, name: str, token: str):
         if (
@@ -145,7 +146,7 @@ class Portfolios:
             and token in st.session_state.portfolios[name]
         ):
             st.session_state.portfolios[name].pop(token)
-            self.save()
+
 
     def rename(self, old_name: str, new_name: str):
         if old_name in st.session_state.portfolios:
@@ -168,19 +169,29 @@ class Portfolios:
         else:
             raise ValueError(f"Le portfolio '{old_name}' n'existe pas")
 
-    def get_consolidated_tokens(self) -> dict:
-        """
-        Retourne un dictionnaire avec la somme totale de chaque token à travers tous les portfolios.
-        Returns:
-            dict: {token: montant_total}
-        """
-        consolidated = {}
-        for portfolio in st.session_state.portfolios.values():
-            for token, token_data in portfolio.items():
-                if token not in consolidated:
-                    consolidated[token] = 0
-                consolidated[token] += float(token_data["amount"])
-        
-        # Convertir les totaux en strings pour la cohérence avec le reste de l'application
-        return {token: str(amount) for token, amount in consolidated.items()}
+    def makedf(self, data: dict) -> pd.DataFrame:
+        logger.debug(f"makedf - Data: {data}")
+        if not data:
+            logger.debug("No data")
+            return pd.DataFrame()
+        df = pd.DataFrame(data).T
+        df.index.name = "token"
+        df["amount"] = df.apply(lambda row: clean_price(row["amount"]), axis=1)
+        # Ajouter une colonne "Value" basée sur le cours actuel
+        df["value(€)"] = df.apply(
+            lambda row: round(
+                clean_price(row["amount"]) * get_current_price(row.name), 2
+            ),
+            axis=1,
+        )
+        return df
 
+    def aggregate_tokens(self) -> dict:
+        logger.debug("Aggregating tokens")
+        df = pd.DataFrame()
+        for pf in st.session_state.portfolios:
+            df = pd.concat([df, self.makedf(st.session_state.portfolios[pf])])
+        df_ret = df.groupby("token").agg({"amount": "sum", "value(€)": "sum"})
+        logger.debug(f"Aggregated tokens: {df_ret}")
+        return df_ret
+        

@@ -1,8 +1,10 @@
 import streamlit as st
 import pandas as pd
 import logging
-from modules import portfolios as pf
-from modules.process import clean_price, get_current_price
+from modules import cmc, portfolios as pf
+from modules.plotter import plot_as_pie
+
+import matplotlib.pyplot as plt
 
 
 logger = logging.getLogger(__name__)
@@ -17,6 +19,7 @@ def add_new_portfolio():
     if st.button("Submit"):
         logger.debug(f"Adding portfolio {name}")
         g_portfolios.add(name)
+        g_portfolios.save()
         # Close dialog
         st.rerun()
 
@@ -28,6 +31,7 @@ def danger_zone(name: str):
     confirm = st.text_input("Type 'delete' to confirm")
     if st.button("Delete") and confirm == "delete":
         g_portfolios.delete(name)
+        g_portfolios.save()
         st.rerun()
 
 
@@ -49,6 +53,7 @@ def add_token(name: str):
     amount = st.number_input("Amount", min_value=0.0, format="%.8f")
     if st.button("Submit"):
         g_portfolios.add_token(name, token, amount)
+        g_portfolios.save()
         # Close dialog
         st.rerun()
 
@@ -60,23 +65,9 @@ def delete_token(name: str):
     token = st.selectbox("Token", list(st.session_state.portfolios[name].keys()))
     if st.button("Submit"):
         g_portfolios.delete_token(name, token)
+        g_portfolios.save()
         # Close dialog
         st.rerun()
-
-
-@st.cache_data
-def makedf(data: dict) -> pd.DataFrame:
-    logger.debug(f"makedf - Data: {data}")
-    df = pd.DataFrame(data).T
-    df.index.name = "token"
-    df["amount"] = df.apply(lambda row: clean_price(row["amount"]), axis=1)
-    # Ajouter une colonne "Value" basée sur le cours actuel
-    df["value(€)"] = df.apply(
-        lambda row: round(clean_price(row["amount"]) * get_current_price(row.name), 2),
-        axis=1,
-    )
-
-    return df
 
 
 def portfolioUI(tabs: list):
@@ -88,7 +79,7 @@ def portfolioUI(tabs: list):
         with tab:
             data = st.session_state.portfolios[tabs[i]]
             if data:  # Only create DataFrame if data exists
-                df = makedf(data)
+                df = g_portfolios.makedf(data)
                 logger.debug(f"Dataframe:\n{df}")
                 updated_data = st.data_editor(df, use_container_width=True)
                 if not updated_data.equals(df):
@@ -139,13 +130,69 @@ def portfolioUI(tabs: list):
                 ):
                     danger_zone(tabs[i])
 
+
+def aggregaterUI():
+    df = pd.DataFrame()
+    for pf in st.session_state.portfolios:
+        df = pd.concat([df, g_portfolios.makedf(st.session_state.portfolios[pf])])
+
+    col_tbl, col_pie = st.columns(2)
+    with col_tbl:
+        st.header("Tokens")
+        if not df.empty:
+            df = df.groupby("token").agg({"amount": "sum", "value(€)": "sum"})
+            st.dataframe(df, use_container_width=True, height=650)
+            st.write("Total value: €" + str(round(df["value(€)"].sum(), 2)))
+        else:
+            st.warning("No data available")
+    with col_pie:
+        st.header("Tokens repartition")
+        if not df.empty:
+            # Créer un graphique en secteurs pour la colonne "value(€)"
+            transposed = df.transpose()
+            transposed = transposed.drop("amount")
+            logger.debug(f"transposed:\n{transposed}")
+            plot_as_pie(transposed)
+        else:
+            st.warning("No data available")
+
+def update_prices():
+    df = pd.DataFrame()
+    for pf in st.session_state.portfolios:
+        df = pd.concat([df, g_portfolios.makedf(st.session_state.portfolios[pf])])
+    if df.empty:
+        logger.debug("No data available")
+        return
+    df.groupby("token").agg({"amount": "sum", "value(€)": "sum"})
+    df.drop(columns=["value(€)"], inplace=True)
+    logger.debug(f"update_prices - Dataframe:\n{df}")
+
+    cmc_prices = cmc.cmc(st.session_state.settings["coinmarketcap_token"])
+    tokens = cmc_prices.getCryptoPrices(df.to_dict(orient="index"))
+    logger.debug(f"update_prices - Tokens: {tokens}")
+    
+    st.toast("Prices updated")
+
+
 g_portfolios = pf.Portfolios()
 
 # Add new portfolio dialog
 if st.sidebar.button(
-    "Add new portfolio", key="add_new_portfolio", icon=":material/note_add:"
+    "Add new portfolio",
+    key="add_new_portfolio",
+    icon=":material/note_add:",
+    use_container_width=True,
 ):
     add_new_portfolio()
+
+# Update prices
+if st.sidebar.button(
+    "Update prices",
+    key="update_prices",
+    icon=":material/refresh:",
+    use_container_width=True,
+):
+    update_prices()
 
 # Display portfolios
 tabs = []
@@ -158,5 +205,11 @@ if len(tabs) > 0:
     except Exception as e:
         st.error(f"Error: {str(e)}")
 
-if st.session_state.settings["debug_flag"]:
-    st.write(st.session_state)
+st.divider()
+
+# Display portfolios aggregated data
+st.title("Totals")
+aggregaterUI()
+
+
+st.write(st.session_state.database)

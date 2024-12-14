@@ -58,8 +58,12 @@ def get_current_price(token: str) -> float:
     if prices.empty:
         return 0.0
 
-    # Récupérer la valeur brute
-    raw_price = prices[token].values[0]
+    # Récupérer la valeur brute 
+    try:
+        raw_price = prices[token].values[0]
+    except KeyError:
+        logger.warning(f"Pas de prix pour {token}")
+        return 0.0
 
     # Nettoyer et convertir la valeur
     try:

@@ -63,12 +63,12 @@ def extract(input: any) -> pd.DataFrame:
         try:
             if isinstance(input, bytes):
                 message_json, _ = aiprocessing.extract_from_img(
-                    input, st.session_state.openai_token
+                    input, st.session_state.settings["openai_token"]
                 )
                 output = pd.DataFrame.from_dict(loads(message_json).get("assets"))
             elif isinstance(input, pd.DataFrame):
                 message_json, _ = aiprocessing.extract_from_df(
-                    input, st.session_state.openai_token
+                    input, st.session_state.settings["openai_token"]
                 )
                 output = pd.DataFrame.from_dict(loads(message_json).get("assets"))
             else:
@@ -104,10 +104,7 @@ def saveData(df: pd.DataFrame, portfolio: str = None, action: str = "Set"):
                 g_portfolio.set_token(portfolio, data["symbol"], data["amount"])
             elif action == "Add":
                 g_portfolio.add_token(portfolio, data["symbol"], data["amount"])
-
-    cmc_prices = cmc.cmc(st.session_state.coinmarketcap_token)
-    tokens = cmc_prices.getCryptoPrices(tokens)
-
+    g_portfolio.save()
     st.toast("Data saved", icon=":material/check:")
 
 
