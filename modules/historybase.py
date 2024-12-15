@@ -3,16 +3,14 @@ import pandas as pd
 import logging
 
 logger = logging.getLogger(__name__)
-class Data:
+class HistoryBase:
     def __init__(self, db_path: str):
-        logger.debug("Init Data - Database: " + db_path)
         self.db_path = db_path
         self.initDatabase()
         self.df_balance = pd.DataFrame()
         self.df_tokencount = pd.DataFrame()
         self.df_market = pd.DataFrame()
         self.df_sum = pd.DataFrame()
-        self.make_data()
 
     def initDatabase(self):
         logger.debug("Init database")
@@ -24,7 +22,7 @@ class Data:
         con.commit()
         con.close()
 
-    def make_data(self):
+    def makeDataframes(self):
         logger.debug("Make dataframes")
 
         con = sqlite3.connect(self.db_path)
@@ -105,8 +103,9 @@ class Data:
 
         df: pd.DataFrame = pd.DataFrame(columns=["timestamp", "token", "price", "count"])
         for token, data in tokens.items():
-            df.loc[len(df)] = [timestamp, token, data["price"], data["count"]]
+            df.loc[len(df)] = [timestamp, token, data["price"], data["amount"]]
+        logger.debug(f"Dataframe to add:\n{df}")
         con = sqlite3.connect(self.db_path)
         df.to_sql("Database", con, if_exists="append", index=False)
         con.close()
-        self.make_data()
+        self.makeDataframes()

@@ -2,7 +2,7 @@ import streamlit as st
 import logging
 import sys
 from modules import process
-from modules.data import Data
+from modules.historybase import HistoryBase
 from modules.configuration import configuration as Configuration
 
 st.set_page_config(layout="wide", page_title="CryptoUpdate", page_icon="📈")
@@ -17,7 +17,9 @@ logger = logging.getLogger(__name__)
 
 @st.cache_data(show_spinner=False)
 def getData(dbfile):
-    return Data(dbfile)
+    histdb = HistoryBase(dbfile)
+    histdb.makeDataframes()
+    return histdb
 
 logger.debug("### Start Render ###")
 

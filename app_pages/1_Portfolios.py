@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import logging
 from modules import cmc, portfolios as pf
+from modules.historybase import HistoryBase
 from modules.plotter import plot_as_pie
 
 import matplotlib.pyplot as plt
@@ -152,7 +153,10 @@ def aggregaterUI():
             transposed = df.transpose()
             transposed = transposed.drop("amount")
             logger.debug(f"transposed:\n{transposed}")
-            plot_as_pie(transposed)
+            try:
+                plot_as_pie(transposed)
+            except Exception as e:
+                st.error(f"Error: {str(e)}")
         else:
             st.warning("No data available")
 
@@ -163,13 +167,14 @@ def update_prices():
     if df.empty:
         logger.debug("No data available")
         return
-    df.groupby("token").agg({"amount": "sum", "value(€)": "sum"})
     df.drop(columns=["value(€)"], inplace=True)
-    logger.debug(f"update_prices - Dataframe:\n{df}")
+    df = df.groupby("token").agg({"amount": "sum"})
 
     cmc_prices = cmc.cmc(st.session_state.settings["coinmarketcap_token"])
-    tokens = cmc_prices.getCryptoPrices(df.to_dict(orient="index"))
-    logger.debug(f"update_prices - Tokens: {tokens}")
+    upd_table = cmc_prices.getCryptoPrices(df.to_dict(orient="index"))
+    logger.debug(f"Updated prices table:\n{upd_table}")
+    histdb = HistoryBase(st.session_state.dbfile)
+    histdb.add_data_df(upd_table)
     
     st.toast("Prices updated")
 
