@@ -5,7 +5,7 @@ import requests
 import logging
 from alive_progress import alive_bar
 from dotenv import load_dotenv
-from modules import Notion
+from modules import Notion, cmc
 
 class Updater:
     def __init__(self, coinmarketcap_token: str, notion_token: str, database_id: str):
@@ -32,48 +32,16 @@ class Updater:
             resp.update({text: {"page": v["id"], "price": price}})
         return resp
 
-    def getCryptoPrices(self, debug=False):
+    def getCryptoPrices(self):
         """
         Get the price of the cryptocurrencies from the Coinmarketcap API
         """
-        names = str(",").join(self.notion_entries)
-        logging.info(f"Request tokens current prices for {names}")
-        if debug:
-            logging.info(
-                "Debug mode: use sandbox-api.coinmarketcap.com instead of pro-api.coinmarketcap.com"
-            )
-            url = (
-                "https://sandbox-api.coinmarketcap.com/v2/cryptocurrency/quotes/latest"
-            )
-            headers = {"X-CMC_PRO_API_KEY": "b54bcf4d-1bca-4e8e-9a24-22ff2c3d462c"}
+        cmc_prices = cmc.cmc(self.coinmarketcap_token)
+        upd_table = cmc_prices.getCryptoPrices(self.notion_entries)
+        if upd_table is not None:
+            self.notion_entries = upd_table
         else:
-            url = "https://pro-api.coinmarketcap.com/v2/cryptocurrency/quotes/latest"
-            headers = {"X-CMC_PRO_API_KEY": str(self.coinmarketcap_token)}
-
-        params = {
-            "symbol": names,
-            "convert": "EUR",
-        }
-
-        response = requests.get(url, headers=headers, params=params)
-        if response.status_code == 200:
-            content = response.json()
-            logging.info("Get current maket prices form Coinmarketcap successfully")
-            for name in content["data"]:
-                try:
-                    if content["data"][name][0]["quote"]["EUR"]["price"] is None:
-                        self.notion_entries[name]["price"] = 0
-                    else:
-                        self.notion_entries[name]["price"] = content["data"][name][0][
-                            "quote"
-                        ]["EUR"]["price"]
-                except:
-                    logging.error(
-                        "Error getting current coins values (", name, "). Set to null."
-                    )
-                    self.notion_entries[name]["price"] = 0
-        else:
-            logging.error(f"Error getting current coins values. code: {response.status_code}")
+            logging.error("Error getting current coins values. Quit.")
             quit()
 
     def UpdateDBHandleError(self, response):
@@ -127,11 +95,11 @@ class Updater:
         )
         self.notion.patchNotionPage(pageId, properties)
 
-    def UpdateCrypto(self, debug=False):
+    def UpdateCrypto(self):
         """
         Update the Notion database with the current price of the cryptocurrency
         """
-        self.getCryptoPrices(debug=debug)
+        self.getCryptoPrices()
 
         count = len(self.notion_entries)
         with alive_bar(

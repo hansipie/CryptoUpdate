@@ -46,7 +46,8 @@ class cmc:
                             "price"
                         ]
                 except:
-                    pass
+                    logger.error(f"Error: {content['data'][name][0]}")
+                    tokens[name]["price"] = 0
             logger.debug(f"Prices: {tokens}")
             return tokens
         else:

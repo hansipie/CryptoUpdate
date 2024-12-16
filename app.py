@@ -2,8 +2,9 @@ import streamlit as st
 import logging
 import sys
 from modules import process
-from modules.historybase import HistoryBase
-from modules.configuration import configuration as Configuration
+from modules.historybase import HistoryBase as hb
+from modules.configuration import configuration as cfg
+from modules.portfolios import Portfolios as pf
 
 st.set_page_config(layout="wide", page_title="CryptoUpdate", page_icon="📈")
 
@@ -17,13 +18,13 @@ logger = logging.getLogger(__name__)
 
 @st.cache_data(show_spinner=False)
 def getData(dbfile):
-    histdb = HistoryBase(dbfile)
+    histdb = hb(dbfile)
     histdb.makeDataframes()
     return histdb
 
 logger.debug("### Start Render ###")
 
-config = Configuration()
+config = cfg()
 try:
     config.readConfig()
 except FileNotFoundError:
@@ -42,6 +43,9 @@ st.session_state.database["sum"] = data.df_sum
 st.session_state.database["balance"] = data.df_balance
 st.session_state.database["tokencount"] = data.df_tokencount
 st.session_state.database["market"] = data.df_market
+
+if "portfolios" not in st.session_state:
+    pf(st.session_state.dbfile)
 
 home_page = st.Page("app_pages/0_Home.py", title="Home", icon="🏠", default=True)
 pfolios_page = st.Page("app_pages/1_Portfolios.py", title="Portfolios", icon="📊")

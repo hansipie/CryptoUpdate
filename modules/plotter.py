@@ -10,6 +10,9 @@ logger = logging.getLogger(__name__)
 def plot_as_pie(df):
     # find value of 1% of the total
     total = df.sum(axis=1).values[0]
+    if total == 0:
+        st.error("No data to plot")
+        return
     limit = (1 * total) / 100
     logger.debug(f"1% of {total} is {limit}")
 

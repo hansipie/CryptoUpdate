@@ -3,6 +3,8 @@ import pandas as pd
 import logging
 
 logger = logging.getLogger(__name__)
+
+
 class HistoryBase:
     def __init__(self, db_path: str):
         self.db_path = db_path
@@ -22,70 +24,83 @@ class HistoryBase:
         con.commit()
         con.close()
 
-    def makeDataframes(self):
-        logger.debug("Make dataframes")
-
-        con = sqlite3.connect(self.db_path)
-
-        # sum
-        df_temp = pd.read_sql_query(
+    def getSums(self, con) -> pd.DataFrame:
+        logger.debug("Get sums")
+        df = pd.read_sql_query(
             "SELECT DISTINCT timestamp from Database ORDER BY timestamp", con
         )
-        self.df_sum = pd.DataFrame(columns=["datetime", "value"])
-        for mytime in df_temp["timestamp"]:
+        df_sum = pd.DataFrame(columns=["datetime", "value"])
+        for mytime in df["timestamp"]:
             dftmp = pd.read_sql_query(
                 f"SELECT ROUND(sum(price*(CASE WHEN count IS NOT NULL THEN count ELSE 0 END)), 2) as value, DATETIME(timestamp, 'unixepoch') AS datetime from Database WHERE timestamp = {str(mytime)};",
                 con,
             )
-            self.df_sum.loc[len(self.df_sum)] = [
-                dftmp["datetime"][0],
-                dftmp["value"][0],
-            ]
-        self.df_sum.set_index("datetime", inplace=True)
+            df_sum.loc[len(df_sum)] = [dftmp["datetime"][0], dftmp["value"][0]]
+        df_sum.set_index("datetime", inplace=True)
+        return df_sum
 
-        # balances
+    def getBalances(self, con) -> pd.DataFrame:
+        logger.debug("Get balances")
         df_tokens = pd.read_sql_query("select DISTINCT token from Database", con)
+        df_balance = pd.DataFrame()
         for token in df_tokens["token"]:
             df = pd.read_sql_query(
                 f"SELECT DATETIME(timestamp, 'unixepoch') AS datetime, ROUND(price*(CASE WHEN count IS NOT NULL THEN count ELSE 0 END), 2) AS '{token}' FROM Database WHERE token = '{token}' ORDER BY timestamp;",
                 con,
             )
             df.set_index("datetime", inplace=True)
-            if self.df_balance.empty:
-                self.df_balance = df
+            if df_balance.empty:
+                df_balance = df
             else:
-                self.df_balance = self.df_balance.join(df, how="outer")
+                df_balance = df_balance.join(df, how="outer")
+        df_balance = df_balance.fillna(0)
+        df_balance.sort_index()
+        return df_balance
 
+    def getTokenCounts(self, con) -> pd.DataFrame:
+        logger.debug("Get token counts")
+        df_tokens = pd.read_sql_query("select DISTINCT token from Database", con)
+        df_tokencount = pd.DataFrame()
+        for token in df_tokens["token"]:
             df = pd.read_sql_query(
                 f"SELECT DATETIME(timestamp, 'unixepoch') AS datetime, count AS '{token}' FROM Database WHERE token = '{token}' ORDER BY timestamp;",
                 con,
             )
             df.set_index("datetime", inplace=True)
-            if self.df_tokencount.empty:
-                self.df_tokencount = df
+            if df_tokencount.empty:
+                df_tokencount = df
             else:
-                self.df_tokencount = self.df_tokencount.join(df, how="outer")
+                df_tokencount = df_tokencount.join(df, how="outer")
+        df_tokencount = df_tokencount.fillna(0)
+        df_tokencount.sort_index()
+        return df_tokencount
 
+    def getMarket(self, con) -> pd.DataFrame:
+        logger.debug("Get market")
+        df_tokens = pd.read_sql_query("select DISTINCT token from Database", con)
+        df_market = pd.DataFrame()
+        for token in df_tokens["token"]:
             df = pd.read_sql_query(
                 f"SELECT DATETIME(timestamp, 'unixepoch') AS datetime, price AS '{token}' FROM Database WHERE token = '{token}' ORDER BY timestamp;",
                 con,
             )
             df.set_index("datetime", inplace=True)
-            if self.df_market.empty:
-                self.df_market = df
+            if df_market.empty:
+                df_market = df
             else:
-                self.df_market = self.df_market.join(df, how="outer")
+                df_market = df_market.join(df, how="outer")
+        df_market = df_market.fillna(0)
+        df_market.sort_index()
+        return df_market
 
-        self.df_balance = self.df_balance.fillna(0)
-        self.df_tokencount = self.df_tokencount.fillna(0)
-        self.df_market = self.df_market.fillna(0)
-
-        self.df_balance.sort_index()
-        self.df_tokencount.sort_index()
-        self.df_market.sort_index()
-
+    def makeDataframes(self):
+        logger.debug("Make dataframes")
+        con = sqlite3.connect(self.db_path)
+        self.df_sum = self.getSums(con)
+        self.df_balance = self.getBalances(con)
+        self.df_tokencount = self.getTokenCounts(con)
+        self.df_market = self.getMarket(con)
         con.close()
-        logger.debug("Dataframes loaded")
 
     def add_data(self, timestamp: int, token: str, price: float, count: float):
         con = sqlite3.connect(self.db_path)
@@ -99,10 +114,14 @@ class HistoryBase:
 
     def add_data_df(self, tokens: dict):
         logger.debug("Adding data to database")
+
         timestamp = int(pd.Timestamp.now().timestamp())
 
-        df: pd.DataFrame = pd.DataFrame(columns=["timestamp", "token", "price", "count"])
+        df: pd.DataFrame = pd.DataFrame(
+            columns=["timestamp", "token", "price", "count"]
+        )
         for token, data in tokens.items():
+            logger.debug(f"data: {data}")
             df.loc[len(df)] = [timestamp, token, data["price"], data["amount"]]
         logger.debug(f"Dataframe to add:\n{df}")
         con = sqlite3.connect(self.db_path)

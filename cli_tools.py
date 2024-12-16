@@ -153,7 +153,6 @@ def updateNotion(inifile: str):
         coinmarketcap_api_token = config["APIKeys"]["coinmarketcap_token"]
         database = config["Notion"]["database"]
         parent_page = config["Notion"]["parent_page"]
-        debug = True if config["APIKeys"]["debug"] == "True" else False
         archive_path = os.path.join(os.getcwd(), config["Local"]["archive_path"])
 
     except KeyError as ke:
@@ -168,7 +167,7 @@ def updateNotion(inifile: str):
         quit()
 
     # update database with current market values
-    Updater(coinmarketcap_api_token, notion_api_token, db_id).UpdateCrypto(debug=debug)
+    Updater(coinmarketcap_api_token, notion_api_token, db_id).UpdateCrypto()
 
     # export database to file.
     # destination: {archive_path}/[epoch]/*.csv

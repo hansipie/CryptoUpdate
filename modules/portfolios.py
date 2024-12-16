@@ -39,9 +39,10 @@ class Portfolios:
         self._load_portfolios()
 
     def _load_portfolios(self):
+        logger.debug("Loading portfolios from database")
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT id, name FROM Portfolios")
+            cursor.execute("SELECT id, name FROM Portfolios ORDER BY name")
             portfolio_rows = cursor.fetchall()
 
             portfolios = {}

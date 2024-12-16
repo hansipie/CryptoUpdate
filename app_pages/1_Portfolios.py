@@ -63,7 +63,12 @@ def add_token(name: str):
 @st.dialog("Delete Token")
 def delete_token(name: str):
     st.write(f"Delete token from {name}")
-    token = st.selectbox("Token", list(st.session_state.portfolios[name].keys()))
+    token = st.selectbox(
+        "Token",
+        list(st.session_state.portfolios[name].keys()),
+        index=None,
+        placeholder="Select a token",
+    )
     if st.button("Submit"):
         g_portfolios.delete_token(name, token)
         g_portfolios.save()
@@ -81,8 +86,9 @@ def portfolioUI(tabs: list):
             data = st.session_state.portfolios[tabs[i]]
             if data:  # Only create DataFrame if data exists
                 df = g_portfolios.makedf(data)
+                height = (len(df) * 35) + 38
                 logger.debug(f"Dataframe:\n{df}")
-                updated_data = st.data_editor(df, use_container_width=True)
+                updated_data = st.data_editor(df, use_container_width=True, height=height)
                 if not updated_data.equals(df):
                     # Convert updated DataFrame back to storage format
                     st.session_state.portfolios[tabs[i]] = updated_data.to_dict(
@@ -141,8 +147,11 @@ def aggregaterUI():
     with col_tbl:
         st.header("Tokens")
         if not df.empty:
+            height = (len(df) * 35) + 38
+            height = min(height, 650)
+
             df = df.groupby("token").agg({"amount": "sum", "value(€)": "sum"})
-            st.dataframe(df, use_container_width=True, height=650)
+            st.dataframe(df, use_container_width=True, height=height)
             st.write("Total value: €" + str(round(df["value(€)"].sum(), 2)))
         else:
             st.warning("No data available")
@@ -160,6 +169,7 @@ def aggregaterUI():
         else:
             st.warning("No data available")
 
+
 def update_prices():
     df = pd.DataFrame()
     for pf in st.session_state.portfolios:
@@ -175,11 +185,17 @@ def update_prices():
     logger.debug(f"Updated prices table:\n{upd_table}")
     histdb = HistoryBase(st.session_state.dbfile)
     histdb.add_data_df(upd_table)
+
+    histdb.makeDataframes()
+    st.session_state.database["sum"] = histdb.df_sum
+    st.session_state.database["balance"] = histdb.df_balance
+    st.session_state.database["tokencount"] = histdb.df_tokencount
+    st.session_state.database["market"] = histdb.df_market
     
     st.toast("Prices updated")
 
 
-g_portfolios = pf.Portfolios()
+g_portfolios = pf.Portfolios(st.session_state.dbfile)
 
 # Add new portfolio dialog
 if st.sidebar.button(
@@ -216,5 +232,5 @@ st.divider()
 st.title("Totals")
 aggregaterUI()
 
-
-st.write(st.session_state.database)
+if st.session_state.settings["debug_flag"]:
+    st.write(st.session_state.database)

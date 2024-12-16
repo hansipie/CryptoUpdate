@@ -17,3 +17,4 @@ syncArchives.py
 .devcontainer/devcontainer.json
 backend/db.sqlite3
 requirements.txt
+/debug_archives
