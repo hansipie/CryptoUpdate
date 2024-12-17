@@ -170,8 +170,8 @@ class Portfolios:
         else:
             raise ValueError(f"Le portfolio '{old_name}' n'existe pas")
 
-    def makedf(self, data: dict) -> pd.DataFrame:
-        logger.debug(f"makedf - Data: {data}")
+    def create_portfolio_dataframe(self, data: dict) -> pd.DataFrame:
+        logger.debug(f"Create portfolio dataframe - Data: {data}")
         if not data:
             logger.debug("No data")
             return pd.DataFrame()
@@ -191,7 +191,7 @@ class Portfolios:
         logger.debug("Aggregating tokens")
         df = pd.DataFrame()
         for pf in st.session_state.portfolios:
-            df = pd.concat([df, self.makedf(st.session_state.portfolios[pf])])
+            df = pd.concat([df, self.create_portfolio_dataframe(st.session_state.portfolios[pf])])
         df_ret = df.groupby("token").agg({"amount": "sum", "value(€)": "sum"})
         logger.debug(f"Aggregated tokens: {df_ret}")
         return df_ret

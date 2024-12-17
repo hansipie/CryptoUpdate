@@ -86,7 +86,7 @@ def portfolioUI(tabs: list):
         with tab:
             data = st.session_state.portfolios[tabs[i]]
             if data:  # Only create DataFrame if data exists
-                df = g_portfolios.makedf(data)
+                df = g_portfolios.create_portfolio_dataframe(data)
                 height = (len(df) * 35) + 38
                 logger.debug(f"Dataframe:\n{df}")
                 updated_data = st.data_editor(df, use_container_width=True, height=height)
@@ -142,7 +142,7 @@ def portfolioUI(tabs: list):
 def aggregaterUI():
     df = pd.DataFrame()
     for pf in st.session_state.portfolios:
-        df = pd.concat([df, g_portfolios.makedf(st.session_state.portfolios[pf])])
+        df = pd.concat([df, g_portfolios.create_portfolio_dataframe(st.session_state.portfolios[pf])])
 
     col_tbl, col_pie = st.columns(2)
     with col_tbl:
@@ -174,7 +174,7 @@ def aggregaterUI():
 def update_prices():
     df = pd.DataFrame()
     for pf in st.session_state.portfolios:
-        df = pd.concat([df, g_portfolios.makedf(st.session_state.portfolios[pf])])
+        df = pd.concat([df, g_portfolios.create_portfolio_dataframe(st.session_state.portfolios[pf])])
     if df.empty:
         logger.debug("No data available")
         return
@@ -184,7 +184,7 @@ def update_prices():
     cmc_prices = cmc(st.session_state.settings["coinmarketcap_token"])
     new_entries = cmc_prices.getCryptoPrices(df.to_dict(orient="index"))
     HistoryBase(st.session_state.dbfile).add_data_df(new_entries)
-    
+
     st.toast("Prices updated")
 
 
