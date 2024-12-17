@@ -1,9 +1,10 @@
 import streamlit as st
 import pandas as pd
 import logging
-from modules import cmc, portfolios as pf
+from modules.cmc import cmc
 from modules.historybase import HistoryBase
 from modules.plotter import plot_as_pie
+from modules.portfolios import Portfolios as pf
 
 import matplotlib.pyplot as plt
 
@@ -180,22 +181,18 @@ def update_prices():
     df.drop(columns=["value(€)"], inplace=True)
     df = df.groupby("token").agg({"amount": "sum"})
 
-    cmc_prices = cmc.cmc(st.session_state.settings["coinmarketcap_token"])
-    upd_table = cmc_prices.getCryptoPrices(df.to_dict(orient="index"))
-    logger.debug(f"Updated prices table:\n{upd_table}")
-    histdb = HistoryBase(st.session_state.dbfile)
-    histdb.add_data_df(upd_table)
-
-    histdb.makeDataframes()
-    st.session_state.database["sum"] = histdb.df_sum
-    st.session_state.database["balance"] = histdb.df_balance
-    st.session_state.database["tokencount"] = histdb.df_tokencount
-    st.session_state.database["market"] = histdb.df_market
+    cmc_prices = cmc(st.session_state.settings["coinmarketcap_token"])
+    new_entries = cmc_prices.getCryptoPrices(df.to_dict(orient="index"))
+    HistoryBase(st.session_state.dbfile).add_data_df(new_entries)
     
     st.toast("Prices updated")
 
 
-g_portfolios = pf.Portfolios(st.session_state.dbfile)
+def load_portfolios():
+    return pf(st.session_state.dbfile)
+
+
+g_portfolios = load_portfolios()
 
 # Add new portfolio dialog
 if st.sidebar.button(

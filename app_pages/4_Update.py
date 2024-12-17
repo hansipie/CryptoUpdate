@@ -6,7 +6,8 @@ import logging
 from modules.Exporter import Exporter
 from modules.Notion import Notion
 from modules.Updater import Updater
-from modules.process import getDateFrame, dropDuplicate, listfilesrecursive
+from modules.historybase import HistoryBase
+from modules.process import getDateFrame, listfilesrecursive
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +29,7 @@ with st.form(key="update_database"):
                     st.stop()
                 else:
                     updater = Updater(st.session_state.settings["coinmarketcap_token"], st.session_state.settings["notion_token"], db_id)
-                    updater.getCryptoPrices(debug=st.session_state.settings["debug_flag"])
+                    updater.getCryptoPrices()
             except KeyError as ke:
                 st.error("Error: " + type(ke).__name__ + " - " + str(ke))
                 st.error("Please set your settings in the settings page")
@@ -55,7 +56,7 @@ with st.form(key="update_database"):
         with st.spinner("Exporting database..."):
             try:
                 exporter = Exporter(st.session_state.settings["notion_token"], st.session_state.archive_path)
-                csvfile = exporter.GetCSVfile(st.session_state.settings["notion_database"])
+                csvfile = exporter.GetCSVfile(st.session_state.settings["notion_database"], st.session_state.settings["notion_parentpage"])
             except KeyError as ke:
                 st.error("Error: " + type(ke).__name__ + " - " + str(ke))
                 st.error("Please set your settings in the settings page")
@@ -88,26 +89,27 @@ with st.form(key="process_archives"):
             st.warning("No archives found.")
         else:
             st.write("Found in archives: ", archiveFiles)
-            conn = sqlite3.connect(st.session_state.dbfile)
             migrate_bar = st.progress(0)
             count = 0
-            for item in archiveFiles:
-                logger.debug(f"Inserting {item}")
-                migrate_bar.progress(
-                    count / len(archiveFiles), text=f"Inserting {item}"
-                )
-                if item.endswith(".csv"):
-                    df = getDateFrame(item)
-                    logger.debug(f"Inserting {df}")
-                    df.to_sql("Database", conn, if_exists="append", index=False)
-                else:
-                    logger.debug(f"ignore: {item}")
-                count += 1
-            migrate_bar.progress(100, text="Done")
-            dropDuplicate(conn)
-            conn.close()
-
-            st.cache_data.clear()
+            
+            # Utilisation du gestionnaire de contexte pour la connexion
+            with sqlite3.connect(st.session_state.dbfile) as conn:
+                for item in archiveFiles:
+                    logger.debug(f"Inserting {item}")
+                    migrate_bar.progress(
+                        count / len(archiveFiles), text=f"Inserting {item}"
+                    )
+                    if item.endswith(".csv"):
+                        df = getDateFrame(item)
+                        logger.debug(f"Inserting {df}")
+                        df.to_sql("Database", conn, if_exists="append", index=False)
+                    else:
+                        logger.debug(f"ignore: {item}")
+                    count += 1
+                migrate_bar.progress(100, text="Done")
+                st.success("Archives processed")
+            histdb = HistoryBase(st.session_state.dbfile)
+            histdb.dropDuplicate()
 
 if st.session_state.settings["debug_flag"]:
     st.write(st.session_state)

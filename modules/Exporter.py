@@ -12,9 +12,9 @@ class Exporter:
         self.epochstr = str(math.floor(time.time()))
         self.archive_path = archive_path
 
-    def __getDashboardData(self, database_name):
+    def __getDashboardData(self, database_name, parent_page):
         """Get the dashboard data from notion"""
-        dashboard_id = self.notion.getObjectId(database_name, "database")
+        dashboard_id = self.notion.getObjectId(database_name, "database", parent_page)
         if dashboard_id is None:
             logging.debug(f"Error: {database_name} database not found")
             return None
@@ -25,10 +25,10 @@ class Exporter:
         dashboard = self.notion.getEntitiesFromDashboard(entities)
         return dashboard
 
-    def GetCSVfile(self, database_name):
+    def GetCSVfile(self, database_name, parent_page):
         
         destpath = os.path.join(self.archive_path, f"{self.epochstr}.csv")
-        dashboard = self.__getDashboardData(database_name)
+        dashboard = self.__getDashboardData(database_name, parent_page)
 
         #save dict to csv file
         if not os.path.exists(os.path.dirname(destpath)):

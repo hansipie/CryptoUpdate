@@ -12,6 +12,7 @@ from modules.Notion import Notion
 from modules.Updater import Updater
 from alive_progress import alive_bar
 from modules import process
+from modules.historybase import HistoryBase
 
 # logging
 logging.basicConfig(
@@ -93,9 +94,9 @@ def saveToDB(inifile):
     try:
         # Read config
         debug_flag = True if config["APIKeys"]["debug"] == "True" else False
-        archive_path = os.path.join(os.getcwd(), process.prefix(config["Local"]["archive_path"], debug_flag))
+        archive_path = os.path.join(os.getcwd(), process.debug_prefix(config["Local"]["archive_path"], debug_flag))
         data_path = os.path.join(os.getcwd(), config["Local"]["data_path"])
-        dbfile = os.path.join(data_path, process.prefix(config["Local"]["sqlite_file"], debug_flag))
+        dbfile = os.path.join(data_path, process.debug_prefix(config["Local"]["sqlite_file"], debug_flag))
 
     except KeyError as ke:
         logging.error("Error: " + type(ke).__name__ + " - " + str(ke))
@@ -116,8 +117,10 @@ def saveToDB(inifile):
             else:
                 logger.debug(f"ignore: {item}")
             bar()
-    process.dropDuplicate(conn)
     conn.close()
+
+    histdb = HistoryBase(dbfile)
+    histdb.dropDuplicate()
 
 @app.command()
 def updateNotion(inifile: str):
@@ -171,7 +174,7 @@ def updateNotion(inifile: str):
 
     # export database to file.
     # destination: {archive_path}/[epoch]/*.csv
-    file = Exporter(notion_api_token, archive_path).GetCSVfile(database)
+    file = Exporter(notion_api_token, archive_path).GetCSVfile(database, parent_page)
 
     logging.info(f"Output file: {file}")
     logging.info("Done.")

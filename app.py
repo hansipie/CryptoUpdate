@@ -16,12 +16,6 @@ logging.basicConfig(
 
 logger = logging.getLogger(__name__)
 
-@st.cache_data(show_spinner=False)
-def getData(dbfile):
-    histdb = hb(dbfile)
-    histdb.makeDataframes()
-    return histdb
-
 logger.debug("### Start Render ###")
 
 config = cfg()
@@ -32,20 +26,6 @@ except FileNotFoundError:
     st.stop()
 
 process.loadSettings(config.conf)
-
-# get dataframes from archives
-with st.spinner("Extracting data..."):
-    data = getData(st.session_state.dbfile)
-
-if "database" not in st.session_state:
-    st.session_state.database = {}
-st.session_state.database["sum"] = data.df_sum
-st.session_state.database["balance"] = data.df_balance
-st.session_state.database["tokencount"] = data.df_tokencount
-st.session_state.database["market"] = data.df_market
-
-if "portfolios" not in st.session_state:
-    pf(st.session_state.dbfile)
 
 home_page = st.Page("app_pages/0_Home.py", title="Home", icon="🏠", default=True)
 pfolios_page = st.Page("app_pages/1_Portfolios.py", title="Portfolios", icon="📊")
