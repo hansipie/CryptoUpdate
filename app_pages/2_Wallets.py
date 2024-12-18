@@ -25,7 +25,7 @@ def build_tabs(df: pd.DataFrame):
 
                 plot_as_graph(df_view, options, count, tab)
 
-                tab.write(df_view[options[count]].tail(1))
+                tab.write(df_view[options[count]])
                 count += 1
         st.session_state.options_save = options
     else:

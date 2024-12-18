@@ -103,7 +103,7 @@ def saveData(df: pd.DataFrame, portfolio: str = None, action: str = "Set"):
             if action == "Set":
                 g_portfolio.set_token(portfolio, data["symbol"], data["amount"])
             elif action == "Add":
-                g_portfolio.add_token(portfolio, data["symbol"], data["amount"])
+                g_portfolio.set_token_add(portfolio, data["symbol"], data["amount"])
     g_portfolio.save()
     st.toast("Data saved", icon=":material/check:")
 

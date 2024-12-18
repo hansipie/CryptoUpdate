@@ -3,12 +3,13 @@ import pandas as pd
 import logging
 
 logger = logging.getLogger(__name__)
-
+logger.setLevel(logging.WARNING)
 
 class HistoryBase:
     def __init__(self, db_path: str):
         self.db_path = db_path
         self.__initDatabase()
+        
 
     def __initDatabase(self):
         logger.debug("Init database")

@@ -93,7 +93,7 @@ def saveToDB(inifile):
 
     try:
         # Read config
-        debug_flag = True if config["APIKeys"]["debug"] == "True" else False
+        debug_flag = True if config["Debug"]["flag"] == "True" else False
         archive_path = os.path.join(os.getcwd(), process.debug_prefix(config["Local"]["archive_path"], debug_flag))
         data_path = os.path.join(os.getcwd(), config["Local"]["data_path"])
         dbfile = os.path.join(data_path, process.debug_prefix(config["Local"]["sqlite_file"], debug_flag))
@@ -131,20 +131,19 @@ def updateNotion(inifile: str):
         inifile (str): Path to the configuration file.
 
     The configuration file should contain the following sections and keys:
-        [APIKeys]
-        notion_token = <your_notion_api_token>
-        coinmarketcap_token = <your_coinmarketcap_api_token>
-        debug = <True/False>
-
         [Notion]
+        token = <your_notion_api_token>
         database = <your_database_name>
-        parent_page = <your_parent_page_id>
+        parentpage = <your_parent_page_id>
+
+        [Coinmarketcap]
+        token = <your_coinmarketcap_api_token>
 
         [Local]
         archive_path = <path_to_archive_directory>
 
-    Raises:
-        KeyError: If any of the required configuration keys are missing.
+        [Debug]
+        flag = <True/False>
     """
 
     config = configparser.ConfigParser()
@@ -152,10 +151,10 @@ def updateNotion(inifile: str):
 
     try:
         # read config
-        notion_api_token = config["APIKeys"]["notion_token"]
-        coinmarketcap_api_token = config["APIKeys"]["coinmarketcap_token"]
+        notion_api_token = config["Notion"]["token"]
+        coinmarketcap_api_token = config["Coinmarketcap"]["token"]
         database = config["Notion"]["database"]
-        parent_page = config["Notion"]["parent_page"]
+        parentpage = config["Notion"]["parentpage"]
         archive_path = os.path.join(os.getcwd(), config["Local"]["archive_path"])
 
     except KeyError as ke:
@@ -164,7 +163,7 @@ def updateNotion(inifile: str):
         quit()
 
     notion = Notion(notion_api_token)
-    db_id = notion.getObjectId(database, "database", parent_page)
+    db_id = notion.getObjectId(database, "database", parentpage)
     if db_id == None:
         logging.error("Error: Database not found")
         quit()
@@ -174,7 +173,7 @@ def updateNotion(inifile: str):
 
     # export database to file.
     # destination: {archive_path}/[epoch]/*.csv
-    file = Exporter(notion_api_token, archive_path).GetCSVfile(database, parent_page)
+    file = Exporter(notion_api_token, archive_path).GetCSVfile(database, parentpage)
 
     logging.info(f"Output file: {file}")
     logging.info("Done.")

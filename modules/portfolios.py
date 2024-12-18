@@ -5,6 +5,9 @@ import sqlite3
 from modules.process import clean_price
 from modules.process import get_current_price
 
+logging.getLogger("matplotlib").setLevel(logging.WARNING)
+logging.getLogger("PIL").setLevel(logging.WARNING)
+logging.getLogger("modules.process").setLevel(logging.WARNING)
 logger = logging.getLogger(__name__)
 
 
@@ -36,139 +39,117 @@ class Portfolios:
             )
             conn.commit()
 
-        self._load_portfolios()
-
-    def _load_portfolios(self):
-        logger.debug("Loading portfolios from database")
+    def get_portfolio_names(self) -> list:
+        logger.debug("Getting portfolios from database")
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT id, name FROM Portfolios ORDER BY name")
-            portfolio_rows = cursor.fetchall()
-
-            portfolios = {}
-            for p_id, name in portfolio_rows:
-                portfolios[name] = {}
-                # Charger les tokens pour ce portfolio
-                cursor.execute(
-                    "SELECT token, amount FROM Tokens_PF WHERE portfolio_id = ?",
-                    (p_id,),
-                )
-                for token, amount in cursor.fetchall():
-                    portfolios[name][token] = {"amount": amount}
-
-            st.session_state.portfolios = portfolios
-
-    def save(self):
-        logger.debug("Saving portfolios to database")
+            cursor.execute("SELECT name FROM Portfolios")
+            # return sorted list of portfolios
+            list = [row[0] for row in cursor.fetchall()]
+            logger.debug(f"Getting portfolios from database {list}")
+            list.sort()
+            return list
+        
+    def get_portfolio(self, name: str) -> dict:
+        logger.debug(f"Getting portfolio {name} from database")
         with sqlite3.connect(self.db_path) as conn:
-            try:
-                cursor = conn.cursor()
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                SELECT token, amount FROM Tokens_PF
+                JOIN Portfolios ON Tokens_PF.portfolio_id = Portfolios.id
+                WHERE Portfolios.name = ?
+            """,
+                (name,),
+            )
+            return {row[0]: {"amount": row[1]} for row in cursor.fetchall()}
 
-                # Sauvegarder l'état actuel avant modifications
-                cursor.execute(
-                    "CREATE TEMP TABLE IF NOT EXISTS Portfolios_Backup AS SELECT * FROM Portfolios"
-                )
-                cursor.execute(
-                    "CREATE TEMP TABLE IF NOT EXISTS Tokens_PF_Backup AS SELECT * FROM Tokens_PF"
-                )
+    def add_portfolio(self, name: str):
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute("INSERT INTO Portfolios (name) VALUES (?)", (name,))
+            conn.commit()
 
-                # Vider les tables
-                cursor.execute("DELETE FROM Tokens_PF")
-                cursor.execute("DELETE FROM Portfolios")
+    def delete_portfolio(self, name: str):
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM Portfolios WHERE name = ?", (name,))
+            conn.commit()
 
-                # Insérer les portfolios
-                for portfolio_name in st.session_state.portfolios:
-                    cursor.execute(
-                        "INSERT INTO Portfolios (name) VALUES (?)", (portfolio_name,)
-                    )
-                    portfolio_id = cursor.lastrowid
 
-                    # Insérer les tokens
-                    for token, token_data in st.session_state.portfolios[
-                        portfolio_name
-                    ].items():
-                        logger.debug(
-                            f"Inserting token {token} for portfolio {portfolio_name}"
-                        )
-                        logger.debug(f"Token data: {token_data}")
-                        amount = clean_price(token_data["amount"])
-                        cursor.execute(
-                            "INSERT INTO Tokens_PF (portfolio_id, token, amount) VALUES (?, ?, ?)",
-                            (portfolio_id, token, amount),
-                        )
-                        logger.debug(f"Token {token} inserted")
-
-                # Si tout s'est bien passé, supprimer les tables de backup
-                cursor.execute("DROP TABLE IF EXISTS Portfolios_Backup")
-                cursor.execute("DROP TABLE IF EXISTS Tokens_PF_Backup")
-                conn.commit()
-
-            except Exception as e:
-                logger.error(f"Error during save operation: {str(e)}")
-                # Restaurer l'état précédent
-                cursor.execute("DELETE FROM Portfolios")
-                cursor.execute("DELETE FROM Tokens_PF")
-                cursor.execute("INSERT INTO Portfolios SELECT * FROM Portfolios_Backup")
-                cursor.execute("INSERT INTO Tokens_PF SELECT * FROM Tokens_PF_Backup")
-                cursor.execute("DROP TABLE IF EXISTS Portfolios_Backup")
-                cursor.execute("DROP TABLE IF EXISTS Tokens_PF_Backup")
-                conn.commit()
-                raise Exception(f"Échec de la sauvegarde: {str(e)}")
-
-        logger.debug("Portfolios saved to database")
-
-    def add(self, name: str):
-        st.session_state.portfolios[name] = {}
-
-    def delete(self, name: str):
-        st.session_state.portfolios.pop(name)
+    def rename_portfolio(self, old_name: str, new_name: str):
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute("UPDATE Portfolios SET name = ? WHERE name = ?", (new_name, old_name))
+            conn.commit()
 
 
     def set_token(self, name: str, token: str, amount: float):
-        if name not in st.session_state.portfolios:
-            st.session_state.portfolios[name] = {}
-        st.session_state.portfolios[name][token] = {"amount": amount}
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                INSERT OR REPLACE INTO Tokens_PF (portfolio_id, token, amount)
+                VALUES (
+                    (SELECT id FROM Portfolios WHERE name = ?),
+                    ?,
+                    ?
+                )
+            """,
+                (name, token, str(amount)),
+            )
 
 
-    def add_token(self, name: str, token: str, amount: float):
-        if name not in st.session_state.portfolios:
-            st.session_state.portfolios[name] = {}
-        if token not in st.session_state.portfolios[name]:
-            st.session_state.portfolios[name][token] = {"amount": "0"}
-        current_amount = float(st.session_state.portfolios[name][token]["amount"])
-        st.session_state.portfolios[name][token] = {
-            "amount": str(current_amount + float(amount))
-        }
+    def set_token_add(self, name: str, token: str, amount: float):
+        #add amout to the ampount of an existing token in portfolio
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                SELECT token, amount FROM Tokens_PF
+                JOIN Portfolios ON Tokens_PF.portfolio_id = Portfolios.id
+                WHERE Portfolios.name = ? AND Tokens_PF.token = ?
+            """,
+                (name, token),
+            )
+            row = cursor.fetchone()
+            if row:
+                new_amount = float(row[1]) + amount
+                cursor.execute(
+                    """
+                    UPDATE Tokens_PF
+                    SET amount = ?
+                    WHERE portfolio_id = (SELECT id FROM Portfolios WHERE name = ?) AND token = ?
+                """,
+                    (str(new_amount), name, token),
+                )
+            else:
+                cursor.execute(
+                    """
+                    INSERT INTO Tokens_PF (portfolio_id, token, amount)
+                    VALUES (
+                        (SELECT id FROM Portfolios WHERE name = ?),
+                        ?,
+                        ?
+                    )
+                """,
+                    (name, token, str(amount)),
+                )
+            conn.commit()
 
 
     def delete_token(self, name: str, token: str):
-        if (
-            name in st.session_state.portfolios
-            and token in st.session_state.portfolios[name]
-        ):
-            st.session_state.portfolios[name].pop(token)
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                DELETE FROM Tokens_PF
+                WHERE portfolio_id = (SELECT id FROM Portfolios WHERE name = ?) AND token = ?
+            """,
+                (name, token),
+            )
+            conn.commit()
 
-
-    def rename(self, old_name: str, new_name: str):
-        if old_name in st.session_state.portfolios:
-            if new_name not in st.session_state.portfolios:  # Éviter les doublons
-                # Modifier dans session_state
-                st.session_state.portfolios[new_name] = st.session_state.portfolios.pop(
-                    old_name
-                )
-
-                # Mise à jour dans la base de données
-                with sqlite3.connect(self.db_path) as conn:
-                    cursor = conn.cursor()
-                    cursor.execute(
-                        "UPDATE Portfolios SET name = ? WHERE name = ?",
-                        (new_name, old_name),
-                    )
-                    conn.commit()
-            else:
-                raise ValueError(f"Un portfolio nommé '{new_name}' existe déjà")
-        else:
-            raise ValueError(f"Le portfolio '{old_name}' n'existe pas")
 
     def create_portfolio_dataframe(self, data: dict) -> pd.DataFrame:
         logger.debug(f"Create portfolio dataframe - Data: {data}")
@@ -185,14 +166,27 @@ class Portfolios:
             ),
             axis=1,
         )
+        #sort df by token
+        df = df.sort_index()
         return df
 
-    def aggregate_tokens(self) -> dict:
-        logger.debug("Aggregating tokens")
-        df = pd.DataFrame()
-        for pf in st.session_state.portfolios:
-            df = pd.concat([df, self.create_portfolio_dataframe(st.session_state.portfolios[pf])])
-        df_ret = df.groupby("token").agg({"amount": "sum", "value(€)": "sum"})
-        logger.debug(f"Aggregated tokens: {df_ret}")
-        return df_ret
+    def aggregate_portfolios(self) -> dict:
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                SELECT token, amount FROM Tokens_PF
+                JOIN Portfolios ON Tokens_PF.portfolio_id = Portfolios.id
+            """
+            )
+            data = cursor.fetchall()
+            df = pd.DataFrame(data, columns=["token", "amount"])
+            logger.debug(f"Aggregate portfolios - Data: {df}")
+            df["amount"] = df.apply(lambda row: clean_price(row["amount"]), axis=1)
+            return df.groupby("token").agg({"amount": "sum"}).to_dict(orient="index")
         
+    def update_portfolio(self, input_data: dict):
+        for name, tokens in input_data.items():
+            for token, amount in tokens.items():
+                self.set_token(name, token, amount)
+        return True

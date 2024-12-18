@@ -4,9 +4,11 @@ import logging
 from modules.cmc import cmc
 from modules.historybase import HistoryBase
 from modules.plotter import plot_as_pie
-from modules.portfolios import Portfolios as pf
+from modules.portfolios import Portfolios
 
 import matplotlib.pyplot as plt
+
+from modules.process import get_current_price
 
 
 logger = logging.getLogger(__name__)
@@ -20,7 +22,7 @@ def add_new_portfolio():
     name = st.text_input("Name")
     if st.button("Submit"):
         logger.debug(f"Adding portfolio {name}")
-        g_portfolios.add(name)
+        g_portfolios.add_portfolio(name)
         g_portfolios.save()
         # Close dialog
         st.rerun()
@@ -32,7 +34,7 @@ def danger_zone(name: str):
     st.write(f"Delete portfolio {name}?")
     confirm = st.text_input("Type 'delete' to confirm")
     if st.button("Delete") and confirm == "delete":
-        g_portfolios.delete(name)
+        g_portfolios.delete_portfolio(name)
         g_portfolios.save()
         st.rerun()
 
@@ -54,7 +56,7 @@ def add_token(name: str):
     token = token.upper()
     amount = st.number_input("Amount", min_value=0.0, format="%.8f")
     if st.button("Submit"):
-        g_portfolios.add_token(name, token, amount)
+        g_portfolios.set_token_add(name, token, amount)
         g_portfolios.save()
         # Close dialog
         st.rerun()
@@ -66,7 +68,7 @@ def delete_token(name: str):
     st.write(f"Delete token from {name}")
     token = st.selectbox(
         "Token",
-        list(st.session_state.portfolios[name].keys()),
+        g_portfolios.get_portfolio_names,
         index=None,
         placeholder="Select a token",
     )
@@ -84,18 +86,14 @@ def portfolioUI(tabs: list):
 
     for i, tab in enumerate(tabs_widget):
         with tab:
-            data = st.session_state.portfolios[tabs[i]]
-            if data:  # Only create DataFrame if data exists
-                df = g_portfolios.create_portfolio_dataframe(data)
+            pf = g_portfolios.get_portfolio(tabs[i])
+            df = g_portfolios.create_portfolio_dataframe(pf)
+            if not df.empty:  # Only create DataFrame if data exists
                 height = (len(df) * 35) + 38
                 logger.debug(f"Dataframe:\n{df}")
                 updated_data = st.data_editor(df, use_container_width=True, height=height)
                 if not updated_data.equals(df):
-                    # Convert updated DataFrame back to storage format
-                    st.session_state.portfolios[tabs[i]] = updated_data.to_dict(
-                        orient="index"
-                    )
-                    g_portfolios.save()
+                    g_portfolios.update_portfolio({tabs[i]: updated_data.to_dict()})
                     logger.debug("## Rerun ##")
                     st.rerun()
                 else:
@@ -138,11 +136,9 @@ def portfolioUI(tabs: list):
                 ):
                     danger_zone(tabs[i])
 
-
 def aggregaterUI():
-    df = pd.DataFrame()
-    for pf in st.session_state.portfolios:
-        df = pd.concat([df, g_portfolios.create_portfolio_dataframe(st.session_state.portfolios[pf])])
+    agg = g_portfolios.aggregate_portfolios()
+    df = g_portfolios.create_portfolio_dataframe(agg)
 
     col_tbl, col_pie = st.columns(2)
     with col_tbl:
@@ -172,14 +168,11 @@ def aggregaterUI():
 
 
 def update_prices():
-    df = pd.DataFrame()
-    for pf in st.session_state.portfolios:
-        df = pd.concat([df, g_portfolios.create_portfolio_dataframe(st.session_state.portfolios[pf])])
-    if df.empty:
-        logger.debug("No data available")
+
+    agg = g_portfolios.aggregate_portfolios()
+    if not agg:
+        st.warning("No data available")
         return
-    df.drop(columns=["value(€)"], inplace=True)
-    df = df.groupby("token").agg({"amount": "sum"})
 
     cmc_prices = cmc(st.session_state.settings["coinmarketcap_token"])
     new_entries = cmc_prices.getCryptoPrices(df.to_dict(orient="index"))
@@ -188,11 +181,11 @@ def update_prices():
     st.toast("Prices updated")
 
 
-def load_portfolios():
-    return pf(st.session_state.dbfile)
+def load_portfolios(dbfile: str) -> Portfolios:
+    return Portfolios(dbfile)
 
 
-g_portfolios = load_portfolios()
+g_portfolios = load_portfolios(st.session_state.dbfile)
 
 # Add new portfolio dialog
 if st.sidebar.button(
@@ -213,15 +206,13 @@ if st.sidebar.button(
     update_prices()
 
 # Display portfolios
-tabs = []
-for _, section in enumerate(st.session_state.portfolios):
-    tabs.append(section)
+tabs = g_portfolios.get_portfolio_names()
+logger.debug(f"Portfolios: {tabs}")
 
-if len(tabs) > 0:
-    try:
-        portfolioUI(tabs)
-    except Exception as e:
-        st.error(f"Error: {str(e)}")
+try:
+    portfolioUI(tabs)
+except Exception as e:
+    st.error(f"Error: {str(e)}")
 
 st.divider()
 
@@ -230,4 +221,4 @@ st.title("Totals")
 aggregaterUI()
 
 if st.session_state.settings["debug_flag"]:
-    st.write(st.session_state.database)
+    st.write(st.session_state)
