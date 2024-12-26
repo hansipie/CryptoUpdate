@@ -26,7 +26,10 @@ def get_image_type(image: bytes):
 
 def extract_from_df(df: pd.DataFrame, api_key: str):
     messages = [
-        {"role": "system", "content": "You are a data extraction model."},
+        {
+            "role": "system",
+            "content": "You are a data extraction model. You must return responses in JSON format only.",
+        },
         {"role": "assistant", "content": f"data: ```{df.to_json()}```"},
         {
             "role": "user",
@@ -34,12 +37,27 @@ def extract_from_df(df: pd.DataFrame, api_key: str):
                 "The data is a JSON dump of a cryptocurrency portfolio.\n"
                 "Analyse it and identifying individual assets details.\n"
                 "Extract the following informations:\n"
-                "- Asset's name\n"
-                "- Asset's numeric amount written in a valid float format, without symbol (if applicable)\n"
-                "- Asset's cryptocurrency symbol\n"
-                "- Asset's fiat value written into a valid float format (if applicable)\n"
-                "Format the extracted data into a well-structured JSON format, ensuring that each asset is represented as an object within an array.\n"
-                'If you can not find cryptocurrencies data in the image, return only the string "NO_DATA".'
+                "{\n"
+                '  "assets": [\n'
+                "    {\n"
+                '      "name": "Bitcoin",\n'
+                '      "amount": 0.5,\n'
+                '      "symbol": "BTC",\n'
+                '      "value": 15000.00\n'
+                "    },\n"
+                "    {\n"
+                '      "name": "Ethereum",\n'
+                '      "amount": 2.5,\n'
+                '      "symbol": "ETH",\n'
+                '      "value": 4500.50\n'
+                "    }\n"
+                "  ]\n"
+                "}\n"
+                'If no cryptocurrency data is found, return exactly: {"assets": []}\n'
+                "Rules:\n"
+                "- amount and value must be valid floats without currency symbols\n"
+                "- symbol must be uppercase\n"
+                "- name must be the full name of the cryptocurrency\n"
             ),
         },
     ]
@@ -58,7 +76,10 @@ def extract_from_img(bytes_data: bytes, api_key: str):
     base64_image = base64.b64encode(bytes_data).decode("utf-8")
 
     messages = [
-        {"role": "system", "content": "You are a data extraction model."},
+        {
+            "role": "system",
+            "content": "You are a data extraction model. You must return responses in JSON format only.",
+        },
         {
             "role": "user",
             "content": [
@@ -67,13 +88,28 @@ def extract_from_img(bytes_data: bytes, api_key: str):
                     "text": (
                         "The image is a screenshot of a cryptocurrency portfolio.\n"
                         "Analyse it and identifying individual assets details.\n"
-                        "Extract the following informations:\n"
-                        "- Asset's name\n"
-                        "- Asset's numeric amount written in a valid float format, without symbol (if applicable)\n"
-                        "- Asset's cryptocurrency symbol\n"
-                        "- Asset's fiat value written into a valid float format (if applicable)\n"
-                        "Format the extracted data into a well-structured JSON format, ensuring that each asset is represented as an object within an array.\n"
-                        'If you can not find cryptocurrencies data in the image, return only the string "NO_DATA".'
+                        "Extract the following informations and format them exactly like this example:\n"
+                        "{\n"
+                        '  "assets": [\n'
+                        "    {\n"
+                        '      "name": "Bitcoin",\n'
+                        '      "amount": 0.5,\n'
+                        '      "symbol": "BTC",\n'
+                        '      "value": 15000.00\n'
+                        "    },\n"
+                        "    {\n"
+                        '      "name": "Ethereum",\n'
+                        '      "amount": 2.5,\n'
+                        '      "symbol": "ETH",\n'
+                        '      "value": 4500.50\n'
+                        "    }\n"
+                        "  ]\n"
+                        "}\n"
+                        'If no cryptocurrency data is found, return exactly: {"assets": []}\n'
+                        "Rules:\n"
+                        "- amount and value must be valid floats without currency symbols\n"
+                        "- symbol must be uppercase\n"
+                        "- name must be the full name of the cryptocurrency\n"
                     ),
                 },
                 {

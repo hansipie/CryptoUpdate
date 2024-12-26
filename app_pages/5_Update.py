@@ -6,7 +6,7 @@ import logging
 from modules.Exporter import Exporter
 from modules.Notion import Notion
 from modules.Updater import Updater
-from modules.historybase import HistoryBase
+from modules.database.historybase import HistoryBase
 from modules.process import getDateFrame, listfilesrecursive
 
 logger = logging.getLogger(__name__)

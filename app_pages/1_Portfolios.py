@@ -2,9 +2,9 @@ import streamlit as st
 import pandas as pd
 import logging
 from modules.cmc import cmc
-from modules.historybase import HistoryBase
+from modules.database.historybase import HistoryBase
 from modules.plotter import plot_as_pie
-from modules.portfolios import Portfolios
+from modules.database.portfolios import Portfolios
 
 import matplotlib.pyplot as plt
 
@@ -23,7 +23,6 @@ def add_new_portfolio():
     if st.button("Submit"):
         logger.debug(f"Adding portfolio {name}")
         g_portfolios.add_portfolio(name)
-        g_portfolios.save()
         # Close dialog
         st.rerun()
 
@@ -35,7 +34,6 @@ def danger_zone(name: str):
     confirm = st.text_input("Type 'delete' to confirm")
     if st.button("Delete") and confirm == "delete":
         g_portfolios.delete_portfolio(name)
-        g_portfolios.save()
         st.rerun()
 
 
@@ -57,7 +55,6 @@ def add_token(name: str):
     amount = st.number_input("Amount", min_value=0.0, format="%.8f")
     if st.button("Submit"):
         g_portfolios.set_token_add(name, token, amount)
-        g_portfolios.save()
         # Close dialog
         st.rerun()
 
@@ -68,13 +65,12 @@ def delete_token(name: str):
     st.write(f"Delete token from {name}")
     token = st.selectbox(
         "Token",
-        g_portfolios.get_portfolio_names,
+        g_portfolios.get_tokens(name),
         index=None,
         placeholder="Select a token",
     )
     if st.button("Submit"):
         g_portfolios.delete_token(name, token)
-        g_portfolios.save()
         # Close dialog
         st.rerun()
 
@@ -93,7 +89,7 @@ def portfolioUI(tabs: list):
                 logger.debug(f"Dataframe:\n{df}")
                 updated_data = st.data_editor(df, use_container_width=True, height=height)
                 if not updated_data.equals(df):
-                    g_portfolios.update_portfolio({tabs[i]: updated_data.to_dict()})
+                    g_portfolios.update_portfolio({tabs[i]: updated_data.to_dict(orient="index")})
                     logger.debug("## Rerun ##")
                     st.rerun()
                 else:

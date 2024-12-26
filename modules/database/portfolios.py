@@ -83,6 +83,18 @@ class Portfolios:
             cursor.execute("UPDATE Portfolios SET name = ? WHERE name = ?", (new_name, old_name))
             conn.commit()
 
+    def get_tokens(self, name: str) -> dict:
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                SELECT token, amount FROM Tokens_PF
+                JOIN Portfolios ON Tokens_PF.portfolio_id = Portfolios.id
+                WHERE Portfolios.name = ?
+            """,
+                (name,),
+            )
+            return {row[0]: row[1] for row in cursor.fetchall()}
 
     def set_token(self, name: str, token: str, amount: float):
         with sqlite3.connect(self.db_path) as conn:
@@ -186,7 +198,9 @@ class Portfolios:
             return df.groupby("token").agg({"amount": "sum"}).to_dict(orient="index")
         
     def update_portfolio(self, input_data: dict):
-        for name, tokens in input_data.items():
-            for token, amount in tokens.items():
-                self.set_token(name, token, amount)
+        logger.debug(f"Update portfolio - Data: {input_data.items()}")
+        for portfolio_name, tokens in input_data.items():
+            logger.debug(f"Update portfolio - Name: {portfolio_name} - Tokens: {tokens.items()}")
+            for token_name, token_details in tokens.items():
+                self.set_token(portfolio_name, token_name, token_details["amount"])  
         return True

@@ -12,7 +12,7 @@ from modules.Notion import Notion
 from modules.Updater import Updater
 from alive_progress import alive_bar
 from modules import process
-from modules.historybase import HistoryBase
+from modules.database.historybase import HistoryBase
 
 # logging
 logging.basicConfig(

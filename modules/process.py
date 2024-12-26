@@ -3,7 +3,7 @@ import logging
 import os
 import hashlib
 import streamlit as st
-from modules.historybase import HistoryBase as hb
+from modules.database.historybase import HistoryBase as hb
 
 logger = logging.getLogger(__name__)
 
@@ -104,3 +104,4 @@ def load_db(dbfile: str) -> pd.DataFrame:
         df_market = histdb.getMarket()
         df_tokencount = histdb.getTokenCounts()
         return df_balance, df_sums, df_market, df_tokencount
+    

@@ -7,7 +7,7 @@ import configparser
 import logging
 import pandas as pd
 from modules import aiprocessing
-from modules import portfolios as pf
+from modules.database import portfolios as pf
 from modules import cmc
 
 logging.getLogger("PIL").setLevel(logging.WARNING)
@@ -29,11 +29,6 @@ def decodeImg(image_bytes) -> bytes:
     return img_bytes.getvalue()
 
 
-def getPortfolios() -> list:
-    logger.debug("Getting portfolios")
-    return list(st.session_state.portfolios.keys())
-
-
 @st.fragment
 def dataUI(df: pd.DataFrame) -> pd.DataFrame:
     # add column for portfolios
@@ -46,7 +41,10 @@ def dataUI(df: pd.DataFrame) -> pd.DataFrame:
     col_pfolios, col_action = st.columns([0.8, 0.2], vertical_alignment="center")
     with col_pfolios:
         portfolios = st.selectbox(
-            "Portfolios", getPortfolios(), index=None, placeholder="Select a portfolio"
+            "Portfolios",
+            g_portfolio.get_portfolio_names(),
+            index=None,
+            placeholder="Select a portfolio",
         )
     with col_action:
         action = st.segmented_control("Actions", ["Set", "Add"], default="Set")
@@ -104,7 +102,6 @@ def saveData(df: pd.DataFrame, portfolio: str = None, action: str = "Set"):
                 g_portfolio.set_token(portfolio, data["symbol"], data["amount"])
             elif action == "Add":
                 g_portfolio.set_token_add(portfolio, data["symbol"], data["amount"])
-    g_portfolio.save()
     st.toast("Data saved", icon=":material/check:")
 
 

@@ -146,3 +146,8 @@ class HistoryBase:
                 logger.debug(f"Found {dupcount} duplicated rows. Dropping...") 
                 df.drop_duplicates(inplace=True)
                 df.to_sql('Database', con, if_exists='replace', index=False)
+
+    def getTokens(self) -> list:
+        with sqlite3.connect(self.db_path) as con:
+            df = pd.read_sql_query("SELECT DISTINCT token from Database ORDER BY token", con)
+            return df["token"].to_list()
