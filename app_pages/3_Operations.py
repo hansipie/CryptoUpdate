@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import logging
+import tzlocal
 from modules.database.portfolios import Portfolios
 from modules.database.historybase import HistoryBase
 from modules.database.operations import operations
@@ -19,13 +20,20 @@ def submitbuy(date, time, from_amount, form_currency, to_amount, to_token, to_wa
     logger.debug(
         f"submitbuy: date={date}, time={time} from_amount={from_amount}, form_currency={form_currency}, to_amount={to_amount}, to_token={to_token}, to_wallet={to_wallet}"
     )
-    
-    #date if formated as yyyy-mm-dd, time as hh:mm:00. merge them to a datetime object and convert it to epoch timestamp
-    datetime = pd.to_datetime(f"{date} {time}")
-    timestamp = datetime.timestamp()
-    logger.debug(f"submitbuy: timestamp={timestamp}")
 
-    op.insert("buy", from_amount, to_amount, form_currency, to_token, timestamp, to_wallet)
+    # date if formated as yyyy-mm-dd, time as hh:mm:00. merge them to a datetime object, convert to UTC and then to epoch timestamp
+    datetime_local = pd.to_datetime(f"{date} {time}")
+    local_timezone = tzlocal.get_localzone()
+    logger.debug(f"Timezone locale: {local_timezone}")
+    datetime_utc = datetime_local.tz_localize(local_timezone).tz_convert("UTC")
+    timestamp = datetime_utc.timestamp()
+    logger.debug(
+        f"submitbuy: local_time={datetime_local}, utc_time={datetime_utc}, timestamp={timestamp}"
+    )
+
+    op.insert(
+        "buy", from_amount, to_amount, form_currency, to_token, timestamp, to_wallet
+    )
 
     if to_wallet is not None:
         g_portfolios.set_token_add(to_wallet, to_token, to_amount)
@@ -76,20 +84,36 @@ with buy_tab:
                 "Portfolio", g_wallets, key="to_wallet", index=None
             )
         if st.form_submit_button("Submit", use_container_width=True):
-            submitbuy(date, time, from_amount, form_currency, to_amount, to_token, to_wallet)
-    
+            submitbuy(
+                date, time, from_amount, form_currency, to_amount, to_token, to_wallet
+            )
+
     buylist = op.get_operations_by_type("buy")
-    #save buylist to a dataframe
-    df_buylist = pd.DataFrame(buylist, columns=["id", "type", "From",  "To", "Currency", "Token", "timestamp", "Portfolio"])
-    #drop id and type columns
+    # save buylist to a dataframe
+    df_buylist = pd.DataFrame(
+        buylist,
+        columns=[
+            "id",
+            "type",
+            "From",
+            "To",
+            "Currency",
+            "Token",
+            "timestamp",
+            "Portfolio",
+        ],
+    )
+    # drop id and type columns
     df_buylist.drop(columns=["id", "type"], inplace=True)
-    #convert timestamp to datetime
+    # convert timestamp to datetime
     df_buylist["timestamp"] = pd.to_datetime(df_buylist["timestamp"], unit="s")
-    #reorder columns
-    df_buylist = df_buylist[["timestamp", "From", "Currency", "To", "Token", "Portfolio"]]
-    #sort by timestamp in descending order
+    # reorder columns
+    df_buylist = df_buylist[
+        ["timestamp", "From", "Currency", "To", "Token", "Portfolio"]
+    ]
+    # sort by timestamp in descending order
     df_buylist.sort_values(by="timestamp", ascending=False, inplace=True)
-    
+
     st.dataframe(df_buylist, use_container_width=True, hide_index=True)
 
 with swap_tab:
@@ -153,7 +177,7 @@ with import_tab:
         if st.button("Import"):
             for index, row in df.iterrows():
                 op.insert(
-                    "buy", 
+                    "buy",
                     row["Value HT (€)"],
                     row["Coins Value"],
                     "EUR",
