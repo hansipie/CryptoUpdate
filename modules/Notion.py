@@ -207,7 +207,7 @@ class Notion:
         ret = {}
         with alive_bar(
             len(entities),
-            title="Get market prices",
+            title="Get Dashboard Entities",
             force_tty=True,
             stats="(eta:{eta})",
         ) as bar:
