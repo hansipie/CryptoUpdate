@@ -104,7 +104,7 @@ class HistoryBase:
 
     def add_data_df(self, tokens: dict):
         logger.debug("Adding data to database")
-        timestamp = int(pd.Timestamp.now().timestamp())
+        timestamp = int(pd.Timestamp.now(tz='UTC').timestamp())
 
         df: pd.DataFrame = pd.DataFrame(
             columns=["timestamp", "token", "price", "count"]
