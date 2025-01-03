@@ -29,9 +29,10 @@ process.loadSettings(config.conf)
 
 home_page = st.Page("app_pages/0_Home.py", title="Home", icon="🏠", default=True)
 pfolios_page = st.Page("app_pages/1_Portfolios.py", title="Portfolios", icon="📊")
-operations_page = st.Page("app_pages/2_Operations.py", title="Operations", icon="💱")
-import_page = st.Page("app_pages/3_Import.py", title="Import", icon="📥")
-wallets_page = st.Page("app_pages/4_Wallets.py", title="Wallets", icon="💰")
+thematics_page = st.Page("app_pages/1_1_Thematics.py", title="Thematics", icon="📊")
+wallets_page = st.Page("app_pages/2_Wallets.py", title="Wallets", icon="💰")
+operations_page = st.Page("app_pages/3_Operations.py", title="Operations", icon="💱")
+import_page = st.Page("app_pages/4_Import.py", title="Import", icon="📥")
 update_page = st.Page("app_pages/5_Update.py", title="Update", icon="🔄")
 settings_page = st.Page("app_pages/6_Settings.py", title="Settings", icon="⚙️")
 
@@ -39,8 +40,9 @@ pg = st.navigation(
     [
         home_page,
         pfolios_page,
-        operations_page,
+        thematics_page,
         wallets_page,
+        operations_page,
         import_page,
         update_page,
         settings_page,

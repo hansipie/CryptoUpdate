@@ -37,9 +37,11 @@ class Updater:
         Get the price of the cryptocurrencies from the Coinmarketcap API
         """
         cmc_prices = cmc.cmc(self.coinmarketcap_token)
-        upd_table = cmc_prices.getCryptoPrices(self.notion_entries)
-        if upd_table is not None:
-            self.notion_entries = upd_table
+        tokens = list(self.notion_entries.keys())
+        token_prices = cmc_prices.getCryptoPrices(tokens)
+        if token_prices is not None:
+            for token, data in token_prices.items():
+                self.notion_entries[token]["price"] = data["price"]
         else:
             logging.error("Error getting current coins values. Quit.")
             quit()

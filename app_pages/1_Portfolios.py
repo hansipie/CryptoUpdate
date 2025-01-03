@@ -164,14 +164,27 @@ def aggregaterUI():
 
 
 def update_prices():
-
     agg = g_portfolios.aggregate_portfolios()
     if not agg:
         st.warning("No data available")
         return
+    logger.debug(f"agg: {agg}")
+
+    #save in a list the agg keys
+    tokens = list(agg.keys())
+    logger.debug(f"tokens: {tokens}")
 
     cmc_prices = cmc(st.session_state.settings["coinmarketcap_token"])
-    new_entries = cmc_prices.getCryptoPrices(df.to_dict(orient="index"))
+    tokens_prices = cmc_prices.getCryptoPrices(tokens)
+    if not tokens_prices:
+        st.warning("No data available")
+        return
+    logger.debug(f"tokens_prices: {tokens_prices}")
+
+    # merge agg and tokens_prices
+    new_entries = {}
+    for token in tokens:
+        new_entries[token] = {"amount": agg[token]["amount"], "price": tokens_prices[token]["price"]}
     HistoryBase(st.session_state.dbfile).add_data_df(new_entries)
 
     st.toast("Prices updated")

@@ -113,7 +113,7 @@ class Portfolios:
 
 
     def set_token_add(self, name: str, token: str, amount: float):
-        #add amout to the ampount of an existing token in portfolio
+        #add amout to the amount of an existing token in portfolio
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
             cursor.execute(
