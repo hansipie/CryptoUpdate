@@ -1,11 +1,46 @@
 import streamlit as st
 import pandas as pd
 import logging
-from modules.plotter import plot_as_graph
+from modules.database.portfolios import Portfolios
+from modules.plotter import plot_as_graph, plot_as_pie
 from modules.process import load_db
+
 
 logger = logging.getLogger(__name__)
 
+def load_portfolios(dbfile: str) -> Portfolios:
+    return Portfolios(dbfile)
+
+def aggregaterUI():
+    portfolios = load_portfolios(st.session_state.dbfile)
+    agg = portfolios.aggregate_portfolios()
+    df = portfolios.create_portfolio_dataframe(agg)
+
+    col_tbl, col_pie = st.columns(2)
+    with col_tbl:
+        st.header("Tokens")
+        if not df.empty:
+            height = (len(df) * 35) + 38
+            height = min(height, 650)
+
+            df = df.groupby("token").agg({"amount": "sum", "value(€)": "sum"})
+            st.dataframe(df, use_container_width=True, height=height)
+            st.write("Total value: €" + str(round(df["value(€)"].sum(), 2)))
+        else:
+            st.warning("No data available")
+    with col_pie:
+        st.header("Tokens repartition")
+        if not df.empty:
+            # Créer un graphique en secteurs pour la colonne "value(€)"
+            transposed = df.transpose()
+            transposed = transposed.drop("amount")
+            logger.debug(f"transposed:\n{transposed}")
+            try:
+                plot_as_pie(transposed)
+            except Exception as e:
+                st.error(f"Error: {str(e)}")
+        else:
+            st.warning("No data available")
 
 def build_tabs(df: pd.DataFrame):
     logger.debug("Build tabs")
@@ -47,22 +82,9 @@ if add_selectbox != "Global":
 
 if add_selectbox == "Global":
     logger.debug("Global")
+    # Display portfolios aggregated data
     st.title("Global")
-
-    # get last values
-    last = df_balance.tail(1)
-    balance = last.sum(axis=1).values[0] if not last.empty else 0
-    balance = round(balance, 2)
-
-    # show wallet value
-    st.header("Wallet value : " + str(balance) + " €")
-
-    plot_as_graph(df_sums)
-
-    # show last values"
-    st.header("Last values")
-    last_u = df_balance.tail(5).astype(str) + " €"
-    st.dataframe(last_u)
+    aggregaterUI()
 
 if add_selectbox == "Assets Value":
     logger.debug("Assets Value")

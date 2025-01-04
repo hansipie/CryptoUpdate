@@ -26,14 +26,16 @@ class HistoryBase:
             df = pd.read_sql_query(
                 "SELECT DISTINCT timestamp from Database ORDER BY timestamp", con
             )
-            df_sum = pd.DataFrame(columns=["datetime", "value"])
+            df_sum = pd.DataFrame(columns=["timestamp", "value"])
             for mytime in df["timestamp"]:
                 dftmp = pd.read_sql_query(
-                    f"SELECT ROUND(sum(price*(CASE WHEN count IS NOT NULL THEN count ELSE 0 END)), 2) as value, DATETIME(timestamp, 'unixepoch') AS datetime from Database WHERE timestamp = {str(mytime)};",
+                    f"SELECT ROUND(sum(price*(CASE WHEN count IS NOT NULL THEN count ELSE 0 END)), 2) as value, timestamp from Database WHERE timestamp = {str(mytime)};",
                     con,
                 )
-                df_sum.loc[len(df_sum)] = [dftmp["datetime"][0], dftmp["value"][0]]
-            df_sum.set_index("datetime", inplace=True)
+                df_sum.loc[len(df_sum)] = [dftmp["timestamp"][0], dftmp["value"][0]]
+            df_sum["timestamp"] = pd.to_datetime(df_sum["timestamp"], unit="s")
+            df_sum.rename(columns={"timestamp": "Date"}, inplace=True)
+            df_sum.set_index("Date", inplace=True)
             return df_sum
 
     def getBalances(self) -> pd.DataFrame:
@@ -43,16 +45,17 @@ class HistoryBase:
             df_balance = pd.DataFrame()
             for token in df_tokens["token"]:
                 df = pd.read_sql_query(
-                    f"SELECT DATETIME(timestamp, 'unixepoch') AS datetime, ROUND(price*(CASE WHEN count IS NOT NULL THEN count ELSE 0 END), 2) AS '{token}' FROM Database WHERE token = '{token}' ORDER BY timestamp;",
+                    f"SELECT timestamp, ROUND(price*(CASE WHEN count IS NOT NULL THEN count ELSE 0 END), 2) AS '{token}' FROM Database WHERE token = '{token}' ORDER BY timestamp;",
                     con,
                 )
-                df.set_index("datetime", inplace=True)
                 if df_balance.empty:
                     df_balance = df
                 else:
-                    df_balance = df_balance.join(df, how="outer")
+                    df_balance = df_balance.merge(df, on="timestamp", how="outer")
             df_balance = df_balance.fillna(0)
-            df_balance.sort_index()
+            df_balance["timestamp"] = pd.to_datetime(df_balance["timestamp"], unit="s")
+            df_balance.rename(columns={"timestamp": "Date"}, inplace=True)
+            df_balance.set_index("Date", inplace=True)
             return df_balance
 
     def getTokenCounts(self) -> pd.DataFrame:
@@ -62,16 +65,17 @@ class HistoryBase:
             df_tokencount = pd.DataFrame()
             for token in df_tokens["token"]:
                 df = pd.read_sql_query(
-                    f"SELECT DATETIME(timestamp, 'unixepoch') AS datetime, count AS '{token}' FROM Database WHERE token = '{token}' ORDER BY timestamp;",
+                    f"SELECT timestamp, count AS '{token}' FROM Database WHERE token = '{token}' ORDER BY timestamp;",
                     con,
                 )
-                df.set_index("datetime", inplace=True)
                 if df_tokencount.empty:
                     df_tokencount = df
                 else:
-                    df_tokencount = df_tokencount.join(df, how="outer")
+                    df_tokencount = df_tokencount.merge(df, on="timestamp", how="outer")
             df_tokencount = df_tokencount.fillna(0)
-            df_tokencount.sort_index()
+            df_tokencount["timestamp"] = pd.to_datetime(df_tokencount["timestamp"], unit="s")
+            df_tokencount.rename(columns={"timestamp": "Date"}, inplace=True)
+            df_tokencount.set_index("Date", inplace=True)
             return df_tokencount
 
     def getMarket(self) -> pd.DataFrame:
@@ -81,16 +85,17 @@ class HistoryBase:
             df_market = pd.DataFrame()
             for token in df_tokens["token"]:
                 df = pd.read_sql_query(
-                    f"SELECT DATETIME(timestamp, 'unixepoch') AS datetime, price AS '{token}' FROM Database WHERE token = '{token}' ORDER BY timestamp;",
+                    f"SELECT timestamp, price AS '{token}' FROM Database WHERE token = '{token}' ORDER BY timestamp;",
                     con,
                 )
-                df.set_index("datetime", inplace=True)
                 if df_market.empty:
                     df_market = df
                 else:
-                    df_market = df_market.join(df, how="outer")
+                    df_market = df_market.merge(df, on="timestamp", how="outer")
             df_market = df_market.fillna(0)
-            df_market.sort_index()
+            df_market["timestamp"] = pd.to_datetime(df_market["timestamp"], unit="s")
+            df_market.rename(columns={"timestamp": "Date"}, inplace=True)
+            df_market.set_index("Date", inplace=True)
             return df_market
 
     def add_data(self, timestamp: int, token: str, price: float, count: float):

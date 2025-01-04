@@ -103,16 +103,14 @@ with buy_tab:
             "Portfolio",
         ],
     )
-    # drop id and type columns
-    df_buylist.drop(columns=["id", "type"], inplace=True)
     # convert timestamp to datetime
-    df_buylist["timestamp"] = pd.to_datetime(df_buylist["timestamp"], unit="s")
+    df_buylist["Date"] = pd.to_datetime(df_buylist["timestamp"], unit="s")
     # reorder columns
     df_buylist = df_buylist[
-        ["timestamp", "From", "Currency", "To", "Token", "Portfolio"]
+        ["Date", "From", "Currency", "To", "Token", "Portfolio"]
     ]
     # sort by timestamp in descending order
-    df_buylist.sort_values(by="timestamp", ascending=False, inplace=True)
+    df_buylist.sort_values(by="Date", ascending=False, inplace=True)
 
     st.dataframe(df_buylist, use_container_width=True, hide_index=True)
 

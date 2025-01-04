@@ -1,20 +1,14 @@
 import streamlit as st
-import pandas as pd
 import logging
 from modules.cmc import cmc
 from modules.database.historybase import HistoryBase
-from modules.plotter import plot_as_pie
 from modules.database.portfolios import Portfolios
 
-import matplotlib.pyplot as plt
-
-from modules.process import get_current_price
 
 
 logger = logging.getLogger(__name__)
 
 st.title("Portfolios")
-
 
 @st.fragment
 @st.dialog("Add new portfolio")
@@ -85,6 +79,8 @@ def portfolioUI(tabs: list):
             pf = g_portfolios.get_portfolio(tabs[i])
             df = g_portfolios.create_portfolio_dataframe(pf)
             if not df.empty:  # Only create DataFrame if data exists
+                balance = df["value(€)"].sum()
+                st.write(f"Total value: €{round(balance, 2)}")
                 height = (len(df) * 35) + 38
                 logger.debug(f"Dataframe:\n{df}")
                 updated_data = st.data_editor(df, use_container_width=True, height=height)
@@ -132,37 +128,6 @@ def portfolioUI(tabs: list):
                 ):
                     danger_zone(tabs[i])
 
-def aggregaterUI():
-    agg = g_portfolios.aggregate_portfolios()
-    df = g_portfolios.create_portfolio_dataframe(agg)
-
-    col_tbl, col_pie = st.columns(2)
-    with col_tbl:
-        st.header("Tokens")
-        if not df.empty:
-            height = (len(df) * 35) + 38
-            height = min(height, 650)
-
-            df = df.groupby("token").agg({"amount": "sum", "value(€)": "sum"})
-            st.dataframe(df, use_container_width=True, height=height)
-            st.write("Total value: €" + str(round(df["value(€)"].sum(), 2)))
-        else:
-            st.warning("No data available")
-    with col_pie:
-        st.header("Tokens repartition")
-        if not df.empty:
-            # Créer un graphique en secteurs pour la colonne "value(€)"
-            transposed = df.transpose()
-            transposed = transposed.drop("amount")
-            logger.debug(f"transposed:\n{transposed}")
-            try:
-                plot_as_pie(transposed)
-            except Exception as e:
-                st.error(f"Error: {str(e)}")
-        else:
-            st.warning("No data available")
-
-
 def update_prices():
     agg = g_portfolios.aggregate_portfolios()
     if not agg:
@@ -193,7 +158,6 @@ def update_prices():
 def load_portfolios(dbfile: str) -> Portfolios:
     return Portfolios(dbfile)
 
-
 g_portfolios = load_portfolios(st.session_state.dbfile)
 
 # Add new portfolio dialog
@@ -222,12 +186,6 @@ try:
     portfolioUI(tabs)
 except Exception as e:
     st.error(f"Error: {str(e)}")
-
-st.divider()
-
-# Display portfolios aggregated data
-st.title("Totals")
-aggregaterUI()
 
 if st.session_state.settings["debug_flag"]:
     st.write(st.session_state)
