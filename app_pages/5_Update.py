@@ -48,9 +48,9 @@ with st.form(key="update_database"):
             )
             updater.updateNotionDatabase(pageId=data["page"], coinPrice=data["price"])
             count += 1
-        updatetokens_bar.progress(100, text="Done")
+        updatetokens_bar.progress(100, text="Update completed")
 
-        with st.spinner("Updating last update..."):
+        with st.spinner("Updating last update timestamp..."):
             updater.UpdateLastUpdate()
 
         with st.spinner("Exporting database..."):
@@ -86,7 +86,7 @@ with st.form(key="process_archives"):
     )
     if submit_button:
         if len(archiveFiles) == 0:
-            st.warning("No archives found.")
+            st.warning("No archive files found.")
         else:
             st.write("Found in archives: ", archiveFiles)
             migrate_bar = st.progress(0)
@@ -106,8 +106,8 @@ with st.form(key="process_archives"):
                     else:
                         logger.debug(f"ignore: {item}")
                     count += 1
-                migrate_bar.progress(100, text="Done")
-                st.success("Archives processed")
+                migrate_bar.progress(100, text="Migration completed")
+                st.success("Archives successfully processed")
             histdb = HistoryBase(st.session_state.dbfile)
             histdb.dropDuplicate()
 

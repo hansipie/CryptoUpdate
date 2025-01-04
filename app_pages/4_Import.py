@@ -102,7 +102,7 @@ def saveData(df: pd.DataFrame, portfolio: str = None, action: str = "Set"):
                 g_portfolio.set_token(portfolio, data["symbol"], data["amount"])
             elif action == "Add":
                 g_portfolio.set_token_add(portfolio, data["symbol"], data["amount"])
-    st.toast("Data saved", icon=":material/check:")
+    st.toast("Data successfully saved", icon=":material/check:")
 
 
 def processImg(file) -> bytes:

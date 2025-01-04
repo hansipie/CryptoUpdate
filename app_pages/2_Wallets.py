@@ -29,7 +29,7 @@ def build_tabs(df: pd.DataFrame):
                 count += 1
         st.session_state.options_save = options
     else:
-        st.error("End date must be after start date")
+        st.error("The end date must be after the start date")
 
 df_balance, df_sums, df_market, df_tokencount = load_db(st.session_state.dbfile)
 
@@ -62,7 +62,7 @@ if add_selectbox == "Global":
     # show last values"
     st.header("Last values")
     last_u = df_balance.tail(5).astype(str) + " €"
-    st.write(last_u)
+    st.dataframe(last_u)
 
 if add_selectbox == "Assets Value":
     logger.debug("Assets Value")

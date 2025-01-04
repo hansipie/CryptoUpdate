@@ -22,7 +22,7 @@ config = cfg()
 try:
     config.readConfig()
 except FileNotFoundError:
-    st.error("Settings file not found. Please check your settings.")
+    st.error("Settings file not found. Please verify your configuration file exists and is accessible.")
     st.stop()
 
 process.loadSettings(config.conf)
@@ -39,7 +39,7 @@ settings_page = st.Page("app_pages/6_Settings.py", title="Settings", icon="âš™ï¸
 pg = st.navigation(
     {
         "Home": [home_page],
-        "Accounts": [pfolios_page, thematics_page, wallets_page],
+        "Investments": [pfolios_page, thematics_page, wallets_page],
         "Inputs": [operations_page, import_page, update_page],
         "Settings": [settings_page],
     }

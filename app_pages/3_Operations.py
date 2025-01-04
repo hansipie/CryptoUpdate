@@ -50,7 +50,7 @@ def submitswap(
     swap_amount_to,
     swap_wallet_to,
 ):
-    st.warning("Not implemented yet")
+    st.warning("This feature is not implemented yet.")
 
 
 op = operations()
@@ -185,4 +185,4 @@ with import_tab:
                     row["Timestamp"],
                     None,
                 )
-            st.success("Import successful")
+            st.success("Import successfully completed")
