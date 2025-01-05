@@ -33,7 +33,10 @@ def plot_as_pie(df):
 
 
 def plot_as_graph(df, options=None, count=None, tab=None):
-
+    logger.debug(f"Plot as graph - Options: {options}, Count: {count}, Tab: {tab}")
+    if df.empty:
+        st.error("No data to plot")
+        return
     # Create custom chart with linear time scale
     fig, ax = plt.subplots(figsize=(10, 6))
     df.index = pd.to_datetime(df.index)

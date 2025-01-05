@@ -57,14 +57,14 @@ def add_token(name: str):
 @st.dialog("Delete Token")
 def delete_token(name: str):
     st.write(f"Delete token from {name}")
-    token = st.selectbox(
-        "Token",
+    tokens = st.multiselect(
+        "Token(s)",
         g_portfolios.get_tokens(name),
-        index=None,
         placeholder="Select a token",
     )
     if st.button("Submit"):
-        g_portfolios.delete_token(name, token)
+        for token in tokens:
+            g_portfolios.delete_token(name, token)
         # Close dialog
         st.rerun()
 
