@@ -1,14 +1,14 @@
 import streamlit as st
 import logging
-from modules.cmc import cmc
-from modules.database.historybase import HistoryBase
 from modules.database.portfolios import Portfolios
-
+from modules.database.market import Market
+from modules.database.historybase import HistoryBase
 
 
 logger = logging.getLogger(__name__)
 
 st.title("Portfolios")
+
 
 @st.fragment
 @st.dialog("Add new portfolio")
@@ -83,9 +83,13 @@ def portfolioUI(tabs: list):
                 st.write(f"Total value: €{round(balance, 2)}")
                 height = (len(df) * 35) + 38
                 logger.debug(f"Dataframe:\n{df}")
-                updated_data = st.data_editor(df, use_container_width=True, height=height)
+                updated_data = st.data_editor(
+                    df, use_container_width=True, height=height
+                )
                 if not updated_data.equals(df):
-                    g_portfolios.update_portfolio({tabs[i]: updated_data.to_dict(orient="index")})
+                    g_portfolios.update_portfolio(
+                        {tabs[i]: updated_data.to_dict(orient="index")}
+                    )
                     logger.debug("## Rerun ##")
                     st.rerun()
                 else:
@@ -128,35 +132,51 @@ def portfolioUI(tabs: list):
                 ):
                     danger_zone(tabs[i])
 
+
 def update_prices():
     agg = g_portfolios.aggregate_portfolios()
     if not agg:
-        st.warning("No data available")
-        return
-    logger.debug(f"agg: {agg}")
+        logger.warning("No aggregated portfolios data available")
+        pf_tokens = []
+    else:
+        logger.debug(f"Aggregated portfolios: {agg}")
+        # save in a list the agg keys
+        pf_tokens = list(agg.keys())
+        logger.debug(f"portfolios tokens: {pf_tokens}")
 
-    #save in a list the agg keys
-    tokens = list(agg.keys())
+    market = Market(
+        st.session_state.dbfile, st.session_state.settings["coinmarketcap_token"]
+    )
+    market_tokens = market.getTokens()
+    logger.debug(f"market tokens: {market_tokens}")
+
+    # merge known_tokens and new_tokens. Remove duplicates
+    tokens = list(set(market_tokens + pf_tokens))
     logger.debug(f"tokens: {tokens}")
 
-    cmc_prices = cmc(st.session_state.settings["coinmarketcap_token"])
-    tokens_prices = cmc_prices.getCryptoPrices(tokens)
-    if not tokens_prices:
-        st.warning("No data available")
+    market.addTokens(tokens)
+    tokens_prices = market.getLastMarket()
+    if tokens_prices is None:
+        st.error("No Market data available")
         return
-    logger.debug(f"tokens_prices: {tokens_prices}")
+    logger.debug(f"Tokens prices: {tokens_prices}")
 
     # merge agg and tokens_prices
     new_entries = {}
-    for token in tokens:
-        new_entries[token] = {"amount": agg[token]["amount"], "price": tokens_prices[token]["price"]}
+    for token in pf_tokens:
+        new_entries[token] = {
+            "amount": agg[token]["amount"],
+            "price": tokens_prices[token][0],
+            "timestamp": tokens_prices.index[0].timestamp(),
+        }
     HistoryBase(st.session_state.dbfile).add_data_df(new_entries)
 
-    st.toast("Prices updated")
+    st.toast("Prices updated", icon="✔️")
 
 
 def load_portfolios(dbfile: str) -> Portfolios:
     return Portfolios(dbfile)
+
 
 g_portfolios = load_portfolios(st.session_state.dbfile)
 

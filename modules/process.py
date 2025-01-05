@@ -101,7 +101,6 @@ def load_db(dbfile: str) -> pd.DataFrame:
         histdb = hb(dbfile)
         df_balance = histdb.getBalances()
         df_sums = histdb.getSums()
-        df_market = histdb.getMarket()
         df_tokencount = histdb.getTokenCounts()
-        return df_balance, df_sums, df_market, df_tokencount
+        return df_balance, df_sums, df_tokencount
     

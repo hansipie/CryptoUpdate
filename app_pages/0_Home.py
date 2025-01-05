@@ -14,7 +14,7 @@ if "options" not in st.session_state:
 if "options_save" not in st.session_state:
     st.session_state.options_save = []
 
-df_balance, df_sums, _, _ = load_db(st.session_state.dbfile)
+df_balance, df_sums, _ = load_db(st.session_state.dbfile)
 
 # get last values
 balance = df_balance.iloc[-1, 1:].sum()
