@@ -1,6 +1,7 @@
 import sqlite3
 import pandas as pd
 import logging
+import tzlocal
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.WARNING)
@@ -9,6 +10,7 @@ class HistoryBase:
     def __init__(self, db_path: str):
         self.db_path = db_path
         self.__initDatabase()
+        self.local_timezone = tzlocal.get_localzone()
         
 
     def __initDatabase(self):
@@ -33,7 +35,8 @@ class HistoryBase:
                     con,
                 )
                 df_sum.loc[len(df_sum)] = [dftmp["timestamp"][0], dftmp["value"][0]]
-            df_sum["timestamp"] = pd.to_datetime(df_sum["timestamp"], unit="s")
+            df_sum["timestamp"] = pd.to_datetime(df_sum["timestamp"], unit="s", utc=True)
+            df_sum["timestamp"] = df_sum["timestamp"].dt.tz_convert(self.local_timezone)
             df_sum.rename(columns={"timestamp": "Date"}, inplace=True)
             df_sum.set_index("Date", inplace=True)
             return df_sum
@@ -53,7 +56,8 @@ class HistoryBase:
                 else:
                     df_balance = df_balance.merge(df, on="timestamp", how="outer")
             df_balance = df_balance.fillna(0)
-            df_balance["timestamp"] = pd.to_datetime(df_balance["timestamp"], unit="s")
+            df_balance["timestamp"] = pd.to_datetime(df_balance["timestamp"], unit="s", utc=True)
+            df_balance["timestamp"] = df_balance["timestamp"].dt.tz_convert(self.local_timezone)
             df_balance.rename(columns={"timestamp": "Date"}, inplace=True)
             df_balance.set_index("Date", inplace=True)
             return df_balance
@@ -73,7 +77,8 @@ class HistoryBase:
                 else:
                     df_tokencount = df_tokencount.merge(df, on="timestamp", how="outer")
             df_tokencount = df_tokencount.fillna(0)
-            df_tokencount["timestamp"] = pd.to_datetime(df_tokencount["timestamp"], unit="s")
+            df_tokencount["timestamp"] = pd.to_datetime(df_tokencount["timestamp"], unit="s", utc=True)
+            df_tokencount["timestamp"] = df_tokencount["timestamp"].dt.tz_convert(self.local_timezone)
             df_tokencount.rename(columns={"timestamp": "Date"}, inplace=True)
             df_tokencount.set_index("Date", inplace=True)
             return df_tokencount
@@ -93,7 +98,8 @@ class HistoryBase:
                 else:
                     df_market = df_market.merge(df, on="timestamp", how="outer")
             df_market = df_market.fillna(0)
-            df_market["timestamp"] = pd.to_datetime(df_market["timestamp"], unit="s")
+            df_market["timestamp"] = pd.to_datetime(df_market["timestamp"], unit="s", utc=True)
+            df_market["timestamp"] = df_market["timestamp"].dt.tz_convert(self.local_timezone)
             df_market.rename(columns={"timestamp": "Date"}, inplace=True)
             df_market.set_index("Date", inplace=True)
             return df_market

@@ -71,7 +71,7 @@ with buy_tab:
                     "From", min_value=0.0, format="%.8f", key="from_amount"
                 )
             with col_from_token:
-                form_currency = st.selectbox("", ["EUR", "USD"], key="form_currency")
+                form_currency = st.selectbox("Currency", ["EUR", "USD"], key="form_currency", label_visibility="hidden")
         with col_to:
             col_to_amount, col_to_token = st.columns([3, 1])
             with col_to_amount:
@@ -79,7 +79,7 @@ with buy_tab:
                     "To", min_value=0.0, format="%.8f", key="to_amount"
                 )
             with col_to_token:
-                to_token = st.selectbox("", g_tokens, index=None, key="to_token")
+                to_token = st.selectbox("Token", g_tokens, index=None, key="to_token", label_visibility="hidden")
             to_wallet = st.selectbox(
                 "Portfolio", g_wallets, key="to_wallet", index=None
             )
@@ -104,7 +104,10 @@ with buy_tab:
         ],
     )
     # convert timestamp to datetime
-    df_buylist["Date"] = pd.to_datetime(df_buylist["timestamp"], unit="s")
+    df_buylist["Date"] = pd.to_datetime(df_buylist["timestamp"], unit="s", utc=True)
+    local_timezone = tzlocal.get_localzone()
+    logger.debug(f"Timezone locale: {local_timezone}")
+    df_buylist["Date"] = df_buylist["Date"].dt.tz_convert(local_timezone)
     # reorder columns
     df_buylist = df_buylist[
         ["Date", "From", "Currency", "To", "Token", "Portfolio"]
