@@ -1,89 +1,14 @@
 # **Crypto Update**
 
-Integrate auto cryptocurrencies price update to Notion and archive database.
+Crypto Update is a streamlit application that allows you to keep track of your crypto wallet value. It uses the CoinMarketCap API to get the current value of the coins and updates a Notion database with the information.
 
 ## **Install the required software dependencies by running the following command**
     
     python3 -m pip install -r requirements.txt
 
-## **Create ./inputs/my_variables.yml file with your notion and coinmarketcap related informations**
+## **Run the following command to execute the streamlit application**
     
-    NOTION_VERSION: <insert-API-notion-version>
-    NOTION_API_TOKEN: <insert-your-notion-integration-secret-token> 
-    NOTION_TOKEN_V2: <insert-your-notion-integration-internal-token>
-    NOTION_FILE_TOKEN: <insert-your-notion-file-token>
-    MY_COINMARKETCAP_APIKEY: <insert-your-coinmarketcap-integration-secret-token>
-
-### **How to find those values**
-
-NOTION_API_TOKEN: It has to be created from your Notion account (https://www.notion.so/my-integrations)
-
-NOTION_VERSION: It is found in the API documentation (https://developers.notion.com/reference/versioning)
-
-NOTION_TOKEN_V2:
-
-NOTION_FILE_TOKEN:
-
-MY_COINMARKETCAP_APIKEY: It is found in your API account (https://pro.coinmarketcap.com/account)
-
-## **Notion's database structure**
-
-This is the general structure of the database processed:
-
-```json
-{
-	"object": "database",
-	"title": [
-		{
-			"type": "text",
-			"text": {
-				"content": "Dashboard",
-			},
-			"plain_text": "Dashboard",
-		}
-	],
-	"properties": {
-		"Token": {
-			"id": "title",
-			"name": "Token",
-			"type": "title",
-			"title": {}
-		},
-		"Market Price": {
-			"name": "Market Price",
-			"type": "number",
-			"number": {
-				"format": "number"
-			}
-		},
-		"Coins in wallet": {
-			"name": "Coins in wallet",
-			"type": "number",
-			"number": {
-				"format": "number"
-			}
-		},
-		"Wallet Value (€)": {
-			"name": "Wallet Value (€)",
-			"type": "formula",
-			"formula": {
-				"expression": "multiply(prop(\"Market Price\"), prop(\"Coins in wallet\"))"
-			}
-		}
-	}
-}
-```
-## **Run the following command to execute python script**
-    
-    python3 main.py
-    
-This command will update the notion Dashboard with coins current values and save it in the archives directory as a CSV file.
-    
-## **Archives processing**
-
-    python processArchive.py
-    
-This command will process the archives directory to create a CSV file for wallets evolution throught time.
+    streamlit run app.py
     
 ## **Credits**
 
