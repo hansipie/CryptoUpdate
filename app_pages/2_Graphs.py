@@ -29,8 +29,11 @@ def aggregaterUI():
             height = min(height, 650)
 
             df = df.groupby("token").agg({"amount": "sum", "value(€)": "sum"})
+            df["Repartition(%)"] = round((df["value(€)"] / df["value(€)"].sum())*100, 2)
+            df = df.rename(columns={"amount": "Amount", "value(€)": "Value(€)"})
+            df = df.sort_values(by="Repartition(%)", ascending=False) 
             st.dataframe(df, use_container_width=True, height=height)
-            st.write("Total value: €" + str(round(df["value(€)"].sum(), 2)))
+            st.write("Total value: €" + str(round(df["Value(€)"].sum(), 2)))
         else:
             st.warning("No data available")
     with col_pie:
@@ -38,7 +41,7 @@ def aggregaterUI():
         if not df.empty:
             # Créer un graphique en secteurs pour la colonne "value(€)"
             transposed = df.transpose()
-            transposed = transposed.drop("amount")
+            transposed = transposed.loc[["Value(€)"]]
             logger.debug(f"transposed:\n{transposed}")
             try:
                 plot_as_pie(transposed)
@@ -90,7 +93,7 @@ def syncMarket():
         st.session_state.dbfile, st.session_state.settings["coinmarketcap_token"]
     )
     market.migrateFormDatabase()
-    # market.updateMarket()
+    # market.updateMarket() # add latest market data to database
 
     st.toast("Sync. Market done", icon="✔️")
 
