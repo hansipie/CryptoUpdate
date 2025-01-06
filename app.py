@@ -49,3 +49,7 @@ if st.session_state.settings["debug_flag"]:
 pg.run()
 
 logger.debug("### End Render ###")
+
+if st.session_state.settings["debug_flag"]:
+    st.write(st.session_state)
+    

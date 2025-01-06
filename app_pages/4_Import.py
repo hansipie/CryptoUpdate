@@ -196,8 +196,4 @@ else:
     st.session_state.import_page["input"] = input
     drawUI()
 
-
-if st.session_state.settings["debug_flag"]:
-    st.write(st.session_state)
-
 logger.debug("## ended ##")

@@ -11,8 +11,10 @@ from modules.process import get_file_hash, load_db
 
 logger = logging.getLogger(__name__)
 
+
 def load_portfolios(dbfile: str) -> Portfolios:
     return Portfolios(dbfile)
+
 
 def aggregaterUI():
     portfolios = load_portfolios(st.session_state.dbfile)
@@ -45,49 +47,64 @@ def aggregaterUI():
         else:
             st.warning("No data available")
 
+
 def build_tabs(df: pd.DataFrame):
     logger.debug("Build tabs")
     if df is None or df.empty:
         st.warning("No data available")
         return
     if startdate < enddate:
-        tokens = list(df.columns)
-        st.session_state.options = st.multiselect("Select Tokens to display", tokens)
-        options = st.session_state.options
-        if options:
-            tabs = st.tabs(options)
-            count = 0
+        available_tokens = list(df.columns)
+        tokens = st.multiselect("Select Tokens to display", available_tokens, key="graphtokens")
+        if tokens:
+            tabs = st.tabs(tokens)
+            idx_token = 0
             for tab in tabs:
                 df_view = df.loc[df.index > str(startdate)]
                 df_view = df_view.loc[
                     df_view.index < str(enddate + pd.to_timedelta(1, unit="d"))
                 ]
-                col1, col2 = tab.columns([3,1])
+                mcol1, mcol2 = tab.columns(2)
+                with mcol1:
+                    nbr_days = enddate - startdate
+                    mcol1.metric("Days", value=nbr_days.days)
+                with mcol2:
+                    first = df_view[tokens[idx_token]].iloc[0]
+                    last = df_view[tokens[idx_token]].iloc[-1]
+                    mcol2.metric(
+                        "Performance",
+                        value=f"{round(((last - first) / first) * 100, 2)} %",
+                    )
+                col1, col2 = tab.columns([3, 1])
                 with col1:
-                    plot_as_graph(df_view, options, count, col1)
+                    plot_as_graph(df_view, tokens, idx_token, col1)
                 with col2:
-                    col2.dataframe(df_view[options[count]], use_container_width=True)
-                count += 1
-        st.session_state.options_save = options
+                    col2.dataframe(df_view[tokens[idx_token]], use_container_width=True)
+                idx_token += 1
     else:
         st.error("The end date must be after the start date")
 
+
 def syncMarket():
-    market = Market(st.session_state.dbfile, st.session_state.settings["coinmarketcap_token"])
+    market = Market(
+        st.session_state.dbfile, st.session_state.settings["coinmarketcap_token"]
+    )
     market.migrateFormDatabase()
-    #market.updateMarket()
+    # market.updateMarket()
 
     st.toast("Sync. Market done", icon="✔️")
 
+
 @st.cache_data(
     show_spinner=False,
-    hash_funcs={str: lambda x: get_file_hash(x) if os.path.isfile(x) else hash(x)}
+    hash_funcs={str: lambda x: get_file_hash(x) if os.path.isfile(x) else hash(x)},
 )
 def load_market(dbfile: str) -> pd.DataFrame:
     with st.spinner("Loading market..."):
         logger.debug("Load market")
         market = Market(dbfile, st.session_state.settings["coinmarketcap_token"])
         return market.getMarket()
+
 
 df_balance, df_sums, df_tokencount = load_db(st.session_state.dbfile)
 
@@ -128,6 +145,3 @@ if add_selectbox == "Market":
     df_market = load_market(st.session_state.dbfile)
     build_tabs(df_market)
     st.dataframe(df_market)
-
-if st.session_state.settings["debug_flag"]:
-    st.write(st.session_state)

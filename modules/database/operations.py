@@ -58,3 +58,9 @@ class operations:
             cursor = conn.cursor()
             cursor.execute("SELECT * FROM Operations WHERE type = ?", (type,))
             return cursor.fetchall()
+        
+    def sum_buyoperations(self) -> float:
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT SUM(source) FROM Operations WHERE type = 'buy'")
+            return cursor.fetchone()[0]

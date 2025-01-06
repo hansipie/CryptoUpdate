@@ -110,6 +110,3 @@ with st.form(key="process_archives"):
                 st.success("Archives successfully processed")
             histdb = HistoryBase(st.session_state.dbfile)
             histdb.dropDuplicate()
-
-if st.session_state.settings["debug_flag"]:
-    st.write(st.session_state)

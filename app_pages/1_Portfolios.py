@@ -207,5 +207,3 @@ try:
 except Exception as e:
     st.error(f"Error: {str(e)}")
 
-if st.session_state.settings["debug_flag"]:
-    st.write(st.session_state)
