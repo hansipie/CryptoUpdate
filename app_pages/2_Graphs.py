@@ -29,9 +29,11 @@ def aggregaterUI():
             height = min(height, 650)
 
             df = df.groupby("token").agg({"amount": "sum", "value(€)": "sum"})
-            df["Repartition(%)"] = round((df["value(€)"] / df["value(€)"].sum())*100, 2)
+            df["Repartition(%)"] = round(
+                (df["value(€)"] / df["value(€)"].sum()) * 100, 2
+            )
             df = df.rename(columns={"amount": "Amount", "value(€)": "Value(€)"})
-            df = df.sort_values(by="Repartition(%)", ascending=False) 
+            df = df.sort_values(by="Repartition(%)", ascending=False)
             st.dataframe(df, use_container_width=True, height=height)
             st.write("Total value: €" + str(round(df["Value(€)"].sum(), 2)))
         else:
@@ -58,7 +60,9 @@ def build_tabs(df: pd.DataFrame):
         return
     if startdate < enddate:
         available_tokens = list(df.columns)
-        tokens = st.multiselect("Select Tokens to display", available_tokens, key="graphtokens")
+        tokens = st.multiselect(
+            "Select Tokens to display", available_tokens, key="graphtokens"
+        )
         if tokens:
             tabs = st.tabs(tokens)
             idx_token = 0
@@ -74,9 +78,14 @@ def build_tabs(df: pd.DataFrame):
                 with mcol2:
                     first = df_view[tokens[idx_token]].iloc[0]
                     last = df_view[tokens[idx_token]].iloc[-1]
+                    logger.debug(f"first: {first}, last: {last}")
                     mcol2.metric(
                         "Performance",
-                        value=f"{round(((last - first) / first) * 100, 2)} %",
+                        value=(
+                            f"{round(((last - first) / first) * 100, 2)} %"
+                            if first != 0
+                            else "0 %" if last == 0 else "∞ %"
+                        ),
                     )
                 col1, col2 = tab.columns([3, 1])
                 with col1:
