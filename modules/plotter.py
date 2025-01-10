@@ -32,19 +32,15 @@ def plot_as_pie(df):
     st.pyplot(plt)
 
 
-def plot_as_graph(df, tokens=None, index=None, st_object=None):
-    logger.debug(f"Plot as graph - Tokens: {tokens}, Index: {index}, StreamlitObject: {st_object}")
+def plot_as_graph(df: pd.DataFrame, st_object=None):
+    logger.debug(f"Plot as graph - StreamlitObject: {st_object}")
     if df.empty:
         st.error("No data to plot")
         return
     # Create custom chart with linear time scale
     fig, ax = plt.subplots(figsize=(10, 6))
     df.index = pd.to_datetime(df.index)
-    if tokens:
-        if tokens[index] in df.columns:
-            ax.plot(df.index, df[tokens[index]].values)
-    else:
-        ax.plot(df.index, df.values)
+    ax.plot(df.index, df.values)
 
     # Set x-axis to use dates with fixed intervals
     ax.xaxis.set_major_locator(mdates.AutoDateLocator())

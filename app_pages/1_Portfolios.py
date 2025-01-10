@@ -147,14 +147,8 @@ def update_prices():
     market = Market(
         st.session_state.dbfile, st.session_state.settings["coinmarketcap_token"]
     )
-    market_tokens = market.getTokens()
-    logger.debug(f"market tokens: {market_tokens}")
 
-    # merge known_tokens and new_tokens. Remove duplicates
-    tokens = list(set(market_tokens + pf_tokens))
-    logger.debug(f"tokens: {tokens}")
-
-    market.addTokens(tokens)
+    market.addTokens(pf_tokens)
     tokens_prices = market.getLastMarket()
     if tokens_prices is None:
         st.error("No Market data available")

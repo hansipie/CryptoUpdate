@@ -1,10 +1,12 @@
+import traceback
 import streamlit as st
 import pandas as pd
 import logging
 import os
+from modules.Notion import Notion
+from modules.Updater import Updater
 from modules.database.portfolios import Portfolios
 from modules.database.market import Market
-from modules.database.historybase import HistoryBase
 from modules.plotter import plot_as_graph, plot_as_pie
 from modules.process import get_file_hash, load_db
 
@@ -67,21 +69,18 @@ def build_tabs(df: pd.DataFrame):
             tabs = st.tabs(tokens)
             idx_token = 0
             for tab in tabs:
-                logger.debug(f"df avant: {df}")
-                df = df.dropna(axis=0, how="any")
-                logger.debug(f"df apres: {df}")
                 df_view = df.loc[df.index > str(startdate)]
-                df_view = df_view.loc[
-                    df_view.index < str(enddate + pd.to_timedelta(1, unit="d"))
-                ]
+                df_view = df_view.loc[df_view.index < str(enddate + pd.to_timedelta(1, unit="d"))]
+                df_view = df_view[tokens[idx_token]]
+                df_view = df_view.dropna()
 
                 mcol1, mcol2 = tab.columns(2)
                 with mcol1:
                     nbr_days = enddate - startdate
                     mcol1.metric("Days", value=nbr_days.days)
                 with mcol2:
-                    first = df_view[tokens[idx_token]].iloc[0]
-                    last = df_view[tokens[idx_token]].iloc[-1]
+                    first = df_view.iloc[0]
+                    last = df_view.iloc[-1]
                     logger.debug(f"first: {first}, last: {last}")
                     mcol2.metric(
                         "Performance",
@@ -93,22 +92,45 @@ def build_tabs(df: pd.DataFrame):
                     )
                 col1, col2 = tab.columns([3, 1])
                 with col1:
-                    plot_as_graph(df_view, tokens, idx_token, col1)
+                    plot_as_graph(df_view, col1)
                 with col2:
-                    col2.dataframe(df_view[tokens[idx_token]], use_container_width=True)
+                    col2.dataframe(df_view, use_container_width=True)
                 idx_token += 1
     else:
         st.error("The end date must be after the start date")
 
 
-def syncMarket():
-    market = Market(
-        st.session_state.dbfile, st.session_state.settings["coinmarketcap_token"]
-    )
-    market.migrateFormDatabase()
-    # market.updateMarket() # add latest market data to database
+def syncNotionMarket():
+    with st.spinner("Syncing Notion Database..."):
+        try:
+            notion = Notion(st.session_state.settings["notion_token"])
+            db_id = notion.getObjectId(st.session_state.settings["notion_database"], "database", st.session_state.settings["notion_parentpage"])
+            if db_id == None:
+                st.error("Error: Database not found")
+                st.stop()
+            else:
+                updater = Updater(st.session_state.dbfile, st.session_state.settings["coinmarketcap_token"], st.session_state.settings["notion_token"], db_id)
+                updater.getCryptoPrices()
+        except KeyError as ke:
+            st.error("Error: " + type(ke).__name__ + " - " + str(ke))
+            st.error("Please set your settings in the settings page")
+            traceback.print_exc()
+            st.stop()
+        except Exception as e:
+            st.error("Error: " + type(e).__name__ + " - " + str(e))
+            traceback.print_exc()
+            st.stop()
 
-    st.toast("Sync. Market done", icon="✔️")
+        updatetokens_bar = st.sidebar.progress(0)
+        count = 0
+        for token, data in updater.notion_entries.items():
+            updatetokens_bar.progress(
+                count / len(updater.notion_entries), text=f"Updating {token}"
+            )
+            updater.updateNotionDatabase(pageId=data["page"], coinPrice=data["price"])
+            count += 1
+        updatetokens_bar.progress(100, text="Update completed")
+        updater.UpdateLastUpdate()
 
 
 @st.cache_data(
@@ -137,7 +159,8 @@ if add_selectbox != "Global":
 
 if add_selectbox == "Market":
     st.sidebar.divider()
-    st.sidebar.button("Sync. Market", on_click=syncMarket)
+    if st.sidebar.button("Sync. Notion Database", icon=":material/refresh:"):
+        syncNotionMarket()
 
 if add_selectbox == "Global":
     logger.debug("Global")

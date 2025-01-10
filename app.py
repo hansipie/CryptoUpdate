@@ -33,14 +33,13 @@ thematics_page = st.Page("app_pages/1_Thematics.py", title="Thematics", icon="�
 graphs_page = st.Page("app_pages/2_Graphs.py", title="Graphs", icon="💰")
 operations_page = st.Page("app_pages/3_Operations.py", title="Operations", icon="💱")
 import_page = st.Page("app_pages/4_Import.py", title="Import", icon="📥")
-update_page = st.Page("app_pages/5_Update.py", title="Update", icon="🔄")
 settings_page = st.Page("app_pages/6_Settings.py", title="Settings", icon="⚙️")
 
 pg = st.navigation(
     {
         "Home": [home_page],
         "Investments": [pfolios_page, thematics_page, graphs_page],
-        "Inputs": [operations_page, import_page, update_page],
+        "Inputs": [operations_page, import_page],
         "Settings": [settings_page],
     }
 )

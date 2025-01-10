@@ -91,8 +91,12 @@ class Market:
         self.addTokens(tokens)
 
     # add tokens to the database with the current price
-    def addTokens(self, tokens: list):
+    def addTokens(self, tokens: list = []):
         logger.debug("Add tokens")
+
+        known_tokens = self.getTokens()
+        tokens = list(set(tokens + known_tokens))
+        logger.debug(f"tokens: {tokens}")
 
         timestamp = int(pd.Timestamp.now(tz=pytz.UTC).timestamp())
         cmc_prices = cmc(self.cmc_token)
@@ -111,23 +115,6 @@ class Market:
                     (timestamp, token, tokens_prices[token]["price"]),
                 )
             con.commit()
-
-    #To delete when the database is clean
-    def migrateFormDatabase(self):
-        logger.debug("Migration from database")
-        with sqlite3.connect(self.db_path) as con:
-            df = pd.read_sql_query("SELECT * from Database", con)
-            if df.empty:
-                return
-            for _, row in df.iterrows():
-                cur = con.cursor()
-                cur.execute(
-                    "INSERT INTO Market (timestamp, token, price) VALUES (?, ?, ?)",
-                    (row["timestamp"], row["token"], row["price"]),
-                )
-            con.commit()
-
-        self.dropDuplicate()
 
     # get the last timestamp
     def getLastTimestamp(self) -> int:
