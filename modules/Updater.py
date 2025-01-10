@@ -1,30 +1,33 @@
 import json
 import time
 import traceback
-import requests
 import logging
 from alive_progress import alive_bar
-from dotenv import load_dotenv
 from modules import Notion, cmc
+from modules.database.market import Market
 
+logger = logging.getLogger(__name__)
 class Updater:
-    def __init__(self, coinmarketcap_token: str, notion_token: str, database_id: str):
+    def __init__(
+        self, dbfile: str, coinmarketcap_token: str, notion_token: str, notion_dbid: str
+    ):
         self.notion_entries = {}
+        self.dbfile = dbfile
         self.notion = Notion.Notion(notion_token)
         self.coinmarketcap_token = coinmarketcap_token
-        self.database_id = database_id
+        self.notion_dbid = notion_dbid
         self.lastupdate_id = self.notion.getObjectId("LastUpdate", "database")
         self.notion_entries = self.getNotionDatabaseEntries()
 
     def getNotionDatabaseEntries(self):
         resp = {}
-        for v in self.notion.getNotionDatabaseEntities(self.database_id):
+        for v in self.notion.getNotionDatabaseEntities(self.notion_dbid):
             try:
                 text = v["properties"]["Token"]["title"][0]["text"]["content"]
             except:
-                logging.error("Invalid entry in Dashboard: ", v["id"])
+                logger.error("Invalid entry in Dashboard: ", v["id"])
                 continue
-            logging.debug(f"Found entry: {text}")
+            logger.debug(f"Found entry: {text}")
             if v["properties"]["Market Price"]["number"] is None:
                 price = 0
             else:
@@ -36,26 +39,34 @@ class Updater:
         """
         Get the price of the cryptocurrencies from the Coinmarketcap API
         """
-        cmc_prices = cmc.cmc(self.coinmarketcap_token)
         tokens = list(self.notion_entries.keys())
-        token_prices = cmc_prices.getCryptoPrices(tokens)
-        if token_prices is not None:
-            for token, data in token_prices.items():
-                self.notion_entries[token]["price"] = data["price"]
-        else:
-            logging.error("Error getting current coins values. Quit.")
-            quit()
+        market = Market(self.dbfile, self.coinmarketcap_token)
+        market.addTokens(tokens)
+        tokens_prices = market.getLastMarket()
+        if tokens_prices is None:
+            logger.error("No Market data available")
+            return
+        
+        for token in tokens:
+            if token not in tokens_prices:
+                logger.debug(f"Token {token} not found in market data")
+                continue
+            logger.debug(f"Updating {token} with price {tokens_prices[token]['price']} in Notion database")
+            self.notion_entries[token]["price"] = tokens_prices[token]["price"]
+  
 
     def UpdateDBHandleError(self, response):
-        logging.error("Error updating Notion database. code: ", response.status_code)
+        logger.error("Error updating Notion database. code: ", response.status_code)
         if response.status_code == 429:
-            logging.warning(" - Rate limit exceeded. Retry after ", retry_after, " seconds")
+            logger.warning(
+                " - Rate limit exceeded. Retry after ", retry_after, " seconds"
+            )
             retry_after = int(response.headers["Retry-After"])
         elif response.status_code == 522:
-            logging.warning(" - Connection timed out. Retry.")
+            logger.warning(" - Connection timed out. Retry.")
             retry_after = 2
         else:
-            logging.error(" - Unknown error updating Notion database. Quit.")
+            logger.error(" - Unknown error updating Notion database. Quit.")
             quit()
         time.sleep(retry_after)
 
@@ -65,9 +76,9 @@ class Updater:
         """
 
         if self.lastupdate_id is None:
-            logging.warning("Warning: LastUpdate database not found")
+            logger.warning("Warning: LastUpdate database not found")
         else:
-            logging.info("Updating last update...")
+            logger.info("Updating last update...")
             resp = self.notion.getNotionDatabaseEntities(self.lastupdate_id)
             pageId = resp[0]["id"]
 

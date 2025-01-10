@@ -58,7 +58,7 @@ class HistoryBase:
                     df_balance = df
                 else:
                     df_balance = df_balance.merge(df, on="timestamp", how="outer")
-            df_balance = df_balance.fillna(0)
+            df_balance = df_balance.fillna(0) # c'est OK de remplir les NaN ici
             df_balance["timestamp"] = pd.to_datetime(
                 df_balance["timestamp"], unit="s", utc=True
             )
@@ -84,7 +84,7 @@ class HistoryBase:
                     df_tokencount = df
                 else:
                     df_tokencount = df_tokencount.merge(df, on="timestamp", how="outer")
-            df_tokencount = df_tokencount.fillna(0)
+            df_tokencount = df_tokencount.fillna(0) # c'est OK de remplir les NaN ici
             df_tokencount["timestamp"] = pd.to_datetime(
                 df_tokencount["timestamp"], unit="s", utc=True
             )

@@ -67,10 +67,14 @@ def build_tabs(df: pd.DataFrame):
             tabs = st.tabs(tokens)
             idx_token = 0
             for tab in tabs:
+                logger.debug(f"df avant: {df}")
+                df = df.dropna(axis=0, how="any")
+                logger.debug(f"df apres: {df}")
                 df_view = df.loc[df.index > str(startdate)]
                 df_view = df_view.loc[
                     df_view.index < str(enddate + pd.to_timedelta(1, unit="d"))
                 ]
+
                 mcol1, mcol2 = tab.columns(2)
                 with mcol1:
                     nbr_days = enddate - startdate

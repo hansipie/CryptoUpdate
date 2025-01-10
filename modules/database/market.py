@@ -52,7 +52,7 @@ class Market:
                     df_market = df_market.merge(df, on="timestamp", how="outer")
             if df_market.empty:
                 return None
-            df_market = df_market.fillna(0)
+            #df_market = df_market.fillna(0) # c'est mal de remplir les NaN ici
             df_market["timestamp"] = pd.to_datetime(
                 df_market["timestamp"], unit="s", utc=True
             )
@@ -65,37 +65,24 @@ class Market:
             return df_market
     
     # get the last market
-    def getLastMarket(self) -> pd.DataFrame:
+    def getLastMarket(self) -> dict:
         logger.debug("Get last market")
+        tokens_list = self.getTokens()
+        if not tokens_list:
+            logger.warning("No tokens available")
+            return None
         with sqlite3.connect(self.db_path) as con:
-            df_tokens = pd.read_sql_query("select DISTINCT token from Market", con)
-            if df_tokens.empty:
-                return None
-            df_market = pd.DataFrame()
-            for token in df_tokens["token"]:
+            market_dict = {}
+            for token in tokens_list:
                 df = pd.read_sql_query(
                     f"SELECT timestamp, price AS '{token}' FROM Market WHERE token = '{token}' ORDER BY timestamp DESC LIMIT 1;",
                     con,
                 )
                 if df.empty:
                     continue
-                if df_market.empty:
-                    df_market = df
-                else:
-                    df_market = df_market.merge(df, on="timestamp", how="outer")
-            if df_market.empty:
-                return None
-            df_market = df_market.fillna(0)
-            df_market["timestamp"] = pd.to_datetime(
-                df_market["timestamp"], unit="s", utc=True
-            )
-            df_market["timestamp"] = df_market["timestamp"].dt.tz_convert(
-                self.local_timezone
-            )
-            df_market.rename(columns={"timestamp": "Date"}, inplace=True)
-            df_market.set_index("Date", inplace=True)
-            df_market = df_market.reindex(sorted(df_market.columns), axis=1)
-            return df_market
+                market_dict[token] = {"price": df[token][0], "timestamp": df["timestamp"][0]}
+            logger.debug(f"Last Market get size: {len(market_dict)}")
+            return market_dict
 
     # update the market with the current prices
     def updateMarket(self):
@@ -114,7 +101,7 @@ class Market:
             logger.warning("No data available")
             return
         
-        logger.debug(f"Adding {len(tokens_prices)} tokens to database\n {tokens_prices}")
+        logger.debug(f"Adding {len(tokens_prices)} tokens to database")
 
         with sqlite3.connect(self.db_path) as con:
             for token in tokens_prices:

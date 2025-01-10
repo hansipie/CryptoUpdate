@@ -49,7 +49,6 @@ class cmc:
                 except (KeyError, IndexError, TypeError) as e:
                     logger.error(f"Error getting price for {name}: {str(e)}")
                     logger.error(f"Data received: {content['data'][name]}")
-            logger.debug(f"Final prices: {crypto_prices}")
             return crypto_prices
         else:
             logger.error(f"Error: {response.status_code}")

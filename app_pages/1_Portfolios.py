@@ -159,15 +159,14 @@ def update_prices():
     if tokens_prices is None:
         st.error("No Market data available")
         return
-    logger.debug(f"Tokens prices: {tokens_prices}")
 
     # merge agg and tokens_prices
     new_entries = {}
     for token in pf_tokens:
         new_entries[token] = {
             "amount": agg[token]["amount"],
-            "price": tokens_prices[token][0],
-            "timestamp": tokens_prices.index[0].timestamp(),
+            "price": tokens_prices[token]["price"],
+            "timestamp": tokens_prices[token]["timestamp"],
         }
     HistoryBase(st.session_state.dbfile).add_data_df(new_entries)
 

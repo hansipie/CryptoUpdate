@@ -28,7 +28,7 @@ class Portfolios:
             )
             cursor.execute(
                 """
-                CREATE TABLE IF NOT EXISTS Tokens_PF (
+                CREATE TABLE IF NOT EXISTS Portfolios_Tokens (
                     portfolio_id INTEGER,
                     token TEXT,
                     amount TEXT,
@@ -56,8 +56,8 @@ class Portfolios:
             cursor = conn.cursor()
             cursor.execute(
                 """
-                SELECT token, amount FROM Tokens_PF
-                JOIN Portfolios ON Tokens_PF.portfolio_id = Portfolios.id
+                SELECT token, amount FROM Portfolios_Tokens
+                JOIN Portfolios ON Portfolios_Tokens.portfolio_id = Portfolios.id
                 WHERE Portfolios.name = ?
             """,
                 (name,),
@@ -88,8 +88,8 @@ class Portfolios:
             cursor = conn.cursor()
             cursor.execute(
                 """
-                SELECT token, amount FROM Tokens_PF
-                JOIN Portfolios ON Tokens_PF.portfolio_id = Portfolios.id
+                SELECT token, amount FROM Portfolios_Tokens
+                JOIN Portfolios ON Portfolios_Tokens.portfolio_id = Portfolios.id
                 WHERE Portfolios.name = ?
             """,
                 (name,),
@@ -101,7 +101,7 @@ class Portfolios:
             cursor = conn.cursor()
             cursor.execute(
                 """
-                INSERT OR REPLACE INTO Tokens_PF (portfolio_id, token, amount)
+                INSERT OR REPLACE INTO Portfolios_Tokens (portfolio_id, token, amount)
                 VALUES (
                     (SELECT id FROM Portfolios WHERE name = ?),
                     ?,
@@ -118,9 +118,9 @@ class Portfolios:
             cursor = conn.cursor()
             cursor.execute(
                 """
-                SELECT token, amount FROM Tokens_PF
-                JOIN Portfolios ON Tokens_PF.portfolio_id = Portfolios.id
-                WHERE Portfolios.name = ? AND Tokens_PF.token = ?
+                SELECT token, amount FROM Portfolios_Tokens
+                JOIN Portfolios ON Portfolios_Tokens.portfolio_id = Portfolios.id
+                WHERE Portfolios.name = ? AND Portfolios_Tokens.token = ?
             """,
                 (name, token),
             )
@@ -129,7 +129,7 @@ class Portfolios:
                 new_amount = float(row[1]) + amount
                 cursor.execute(
                     """
-                    UPDATE Tokens_PF
+                    UPDATE Portfolios_Tokens
                     SET amount = ?
                     WHERE portfolio_id = (SELECT id FROM Portfolios WHERE name = ?) AND token = ?
                 """,
@@ -138,7 +138,7 @@ class Portfolios:
             else:
                 cursor.execute(
                     """
-                    INSERT INTO Tokens_PF (portfolio_id, token, amount)
+                    INSERT INTO Portfolios_Tokens (portfolio_id, token, amount)
                     VALUES (
                         (SELECT id FROM Portfolios WHERE name = ?),
                         ?,
@@ -155,7 +155,7 @@ class Portfolios:
             cursor = conn.cursor()
             cursor.execute(
                 """
-                DELETE FROM Tokens_PF
+                DELETE FROM Portfolios_Tokens
                 WHERE portfolio_id = (SELECT id FROM Portfolios WHERE name = ?) AND token = ?
             """,
                 (name, token),
@@ -187,13 +187,13 @@ class Portfolios:
             cursor = conn.cursor()
             cursor.execute(
                 """
-                SELECT token, amount FROM Tokens_PF
-                JOIN Portfolios ON Tokens_PF.portfolio_id = Portfolios.id
+                SELECT token, amount FROM Portfolios_Tokens
+                JOIN Portfolios ON Portfolios_Tokens.portfolio_id = Portfolios.id
             """
             )
             data = cursor.fetchall()
             df = pd.DataFrame(data, columns=["token", "amount"])
-            logger.debug(f"Aggregate portfolios - Data: {df}")
+            logger.debug(f"Aggregate portfolios - Data: \n{df}")
             df["amount"] = df.apply(lambda row: clean_price(row["amount"]), axis=1)
             return df.groupby("token").agg({"amount": "sum"}).to_dict(orient="index")
         
