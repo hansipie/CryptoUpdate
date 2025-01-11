@@ -1,58 +1,48 @@
 import logging
 import streamlit as st
 import pandas as pd
-import matplotlib.pyplot as plt
-import matplotlib.dates as mdates
+import plotly.express as px
 
 logger = logging.getLogger(__name__)
 
 
-def plot_as_pie(df):
-    # find value of 1% of the total
-    total = df.sum(axis=1).values[0]
-    if total == 0:
+def plot_as_pie(df: pd.DataFrame, column):
+    logger.debug(f"Plot with Plotly")
+    if df.empty:
         st.error("No data to plot")
         return
+    
+    total = df[column].sum()
     limit = (1 * total) / 100
     logger.debug(f"1% of {total} is {limit}")
 
     # Group token representing less then 1% of total value
-    dfothers = df.loc[:, (df < limit).all(axis=0)]
-    df = df.loc[:, (df >= limit).all(axis=0)]
-    df["Others"] = dfothers.sum(axis=1)
+    dffinal = df.loc[df[column] >= limit]
+    logger.debug(f"Dataframe more than {limit}:\n{dffinal}")
 
-    labels = df.columns.tolist()
-    values = df.values.tolist()[0]
-    logger.info(f"Pie labels: {labels}")
-    logger.info(f"Pie values: {values}")
+    dfless = df.loc[df[column] < limit]
+    if not dfless.empty:
+        logger.debug(f"Dataframe less than {limit}:\n{dfless}")
 
-    plt.figure(figsize=(10, 10), facecolor="white")
-    ax1 = plt.subplot()
-    ax1.pie(values, labels=labels)
-    st.pyplot(plt)
+        dfless_sum = pd.DataFrame(dfless.sum()).T
+        dfless_sum.index = ['Others']
+        logger.debug(f"Dataframe less than 1% sum:\n{dfless_sum}")
 
+        dffinal = pd.concat([dffinal, dfless_sum])
+        logger.debug(f"Dataframe more than 1% sum with Others:\n{dffinal}")
+
+    fig = px.pie(dffinal, dffinal.index, column, width=700, height=700)
+    st.plotly_chart(fig, use_container_width=True)
 
 def plot_as_graph(df: pd.DataFrame, st_object=None):
-    logger.debug(f"Plot as graph - StreamlitObject: {st_object}")
+    logger.debug(f"Plot with Plotly - StreamlitObject: {st_object}")
     if df.empty:
         st.error("No data to plot")
         return
     # Create custom chart with linear time scale
-    fig, ax = plt.subplots(figsize=(10, 6))
-    df.index = pd.to_datetime(df.index)
-    ax.plot(df.index, df.values)
-
-    # Set x-axis to use dates with fixed intervals
-    ax.xaxis.set_major_locator(mdates.AutoDateLocator())
-    ax.xaxis.set_major_formatter(mdates.DateFormatter("%Y-%m-%d"))
-    plt.xticks(rotation=45)
-
-    # Set labels
-    ax.set_ylabel("Value (€)")
-
-    # Adjust layout and display the plot
-    plt.tight_layout()
+    logger.debug(f"Dataframe: \n{df}")
+    fig = px.line(df, x=df.index, y=df.columns)
     if st_object:
-        st_object.pyplot(fig)
+        st_object.plotly_chart(fig)
     else:
-        st.pyplot(fig)
+        st.plotly_chart(fig)

@@ -43,12 +43,8 @@ def aggregaterUI():
     with col_pie:
         st.header("Tokens repartition")
         if not df.empty:
-            # Créer un graphique en secteurs pour la colonne "value(€)"
-            transposed = df.transpose()
-            transposed = transposed.loc[["Value(€)"]]
-            logger.debug(f"transposed:\n{transposed}")
             try:
-                plot_as_pie(transposed)
+                plot_as_pie(df, column="Value(€)")
             except Exception as e:
                 st.error(f"Error: {str(e)}")
         else:
@@ -70,8 +66,10 @@ def build_tabs(df: pd.DataFrame):
             idx_token = 0
             for tab in tabs:
                 df_view = df.loc[df.index > str(startdate)]
-                df_view = df_view.loc[df_view.index < str(enddate + pd.to_timedelta(1, unit="d"))]
-                df_view = df_view[tokens[idx_token]]
+                df_view = df_view.loc[
+                    df_view.index < str(enddate + pd.to_timedelta(1, unit="d"))
+                ]
+                df_view = df_view[[tokens[idx_token]]]
                 df_view = df_view.dropna()
 
                 mcol1, mcol2 = tab.columns(2)
@@ -79,8 +77,8 @@ def build_tabs(df: pd.DataFrame):
                     nbr_days = enddate - startdate
                     mcol1.metric("Days", value=nbr_days.days)
                 with mcol2:
-                    first = df_view.iloc[0]
-                    last = df_view.iloc[-1]
+                    first = df_view.iloc[0].values[0]
+                    last = df_view.iloc[-1].values[0]
                     logger.debug(f"first: {first}, last: {last}")
                     mcol2.metric(
                         "Performance",
@@ -104,12 +102,21 @@ def syncNotionMarket():
     with st.spinner("Syncing Notion Database..."):
         try:
             notion = Notion(st.session_state.settings["notion_token"])
-            db_id = notion.getObjectId(st.session_state.settings["notion_database"], "database", st.session_state.settings["notion_parentpage"])
+            db_id = notion.getObjectId(
+                st.session_state.settings["notion_database"],
+                "database",
+                st.session_state.settings["notion_parentpage"],
+            )
             if db_id == None:
                 st.error("Error: Database not found")
                 st.stop()
             else:
-                updater = Updater(st.session_state.dbfile, st.session_state.settings["coinmarketcap_token"], st.session_state.settings["notion_token"], db_id)
+                updater = Updater(
+                    st.session_state.dbfile,
+                    st.session_state.settings["coinmarketcap_token"],
+                    st.session_state.settings["notion_token"],
+                    db_id,
+                )
                 updater.getCryptoPrices()
         except KeyError as ke:
             st.error("Error: " + type(ke).__name__ + " - " + str(ke))

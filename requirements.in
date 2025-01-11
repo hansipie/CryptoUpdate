@@ -8,3 +8,5 @@ matplotlib
 python-dotenv
 typer
 openai
+plotly
+
