@@ -95,6 +95,19 @@ class Portfolios:
                 (name,),
             )
             return {row[0]: row[1] for row in cursor.fetchall()}
+        
+    def get_token_by_portfolio(self, token: str) -> dict:
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                SELECT name, amount FROM Portfolios_Tokens
+                JOIN Portfolios ON Portfolios_Tokens.portfolio_id = Portfolios.id
+                WHERE Portfolios_Tokens.token = ?
+            """,
+                (token,),
+            )
+            return {row[0]: row[1] for row in cursor.fetchall()}
 
     def set_token(self, name: str, token: str, amount: float):
         with sqlite3.connect(self.db_path) as conn:

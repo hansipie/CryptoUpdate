@@ -1,4 +1,5 @@
 import streamlit as st
+import pandas as pd
 import logging
 from modules.database.portfolios import Portfolios
 from modules.database.market import Market
@@ -171,6 +172,18 @@ def load_portfolios(dbfile: str) -> Portfolios:
     return Portfolios(dbfile)
 
 
+@st.fragment
+def execute_search():
+    df_search = pd.DataFrame.from_dict(
+        g_portfolios.get_token_by_portfolio(st.session_state.search_target),
+        orient="index",
+        columns=["Amount"],
+    )
+    df_search.sort_index(inplace=True)
+    logger.debug(f"Search result:\n{df_search}")
+    st.dataframe(df_search, use_container_width=True)
+
+
 g_portfolios = load_portfolios(st.session_state.dbfile)
 
 # Add new portfolio dialog
@@ -191,6 +204,15 @@ if st.sidebar.button(
 ):
     update_prices()
 
+st.sidebar.divider()
+
+# search bar
+
+tokens = g_portfolios.aggregate_portfolios().keys()
+if st.sidebar.selectbox("Search", tokens, index=None, label_visibility="collapsed", key="search_target"):
+    with st.sidebar:
+        execute_search()
+
 # Display portfolios
 tabs = g_portfolios.get_portfolio_names()
 logger.debug(f"Portfolios: {tabs}")
@@ -199,4 +221,3 @@ try:
     portfolioUI(tabs)
 except Exception as e:
     st.error(f"Error: {str(e)}")
-
