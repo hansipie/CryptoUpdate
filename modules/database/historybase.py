@@ -4,7 +4,7 @@ import logging
 import tzlocal
 
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.WARNING)
+logger.setLevel(logging.DEBUG)
 
 
 class HistoryBase:
@@ -39,7 +39,7 @@ class HistoryBase:
                 df_sum["timestamp"], unit="s", utc=True
             )
             df_sum["timestamp"] = df_sum["timestamp"].dt.tz_convert(self.local_timezone)
-            df_sum.rename(columns={"timestamp": "Date"}, inplace=True)
+            df_sum.rename(columns={"timestamp": "Date", "value" : "Sum"}, inplace=True)
             df_sum.set_index("Date", inplace=True)
             df_sum = df_sum.reindex(sorted(df_sum.columns), axis=1)
             return df_sum

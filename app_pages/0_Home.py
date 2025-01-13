@@ -10,6 +10,11 @@ st.title("Crypto Update")
 
 df_balance, df_sums, _ = load_db(st.session_state.dbfile)
 
+@st.cache_data
+def join_dfs(df1, df2):
+    df = df1.join(df2)
+    return df
+
 with st.container(border=True):
     col1, col2, col3 = st.columns(3)
     with col1:
@@ -28,7 +33,7 @@ with st.container(border=True):
         )
 
 with st.container(border=True):
-    plot_as_graph(df_sums)
+    plot_as_graph(join_dfs(df_sums, df_balance))
 
 # show last values"
 st.header("Last values")
