@@ -11,8 +11,9 @@ from modules.Exporter import Exporter
 from modules.Notion import Notion
 from modules.Updater import Updater
 from alive_progress import alive_bar
-from modules import process
+from modules import tools
 from modules.database.historybase import HistoryBase
+from modules.utils import debug_prefix, listfilesrecursive
 
 # logging
 logging.basicConfig(
@@ -94,9 +95,9 @@ def saveToDB(inifile):
     try:
         # Read config
         debug_flag = True if config["Debug"]["flag"] == "True" else False
-        archive_path = os.path.join(os.getcwd(), process.debug_prefix(config["Local"]["archive_path"], debug_flag))
+        archive_path = os.path.join(os.getcwd(), debug_prefix(config["Local"]["archive_path"], debug_flag))
         data_path = os.path.join(os.getcwd(), config["Local"]["data_path"])
-        dbfile = os.path.join(data_path, process.debug_prefix(config["Local"]["sqlite_file"], debug_flag))
+        dbfile = os.path.join(data_path, debug_prefix(config["Local"]["sqlite_file"], debug_flag))
 
     except KeyError as ke:
         logging.error("Error: " + type(ke).__name__ + " - " + str(ke))
@@ -105,14 +106,14 @@ def saveToDB(inifile):
 
     conn = sqlite3.connect(dbfile)
 
-    archiveFiles = process.listfilesrecursive(archive_path)
+    archiveFiles = listfilesrecursive(archive_path)
     count = len(archiveFiles)
     with alive_bar(
         count, title="Insert in database", force_tty=True, stats="(eta:{eta})"
     ) as bar:
         for item in archiveFiles:
             if item.endswith(".csv"):
-                df = process.getDateFrame(item)
+                df = tools.getDateFrame(item)
                 df.to_sql("Database", conn, if_exists="append", index=False)
             else:
                 logger.debug(f"ignore: {item}")

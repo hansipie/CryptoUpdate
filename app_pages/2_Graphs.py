@@ -8,7 +8,8 @@ from modules.Updater import Updater
 from modules.database.portfolios import Portfolios
 from modules.database.market import Market
 from modules.plotter import plot_as_graph, plot_as_pie
-from modules.process import get_file_hash, load_db
+from modules.tools import load_db
+from modules.utils import get_file_hash
 
 
 logger = logging.getLogger(__name__)
@@ -51,16 +52,22 @@ def aggregaterUI():
             st.warning("No data available")
 
 
-def build_tabs(df: pd.DataFrame):
+def build_tabs(df: pd.DataFrame, columns: list = None):
     logger.debug("Build tabs")
     if df is None or df.empty:
         st.warning("No data available")
         return
     if startdate < enddate:
-        available_tokens = list(df.columns)
-        tokens = st.multiselect(
-            "Select Tokens to display", available_tokens, key="graphtokens"
-        )
+        if columns is None:
+            available_tokens = list(df.columns)
+        else:
+            available_tokens = columns if all(x in df.columns for x in columns) else None
+        if len(available_tokens) > 1:
+            tokens = st.multiselect(
+                "Select Tokens to display", available_tokens, key="graphtokens"
+            )
+        else:
+            tokens = available_tokens
         if tokens:
             tabs = st.tabs(tokens)
             idx_token = 0
@@ -98,8 +105,9 @@ def build_tabs(df: pd.DataFrame):
         st.error("The end date must be after the start date")
 
 
+@st.dialog("Sync. Notion Database")
 def syncNotionMarket():
-    with st.spinner("Syncing Notion Database..."):
+    with st.spinner("Running ..."):
         try:
             notion = Notion(st.session_state.settings["notion_token"])
             db_id = notion.getObjectId(
@@ -109,7 +117,7 @@ def syncNotionMarket():
             )
             if db_id == None:
                 st.error("Error: Database not found")
-                st.stop()
+                st.rerun()
             else:
                 updater = Updater(
                     st.session_state.dbfile,
@@ -122,13 +130,13 @@ def syncNotionMarket():
             st.error("Error: " + type(ke).__name__ + " - " + str(ke))
             st.error("Please set your settings in the settings page")
             traceback.print_exc()
-            st.stop()
+            st.rerun()
         except Exception as e:
             st.error("Error: " + type(e).__name__ + " - " + str(e))
             traceback.print_exc()
-            st.stop()
+            st.rerun()
 
-        updatetokens_bar = st.sidebar.progress(0)
+        updatetokens_bar = st.progress(0)
         count = 0
         for token, data in updater.notion_entries.items():
             updatetokens_bar.progress(
@@ -138,6 +146,7 @@ def syncNotionMarket():
             count += 1
         updatetokens_bar.progress(100, text="Update completed")
         updater.UpdateLastUpdate()
+    st.rerun()
 
 
 @st.cache_data(
@@ -154,7 +163,7 @@ def load_market(dbfile: str) -> pd.DataFrame:
 df_balance, df_sums, df_tokencount = load_db(st.session_state.dbfile)
 
 add_selectbox = st.sidebar.selectbox(
-    "Assets View", ("Global", "Assets Value", "Assets Count", "Market")
+    "Assets View", ("Global", "Assets Value", "Assets Count", "Market", "Currency (EURUSD)")
 )
 
 if add_selectbox != "Global":
@@ -191,3 +200,12 @@ if add_selectbox == "Market":
     df_market = load_market(st.session_state.dbfile)
     build_tabs(df_market)
     st.dataframe(df_market)
+
+if add_selectbox == "Currency (EURUSD)":
+    logger.debug("Currency (EURUSD)")
+    st.title("Currency (EURUSD)")
+    market = Market(st.session_state.dbfile, st.session_state.settings["coinmarketcap_token"])
+    df_currency = market.getCurrency()
+    build_tabs(df_currency, ["price"])
+    
+    

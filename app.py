@@ -1,7 +1,7 @@
 import streamlit as st
 import logging
 import sys
-from modules import process
+from modules import tools
 from modules.database.historybase import HistoryBase as hb
 from modules.configuration import configuration as cfg
 from modules.database.portfolios import Portfolios as pf
@@ -25,7 +25,7 @@ except FileNotFoundError:
     st.error("Settings file not found. Please verify your configuration file exists and is accessible.")
     st.stop()
 
-process.loadSettings(config.conf)
+tools.loadSettings(config.conf)
 
 home_page = st.Page("app_pages/0_Home.py", title="Home", icon="🏠", default=True)
 pfolios_page = st.Page("app_pages/1_Portfolios.py", title="Portfolios", icon="📊")

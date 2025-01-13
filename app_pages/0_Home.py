@@ -1,7 +1,7 @@
 import streamlit as st
 import logging
 from modules.plotter import plot_as_graph
-from modules.process import load_db
+from modules.tools import load_db
 from modules.database.operations import operations
 
 logger = logging.getLogger(__name__)
@@ -33,7 +33,8 @@ with st.container(border=True):
         )
 
 with st.container(border=True):
-    plot_as_graph(join_dfs(df_sums, df_balance))
+    #plot_as_graph(join_dfs(df_sums, df_balance))
+    plot_as_graph(df_sums)
 
 # show last values"
 st.header("Last values")

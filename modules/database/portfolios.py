@@ -2,8 +2,8 @@ import streamlit as st
 import pandas as pd
 import logging
 import sqlite3
-from modules.process import clean_price
-from modules.process import get_current_price
+from modules.tools import get_current_price
+from modules.utils import clean_price
 
 logging.getLogger("matplotlib").setLevel(logging.WARNING)
 logging.getLogger("PIL").setLevel(logging.WARNING)

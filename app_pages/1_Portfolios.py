@@ -11,7 +11,6 @@ logger = logging.getLogger(__name__)
 st.title("Portfolios")
 
 
-@st.fragment
 @st.dialog("Add new portfolio")
 def add_new_portfolio():
     name = st.text_input("Name")
@@ -22,7 +21,6 @@ def add_new_portfolio():
         st.rerun()
 
 
-@st.fragment
 @st.dialog("Danger Zone")
 def danger_zone(name: str):
     st.write(f"Delete portfolio {name}?")
@@ -32,7 +30,6 @@ def danger_zone(name: str):
         st.rerun()
 
 
-@st.fragment
 @st.dialog("Rename portfolio")
 def rename_portfolio(name: str):
     new_name = st.text_input("New name")
@@ -41,7 +38,6 @@ def rename_portfolio(name: str):
         st.rerun()
 
 
-@st.fragment
 @st.dialog("Add Token")
 def add_token(name: str):
     st.write(f"Add token to {name}")
@@ -54,7 +50,6 @@ def add_token(name: str):
         st.rerun()
 
 
-@st.fragment
 @st.dialog("Delete Token")
 def delete_token(name: str):
     st.write(f"Delete token from {name}")

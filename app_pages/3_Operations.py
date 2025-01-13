@@ -5,7 +5,9 @@ import tzlocal
 from modules.database.portfolios import Portfolios
 from modules.database.historybase import HistoryBase
 from modules.database.operations import operations
+from modules.database.market import Market
 from modules.database.swaps import swaps
+from modules.utils import toTimestamp
 
 logger = logging.getLogger(__name__)
 
@@ -15,19 +17,6 @@ g_portfolios = Portfolios(st.session_state.dbfile)
 g_historybase = HistoryBase(st.session_state.dbfile)
 g_tokens = g_historybase.getTokens()
 g_wallets = g_portfolios.get_portfolio_names()
-
-def toTimestamp(date, time):
-    # date if formated as yyyy-mm-dd, time as hh:mm:00
-    # merge them to a datetime object, convert to UTC and then to epoch timestamp
-    datetime_local = pd.to_datetime(f"{date} {time}")
-    local_timezone = tzlocal.get_localzone()
-    logger.debug(f"Timezone locale: {local_timezone}")
-    datetime_utc = datetime_local.tz_localize(local_timezone).tz_convert("UTC")
-    timestamp = datetime_utc.timestamp()
-    logger.debug(
-        f"submitbuy: local_time={datetime_local}, utc_time={datetime_utc}, timestamp={timestamp}"
-    )
-    return timestamp
 
 def submitbuy(timestamp, from_amount, form_currency, to_amount, to_token, to_wallet):
     logger.debug(
@@ -189,26 +178,6 @@ with swap_tab:
     st.dataframe(df_swaplist, use_container_width=True, hide_index=True)
 
 with import_tab:
-    file = st.file_uploader("Upload a file", type=["csv"])
-    if file is not None:
-        df = pd.read_csv(file)
-
-        # clean up column names
-        df.columns = df.columns.str.strip().str.lower().str.replace(" ", "")
-
-        df.sort_values(by="timestamp", inplace=True)
-        st.dataframe(df)
-
-        if st.button("Import"):
-            for index, row in df.iterrows():
-                logger.debug(f"\n{row}")
-                swaps.insert(
-                    row["timestamp"],
-                    row["token_from"],
-                    row["amount_from"],
-                    None,
-                    row["token_to"],
-                    row["amount_to"],
-                    None,
-                )
-            st.success("Import successfully completed")
+    if st.button("Currencies"):
+        market = Market(st.session_state.dbfile, st.session_state.settings["coinmarketcap_token"])
+        market.updateCurrencies()
