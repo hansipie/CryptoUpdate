@@ -1,3 +1,4 @@
+import sqlite3
 import pandas as pd
 import logging
 import os
@@ -65,4 +66,35 @@ def load_db(dbfile: str) -> pd.DataFrame:
         df_sums = histdb.getSums()
         df_tokencount = histdb.getTokenCounts()
         return df_balance, df_sums, df_tokencount
+    
+def interpolate_EURUSD(timestamp: int, dbfile: str) -> float:
+    with sqlite3.connect(dbfile) as con:
+        df_low = pd.read_sql_query(
+            f"SELECT timestamp, price from Currency WHERE timestamp <= {timestamp} ORDER BY timestamp DESC LIMIT 1;",
+            con,
+        )
+        df_high = pd.read_sql_query(
+            f"SELECT timestamp, price from Currency WHERE timestamp >= {timestamp} ORDER BY timestamp ASC LIMIT 1;",
+            con,
+        )
+        if len(df_high) == 0:
+            logger.debug(st.session_state.settings["currencyapi_token"])
+            client = currencyapicom.Client(st.session_state.settings["currencyapi_token"])
+            result = client.latest()
+            logger.debug(f"Extrapolate EURUSD - API result: {result}")
+
+        logger.debug(f"Extrapolate EURUSD - timestamp: {timestamp}\n- low:\n{df_low}\n- high:\n{df_high}")
+        if len(df_low) == 0 or len(df_high) == 0:
+            logger.warning(f"Extrapolate EURUSD - No data found for timestamp: {timestamp}")
+            return 0.0
+        else:
+            # Interpoler la valeur
+            price_low = df_low["price"][0]
+            price_high = df_high["price"][0]
+            timestamp_low = df_low["timestamp"][0]
+            timestamp_high = df_high["timestamp"][0]
+            price = price_low + (price_high - price_low) * (timestamp - timestamp_low) / (timestamp_high - timestamp_low)
+            logger.debug(f"Extrapolate EURUSD - Price: {price}")
+            return price
+    
     

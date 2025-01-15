@@ -40,7 +40,6 @@ def plot_as_graph(df: pd.DataFrame, st_object=None):
         st.error("No data to plot")
         return
     # Create custom chart with linear time scale
-    logger.debug(f"Dataframe: \n{df}")
     fig = px.line(df, x=df.index, y=df.columns)
     if st_object:
         st_object.plotly_chart(fig)

@@ -160,6 +160,8 @@ def update_prices():
         }
     HistoryBase(st.session_state.dbfile).add_data_df(new_entries)
 
+    market.updateCurrencies()
+
     st.toast("Prices updated", icon="✔️")
 
 

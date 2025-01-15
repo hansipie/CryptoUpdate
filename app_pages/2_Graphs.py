@@ -8,8 +8,8 @@ from modules.Updater import Updater
 from modules.database.portfolios import Portfolios
 from modules.database.market import Market
 from modules.plotter import plot_as_graph, plot_as_pie
-from modules.tools import load_db
-from modules.utils import get_file_hash
+from modules.tools import interpolate_EURUSD, load_db
+from modules.utils import get_file_hash, toTimestamp
 
 
 logger = logging.getLogger(__name__)
@@ -208,4 +208,15 @@ if add_selectbox == "Currency (EURUSD)":
     df_currency = market.getCurrency()
     build_tabs(df_currency, ["price"])
     
-    
+    interpolated = 0.0
+    with st.form(key="interpolate"):
+        col_date, col_time, col_btn = st.columns([3, 2, 1], vertical_alignment="bottom")
+        with col_date:
+            date = st.date_input("Date", key="interdate")
+        with col_time:
+            time = st.time_input("Time", key="intertime")
+        with col_btn:
+            if st.form_submit_button("Submit", use_container_width=True, ):
+                timestamp = toTimestamp(date, time)
+                interpolated = interpolate_EURUSD(timestamp, st.session_state.dbfile)
+        st.info(f"Interpolated value: {interpolated} USD")

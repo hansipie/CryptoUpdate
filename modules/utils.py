@@ -8,15 +8,22 @@ import tzlocal
 
 logger = logging.getLogger(__name__)
 
-def find_linear_function(x1, y1, x2, y2):
+def __find_linear_function(x1, y1, x2, y2):
     # Calculer la pente a
     a = (y2 - y1) / (x2 - x1)
     # Calculer l'ordonnée à l'origine b
     b = y1 - a * x1  
     return a, b
 
-def extrapolate(x1, y1, x2, y2, x):
-    a, b = find_linear_function(x1, y1, x2, y2)
+def interpolate(x1, y1, x2, y2, x):
+    if x1 == x2 or y1 == y2:
+        return y1
+    if x1 > x2:
+        x1, x2 = x2, x1
+        y1, y2 = y2, y1
+    if x < x1 or x > x2:
+        raise ValueError(f"x={x} is out of range [{x1}, {x2}]")
+    a, b = __find_linear_function(x1, y1, x2, y2)
     return a * x + b
 
 def toTimestamp(date, time):

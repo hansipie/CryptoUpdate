@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import logging
 import tzlocal
+from modules.cmc import cmc
 from modules.database.portfolios import Portfolios
 from modules.database.historybase import HistoryBase
 from modules.database.operations import operations
@@ -48,7 +49,7 @@ def submitswap(
 op = operations()
 swaps = swaps()
 
-buy_tab, swap_tab, import_tab = st.tabs(["Buy", "Swap", "Import"])
+buy_tab, swap_tab, tests_tab = st.tabs(["Buy", "Swap", "Tests"])
 with buy_tab:
     with st.form(key="buy"):
         col_date, col_time = st.columns(2)
@@ -177,7 +178,11 @@ with swap_tab:
 
     st.dataframe(df_swaplist, use_container_width=True, hide_index=True)
 
-with import_tab:
+with tests_tab:
     if st.button("Currencies"):
         market = Market(st.session_state.dbfile, st.session_state.settings["coinmarketcap_token"])
         market.updateCurrencies()
+    
+    if st.button("Market"):
+        price = cmc(st.session_state.settings["coinmarketcap_token"]).getFiatPrices()
+        st.write(price)

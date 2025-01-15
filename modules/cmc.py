@@ -9,6 +9,54 @@ class cmc:
         self.coinmarketcap_token = coinmarketcap_token
         pass
 
+    def getFiatPrices(self, converts: list=["USD"], symbol="EUR", amount=1, debug=False) -> dict:
+        """
+        Get the price of the fiat currencies from the Coinmarketcap API
+        """
+        logger.debug(f"Get current maket prices form Coinmarketcap for:\n{converts}")
+        names = str(",").join(converts)
+        logger.info(f"Request fiat current prices for {names}")
+        if debug:
+            logger.info(
+                "Debug mode: use sandbox-api.coinmarketcap.com instead of pro-api.coinmarketcap.com"
+            )
+            url = (
+                "https://sandbox-api.coinmarketcap.com/v2/tools/price-conversion"
+            )
+            headers = {"X-CMC_PRO_API_KEY": "b54bcf4d-1bca-4e8e-9a24-22ff2c3d462c"}
+        else:
+            url = "https://pro-api.coinmarketcap.com/v2/tools/price-conversion"
+            headers = {"X-CMC_PRO_API_KEY": str(self.coinmarketcap_token)}
+
+        params = {
+            "amount": amount,
+            "symbol": symbol,
+            "convert": names,
+        }
+
+        response = requests.get(url, headers=headers, params=params)
+        if response.status_code == 200:
+            fiat_prices = {}
+            content = response.json()
+            logger.info(f"Get current market prices from Coinmarketcap successfully\n{content}")
+            for fiat in converts:
+                # Initialiser l'entrée pour chaque token
+                fiat_prices[fiat] = 0
+                try:
+                    price_data = content["data"][0]["quote"][fiat]["price"]
+                    logger.debug(f"Price for {fiat}: {price_data}")
+                    if price_data is not None:
+                        fiat_prices[fiat] = price_data
+                except (KeyError, IndexError, TypeError) as e:
+                    logger.error(f"Error getting price for {fiat}: {str(e)}")
+                    logger.error(f"Data received: {content["data"]}")
+                    continue
+            return fiat_prices
+        else:
+            logger.error(f"Error: {response.status_code}")
+            logger.error(response.text)
+            return None
+
     def getCryptoPrices(self, tokens: list, unit="EUR", debug=False):
         """
         Get the price of the cryptocurrencies from the Coinmarketcap API
