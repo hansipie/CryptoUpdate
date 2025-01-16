@@ -74,14 +74,14 @@ class Market:
             return df_market
 
     # get the last market
-    def getLastMarket(self) -> dict:
+    def getLastMarket(self) -> pd.DataFrame:
         logger.debug("Get last market")
         tokens_list = self.getTokens()
         if not tokens_list:
             logger.warning("No tokens available")
             return None
         with sqlite3.connect(self.db_path) as con:
-            market_dict = {}
+            market_df = pd.DataFrame()
             for token in tokens_list:
                 df = pd.read_sql_query(
                     f"SELECT timestamp, price AS '{token}' FROM Market WHERE token = '{token}' ORDER BY timestamp DESC LIMIT 1;",
@@ -89,12 +89,12 @@ class Market:
                 )
                 if df.empty:
                     continue
-                market_dict[token] = {
-                    "price": df[token][0],
-                    "timestamp": df["timestamp"][0],
+                market_df[token] = {
+                    df["timestamp"][0]: df[token][0],
+                    #"timestamp": df["timestamp"][0],
                 }
-            logger.debug(f"Last Market get size: {len(market_dict)}")
-            return market_dict
+            logger.debug(f"Last Market get size: {len(market_df)}")
+            return market_df
 
     # update the market with the current prices
     def updateMarket(self):

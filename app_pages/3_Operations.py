@@ -179,10 +179,7 @@ with swap_tab:
     st.dataframe(df_swaplist, use_container_width=True, hide_index=True)
 
 with tests_tab:
-    if st.button("Currencies"):
-        market = Market(st.session_state.dbfile, st.session_state.settings["coinmarketcap_token"])
-        market.updateCurrencies()
-    
-    if st.button("Market"):
-        price = cmc(st.session_state.settings["coinmarketcap_token"]).getCurrentFiatPrices()
-        st.write(price)
+    market = Market(st.session_state.dbfile, st.session_state.settings["coinmarketcap_token"])
+    st.dataframe(market.getLastMarket(), use_container_width=True)
+    st.write(type(market.getLastMarket()))
+    pass

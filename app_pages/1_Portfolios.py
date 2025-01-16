@@ -156,7 +156,7 @@ def update_prices():
         new_entries[token] = {
             "amount": agg[token]["amount"],
             "price": tokens_prices[token]["price"],
-            "timestamp": tokens_prices[token]["timestamp"],
+            "timestamp": tokens_prices.index[0],
         }
     TokensDatabase(st.session_state.dbfile).add_data_df(new_entries)
 
