@@ -144,7 +144,7 @@ def update_prices():
         st.session_state.dbfile, st.session_state.settings["coinmarketcap_token"]
     )
 
-    market.addTokens(pf_tokens)
+    market.updateMarket(pf_tokens)
     tokens_prices = market.getLastMarket()
     if tokens_prices is None:
         st.error("No Market data available")

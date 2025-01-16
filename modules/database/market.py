@@ -97,12 +97,8 @@ class Market:
             return market_df
 
     # update the market with the current prices
-    def updateMarket(self):
-        logger.debug("Update market")
-        self.addTokens()
-
-    # add tokens to the database with the current price
-    def addTokens(self, tokens: list = []):
+    # + add new tokens to the database with the current price
+    def updateMarket(self, tokens: list = []):
         logger.debug("Add tokens")
 
         known_tokens = self.getTokens()
