@@ -5,6 +5,7 @@ import os
 import streamlit as st
 from modules.database.historybase import HistoryBase as hb
 from modules.utils import clean_price, debug_prefix, get_file_hash
+from modules.cmc import cmc
 
 logger = logging.getLogger(__name__)
 
@@ -69,6 +70,7 @@ def load_db(dbfile: str) -> pd.DataFrame:
     
 def interpolate_EURUSD(timestamp: int, dbfile: str) -> float:
     with sqlite3.connect(dbfile) as con:
+
         df_low = pd.read_sql_query(
             f"SELECT timestamp, price from Currency WHERE timestamp <= {timestamp} ORDER BY timestamp DESC LIMIT 1;",
             con,
@@ -78,14 +80,13 @@ def interpolate_EURUSD(timestamp: int, dbfile: str) -> float:
             con,
         )
         if len(df_high) == 0:
-            logger.debug(st.session_state.settings["currencyapi_token"])
-            client = currencyapicom.Client(st.session_state.settings["currencyapi_token"])
-            result = client.latest()
-            logger.debug(f"Extrapolate EURUSD - API result: {result}")
+            cmc_price = cmc(st.session_state.settings["coinmarketcap_token"])
+            prices = cmc_price.getCurrentFiatPrices(["USD"], "EUR", 1, st.session_state.settings["debug_flag"])
+            df_high = pd.DataFrame(prices["USD"], index=[0])
 
-        logger.debug(f"Extrapolate EURUSD - timestamp: {timestamp}\n- low:\n{df_low}\n- high:\n{df_high}")
-        if len(df_low) == 0 or len(df_high) == 0:
-            logger.warning(f"Extrapolate EURUSD - No data found for timestamp: {timestamp}")
+        logger.debug(f"Interpolate EURUSD - timestamp: {timestamp}\n- low:\n{df_low}\n- high:\n{df_high}")
+        if len(df_low) == 0 or len(df_high) == 0 or (df_high["timestamp"][0] < timestamp):
+            logger.warning(f"Interpolate EURUSD - No data found for timestamp: {timestamp}")
             return 0.0
         else:
             # Interpoler la valeur
@@ -94,7 +95,5 @@ def interpolate_EURUSD(timestamp: int, dbfile: str) -> float:
             timestamp_low = df_low["timestamp"][0]
             timestamp_high = df_high["timestamp"][0]
             price = price_low + (price_high - price_low) * (timestamp - timestamp_low) / (timestamp_high - timestamp_low)
-            logger.debug(f"Extrapolate EURUSD - Price: {price}")
+            logger.debug(f"Interpolate EURUSD - Price: {price}")
             return price
-    
-    

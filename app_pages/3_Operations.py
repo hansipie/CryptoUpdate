@@ -184,5 +184,5 @@ with tests_tab:
         market.updateCurrencies()
     
     if st.button("Market"):
-        price = cmc(st.session_state.settings["coinmarketcap_token"]).getFiatPrices()
+        price = cmc(st.session_state.settings["coinmarketcap_token"]).getCurrentFiatPrices()
         st.write(price)

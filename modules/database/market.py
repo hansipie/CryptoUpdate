@@ -166,7 +166,7 @@ class Market:
                 df.drop_duplicates(inplace=True)
                 df.to_sql(table, con, if_exists="replace", index=False)
 
-    def __findMissingTimestamps(self) -> pd.DataFrame :
+    def __findMissingTimestamps(self) -> pd.DataFrame:
         with sqlite3.connect(self.db_path) as con:
             df_timestamps = pd.read_sql_query(
                 "SELECT DISTINCT timestamp from Market",
@@ -185,7 +185,9 @@ class Market:
             # remove timestamp greater than now_timestamp from df_timestamps
             now_timestamp = int(pd.Timestamp.now(tz=pytz.UTC).timestamp())
             logger.debug(f"Now timestamp: {now_timestamp}")
-            logger.debug(f"to remove: {len(df_timestamps[df_timestamps["timestamp"] > now_timestamp])}")
+            logger.debug(
+                f"to remove: {len(df_timestamps[df_timestamps["timestamp"] > now_timestamp])}"
+            )
             df_timestamps = df_timestamps[df_timestamps["timestamp"] <= now_timestamp]
 
             df_rate_timestamps = pd.read_sql_query(
@@ -207,60 +209,59 @@ class Market:
         if count == 0:
             logger.debug("No missing timestamps")
         else:
-            with sqlite3.connect(self.db_path) as con:
-                idx = 0
-                for timestamp in df_timestamps["timestamp"]:
-                    idx += 1
-                    # convert timestamp to datetime(YYYY-MM-DD)
-                    date = pd.to_datetime(timestamp, unit="s", utc=True).strftime(
-                        "%Y-%m-%d"
-                    )
-                    rate_date = f"{date} 14:30:00+00:00"
-                    rate_timestamp = int(pd.Timestamp(rate_date).timestamp())
-                    logger.debug(
-                        f"{idx}/{count} Timestamp: {timestamp} -> Date: {date} -> Rate Date: {rate_date} -> Rate Timestamp: {rate_timestamp}"
-                    )
-
-                    # request the currency rate
-                    url = f"https://free.ratesdb.com/v1/rates?from=EUR&to=USD&date={date}"
-                    response = requests.get(url)
-                    if response.status_code != 200:
-                        logging.error(
-                            f"Error updating currencies. Code: {response.status_code}"
-                        )
-                        time.sleep(1)
-                        return None
-                    resp = response.json()
-
-                    logger.debug(
-                        f"Rate Timestamp: {rate_timestamp}  - Rate: {resp["data"]["rates"]["USD"]}"
-                    )
-                    cur = con.cursor()
-                    cur.execute(
-                        "INSERT INTO Currency (timestamp, currency, price) VALUES (?, ?, ?)",
-                        (rate_timestamp, "USD", resp["data"]["rates"]["USD"]),
-                    )
-                    con.commit()
-                    time.sleep(1)
-                # add current rate
-                
-        #add latest rate to Currency from CMC
-        cmc_prices = cmc(self.cmc_token)
-        price = cmc_prices.getFiatPrices()
-        logger.debug(f"Adding latest rate to Currency: {price}")
-        timestamp = int(pd.Timestamp.now(tz=pytz.UTC).timestamp())
-        with sqlite3.connect(self.db_path) as con:
-            for currency in price:
-                cur = con.cursor()
-                cur.execute(
-                    "INSERT INTO Currency (timestamp, currency, price) VALUES (?, ?, ?)",
-                    (timestamp, currency, price[currency]),
+            idx = 0
+            for timestamp in df_timestamps["timestamp"]:
+                idx += 1
+                # convert timestamp to datetime(YYYY-MM-DD)
+                date = pd.to_datetime(timestamp, unit="s", utc=True).strftime(
+                    "%Y-%m-%d"
                 )
-            con.commit()
+                rate_date = f"{date} 14:30:00+00:00"
+                rate_timestamp = int(pd.Timestamp(rate_date).timestamp())
+                logger.debug(
+                    f"{idx}/{count} Timestamp: {timestamp} -> Date: {date} -> Rate Date: {rate_date} -> Rate Timestamp: {rate_timestamp}"
+                )
+
+                # request the currency rate
+                url = f"https://free.ratesdb.com/v1/rates?from=EUR&to=USD&date={date}"
+                response = requests.get(url)
+                if response.status_code != 200:
+                    logging.error(
+                        f"Error updating currencies. Code: {response.status_code}"
+                    )
+                    time.sleep(1)
+                    return None
+                resp = response.json()
+
+                logger.debug(
+                    f"Rate Timestamp: {rate_timestamp}  - Rate: {resp["data"]["rates"]["USD"]}"
+                )
+                self.addCurrency(rate_timestamp, "USD", resp["data"]["rates"]["USD"])
+
+                # sleep 1 second to avoid api request rate limit
+                time.sleep(1)
+
+        # add current rate to Currency from CMC
+        cmc_prices = cmc(self.cmc_token)
+        price = cmc_prices.getCurrentFiatPrices()
+        logger.debug(f"Adding current rate to Currency: {price}")
+        for currency in price:
+            self.addCurrency(
+                price[currency]["timestamp"], currency, price[currency]["price"]
+            )
 
         # drop duplicate
         self.dropDuplicate("Currency")
 
+    def addCurrency(self, timestamp: int, currency: str, price: float):
+        logger.debug(f"Add currency: {currency} - {price}")
+        with sqlite3.connect(self.db_path) as con:
+            cur = con.cursor()
+            cur.execute(
+                "INSERT INTO Currency (timestamp, currency, price) VALUES (?, ?, ?)",
+                (timestamp, currency, price),
+            )
+            con.commit()
 
     def getCurrency(self) -> pd.DataFrame:
         logger.debug("Get currency")

@@ -1,4 +1,6 @@
+from datetime import datetime
 import logging
+import pytz
 import requests
 
 logger = logging.getLogger(__name__)
@@ -9,7 +11,9 @@ class cmc:
         self.coinmarketcap_token = coinmarketcap_token
         pass
 
-    def getFiatPrices(self, converts: list=["USD"], symbol="EUR", amount=1, debug=False) -> dict:
+    def getCurrentFiatPrices(
+        self, converts: list = ["USD"], symbol="EUR", amount=1, debug=False
+    ) -> dict:
         """
         Get the price of the fiat currencies from the Coinmarketcap API
         """
@@ -20,9 +24,7 @@ class cmc:
             logger.info(
                 "Debug mode: use sandbox-api.coinmarketcap.com instead of pro-api.coinmarketcap.com"
             )
-            url = (
-                "https://sandbox-api.coinmarketcap.com/v2/tools/price-conversion"
-            )
+            url = "https://sandbox-api.coinmarketcap.com/v2/tools/price-conversion"
             headers = {"X-CMC_PRO_API_KEY": "b54bcf4d-1bca-4e8e-9a24-22ff2c3d462c"}
         else:
             url = "https://pro-api.coinmarketcap.com/v2/tools/price-conversion"
@@ -38,15 +40,24 @@ class cmc:
         if response.status_code == 200:
             fiat_prices = {}
             content = response.json()
-            logger.info(f"Get current market prices from Coinmarketcap successfully\n{content}")
+            logger.info(
+                f"Get current market prices from Coinmarketcap successfully\n{content}"
+            )
             for fiat in converts:
                 # Initialiser l'entrée pour chaque token
-                fiat_prices[fiat] = 0
+                fiat_prices[fiat] = {"price": 0, "timestamp": 0}
                 try:
+                    logger.debug(
+                        f"Price for {fiat}: {content["data"][0]["quote"][fiat]}"
+                    )
                     price_data = content["data"][0]["quote"][fiat]["price"]
-                    logger.debug(f"Price for {fiat}: {price_data}")
+                    timestamp_data = content["data"][0]["quote"][fiat]["last_updated"]
+
                     if price_data is not None:
-                        fiat_prices[fiat] = price_data
+                        fiat_prices[fiat]["price"] = price_data
+                        utc_time = datetime.strptime(timestamp_data, "%Y-%m-%dT%H:%M:%S.%fZ")
+                        fiat_prices[fiat]["timestamp"] = utc_time.replace(tzinfo=pytz.UTC).timestamp()
+                        
                 except (KeyError, IndexError, TypeError) as e:
                     logger.error(f"Error getting price for {fiat}: {str(e)}")
                     logger.error(f"Data received: {content["data"]}")

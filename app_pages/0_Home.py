@@ -15,6 +15,19 @@ def join_dfs(df1, df2):
     df = df1.join(df2)
     return df
 
+def update_prices():
+    pass
+
+# Update prices
+st.sidebar.divider()
+if st.sidebar.button(
+    "Update prices",
+    key="update_prices",
+    icon=":material/refresh:",
+    use_container_width=True,
+):
+    update_prices()
+
 with st.container(border=True):
     col1, col2, col3 = st.columns(3)
     with col1:
