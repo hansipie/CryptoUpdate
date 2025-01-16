@@ -12,7 +12,7 @@ from modules.Notion import Notion
 from modules.Updater import Updater
 from alive_progress import alive_bar
 from modules import tools
-from modules.database.historybase import HistoryBase
+from modules.database.tokensdb import TokensDatabase
 from modules.utils import debug_prefix, listfilesrecursive
 
 # logging
@@ -114,13 +114,13 @@ def saveToDB(inifile):
         for item in archiveFiles:
             if item.endswith(".csv"):
                 df = tools.getDateFrame(item)
-                df.to_sql("Database", conn, if_exists="append", index=False)
+                df.to_sql("TokensDatabase", conn, if_exists="append", index=False)
             else:
                 logger.debug(f"ignore: {item}")
             bar()
     conn.close()
 
-    histdb = HistoryBase(dbfile)
+    histdb = TokensDatabase(dbfile)
     histdb.dropDuplicate()
 
 @app.command()

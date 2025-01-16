@@ -3,7 +3,7 @@ import pandas as pd
 import logging
 import os
 import streamlit as st
-from modules.database.historybase import HistoryBase as hb
+from modules.database.tokensdb import TokensDatabase
 from modules.utils import clean_price, debug_prefix, get_file_hash
 from modules.cmc import cmc
 
@@ -23,8 +23,8 @@ def getDateFrame(inputfile):
 def get_current_price(token: str) -> float:
     # Récupérer la valeur brute 
     try:
-        histbd = hb(st.session_state.dbfile)
-        raw_price = histbd.get_last_price(token)
+        tokensdb = TokensDatabase(st.session_state.dbfile)
+        raw_price = tokensdb.get_last_price(token)
     except KeyError:
         logger.warning(f"Pas de prix pour {token}")
         return 0.0
@@ -62,10 +62,10 @@ def loadSettings(settings: dict):
 def load_db(dbfile: str) -> pd.DataFrame:
     with st.spinner("Loading database..."):
         logger.debug("Load database")
-        histdb = hb(dbfile)
-        df_balance = histdb.getBalances()
-        df_sums = histdb.getSums()
-        df_tokencount = histdb.getTokenCounts()
+        tokensdb = TokensDatabase(dbfile)
+        df_balance = tokensdb.getBalances()
+        df_sums = tokensdb.getSums()
+        df_tokencount = tokensdb.getTokenCounts()
         return df_balance, df_sums, df_tokencount
     
 def interpolate_EURUSD(timestamp: int, dbfile: str) -> float:

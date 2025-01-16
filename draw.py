@@ -9,12 +9,12 @@ from dash import html
 logger = logging.getLogger(__name__)
 
 with sqlite3.connect('./data/db.sqlite3') as con:
-    df_tokens = pd.read_sql_query("SELECT DISTINCT token from Database;", con)
-    df_timestamp = pd.read_sql_query("SELECT DISTINCT timestamp from Database ORDER BY timestamp", con)
+    df_tokens = pd.read_sql_query("SELECT DISTINCT token from TokensDatabase;", con)
+    df_timestamp = pd.read_sql_query("SELECT DISTINCT timestamp from TokensDatabase ORDER BY timestamp", con)
     dfall = pd.DataFrame(columns=['datetime', 'value'])
     for mytime in df_timestamp['timestamp']:
         df = pd.read_sql_query(
-            f"SELECT ROUND(sum(price*(CASE WHEN count IS NOT NULL THEN count ELSE 0 END)), 2) as value, DATETIME(timestamp, 'unixepoch') AS datetime from Database WHERE timestamp = {str(mytime)}", 
+            f"SELECT ROUND(sum(price*(CASE WHEN count IS NOT NULL THEN count ELSE 0 END)), 2) as value, DATETIME(timestamp, 'unixepoch') AS datetime from TokensDatabase WHERE timestamp = {str(mytime)}", 
             con
         )
         dfall.loc[len(dfall)] = [df['datetime'][0], df['value'][0]]
@@ -37,7 +37,7 @@ def update_graph(selected_dropdown_value):
     else:
         with sqlite3.connect('./data/db.sqlite3') as con:
             dff = pd.read_sql_query(
-                f"SELECT DATETIME(timestamp, 'unixepoch') AS datetime, ROUND(price*(CASE WHEN count IS NOT NULL THEN count ELSE 0 END), 2) AS value FROM Database WHERE token = '{selected_dropdown_value}' ORDER BY timestamp;", 
+                f"SELECT DATETIME(timestamp, 'unixepoch') AS datetime, ROUND(price*(CASE WHEN count IS NOT NULL THEN count ELSE 0 END), 2) AS value FROM TokensDatabase WHERE token = '{selected_dropdown_value}' ORDER BY timestamp;", 
                 con
             )
             logger.debug(dff.tail())

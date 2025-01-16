@@ -3,7 +3,7 @@ import pandas as pd
 import logging
 from modules.database.portfolios import Portfolios
 from modules.database.market import Market
-from modules.database.historybase import HistoryBase
+from modules.database.tokensdb import TokensDatabase
 
 
 logger = logging.getLogger(__name__)
@@ -158,7 +158,7 @@ def update_prices():
             "price": tokens_prices[token]["price"],
             "timestamp": tokens_prices[token]["timestamp"],
         }
-    HistoryBase(st.session_state.dbfile).add_data_df(new_entries)
+    TokensDatabase(st.session_state.dbfile).add_data_df(new_entries)
 
     market.updateCurrencies()
 

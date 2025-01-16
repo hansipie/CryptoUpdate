@@ -2,9 +2,7 @@ import streamlit as st
 import logging
 import sys
 from modules import tools
-from modules.database.historybase import HistoryBase as hb
 from modules.configuration import configuration as cfg
-from modules.database.portfolios import Portfolios as pf
 
 st.set_page_config(layout="wide", page_title="CryptoUpdate", page_icon="📈")
 

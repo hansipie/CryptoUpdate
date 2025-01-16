@@ -4,7 +4,7 @@ import logging
 import tzlocal
 from modules.cmc import cmc
 from modules.database.portfolios import Portfolios
-from modules.database.historybase import HistoryBase
+from modules.database.tokensdb import TokensDatabase
 from modules.database.operations import operations
 from modules.database.market import Market
 from modules.database.swaps import swaps
@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 st.title("Operations")
 
 g_portfolios = Portfolios(st.session_state.dbfile)
-g_historybase = HistoryBase(st.session_state.dbfile)
+g_historybase = TokensDatabase(st.session_state.dbfile)
 g_tokens = g_historybase.getTokens()
 g_wallets = g_portfolios.get_portfolio_names()
 
