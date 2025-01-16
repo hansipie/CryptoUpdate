@@ -219,4 +219,8 @@ if add_selectbox == "Currency (EURUSD)":
             if st.form_submit_button("Submit", use_container_width=True, ):
                 timestamp = toTimestamp(date, time)
                 interpolated = interpolate_EURUSD(timestamp, st.session_state.dbfile)
-        st.info(f"Interpolated value: {interpolated} USD")
+        if interpolated is not None:
+            if interpolated != 0.0:
+                st.info(f"Interpolated value: {interpolated} USD")
+        else:
+            st.error("No data available")

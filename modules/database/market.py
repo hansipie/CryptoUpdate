@@ -99,8 +99,7 @@ class Market:
     # update the market with the current prices
     def updateMarket(self):
         logger.debug("Update market")
-        tokens = self.getMarket()
-        self.addTokens(tokens)
+        self.addTokens()
 
     # add tokens to the database with the current price
     def addTokens(self, tokens: list = []):

@@ -1,5 +1,6 @@
 import streamlit as st
 import logging
+from modules.database.market import Market
 from modules.plotter import plot_as_graph
 from modules.tools import load_db
 from modules.database.operations import operations
@@ -15,18 +16,18 @@ def join_dfs(df1, df2):
     df = df1.join(df2)
     return df
 
-def update_prices():
-    pass
+def update_Market():
+    market = Market(st.session_state.dbfile, st.session_state.settings["coinmarketcap_token"])
+    market.updateMarket()
 
 # Update prices
-st.sidebar.divider()
 if st.sidebar.button(
-    "Update prices",
+    "Update Market Prices",
     key="update_prices",
     icon=":material/refresh:",
     use_container_width=True,
 ):
-    update_prices()
+    update_Market()
 
 with st.container(border=True):
     col1, col2, col3 = st.columns(3)
