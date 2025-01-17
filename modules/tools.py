@@ -3,11 +3,64 @@ import pandas as pd
 import logging
 import os
 import streamlit as st
+from modules.database.market import Market
+from modules.database.portfolios import Portfolios
 from modules.database.tokensdb import TokensDatabase
 from modules.utils import clean_price, debug_prefix, get_file_hash
 from modules.cmc import cmc
 
 logger = logging.getLogger(__name__)
+
+def UpdateDatabase(dbfile, cmc_apikey):
+    market = Market(dbfile, cmc_apikey)
+    portfolio = Portfolios(dbfile)
+
+    aggregated = portfolio.aggregate_portfolios()
+    if len(aggregated) == 0:
+        logger.warning("No data found in portfolios")
+        tokens = []
+    else:
+        logger.debug(f"Aggregated: {aggregated}")
+        tokens = list(aggregated.keys())
+        logger.debug(f"Tokens: {tokens}")
+
+    market.updateMarket(tokens)
+    market.updateCurrencies()
+
+    tokens_prices = market.getLastMarket()
+    if tokens_prices is None:
+        logger.error("No Market data available")
+        return None
+    
+    new_entries = {}
+    for token in tokens:
+        logger.debug(f"Token: {tokens_prices[token]}")
+        new_entries[token] = {
+            "amount": aggregated[token]["amount"],
+            "price": tokens_prices[token][tokens_prices.index[0]],
+            "timestamp": tokens_prices.index[0],
+        }
+    TokensDatabase(dbfile).addTokens(new_entries)
+
+def create_portfolio_dataframe(data: dict) -> pd.DataFrame:
+    logger.debug(f"Create portfolio dataframe - Data: {data}")
+    if not data:
+        logger.debug("No data")
+        return pd.DataFrame()
+    df = pd.DataFrame(data).T
+    df.index.name = "token"
+    df["amount"] = df.apply(lambda row: clean_price(row["amount"]), axis=1)
+    # Ajouter une colonne "Value" basée sur le cours actuel
+    df["value(€)"] = df.apply(
+        lambda row: round(
+            clean_price(row["amount"]) * get_current_price(row.name), 2
+        ),
+        axis=1,
+    )
+    #sort df by token
+    df = df.sort_index()
+    return df
+    
 
 def getDateFrame(inputfile):
     logger.debug(f"Reading {inputfile}")

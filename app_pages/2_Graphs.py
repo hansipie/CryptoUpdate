@@ -8,7 +8,7 @@ from modules.Updater import Updater
 from modules.database.portfolios import Portfolios
 from modules.database.market import Market
 from modules.plotter import plot_as_graph, plot_as_pie
-from modules.tools import interpolate_EURUSD, load_db
+from modules.tools import create_portfolio_dataframe, interpolate_EURUSD, load_db
 from modules.utils import get_file_hash, toTimestamp
 
 
@@ -22,7 +22,7 @@ def load_portfolios(dbfile: str) -> Portfolios:
 def aggregaterUI():
     portfolios = load_portfolios(st.session_state.dbfile)
     agg = portfolios.aggregate_portfolios()
-    df = portfolios.create_portfolio_dataframe(agg)
+    df = create_portfolio_dataframe(agg)
 
     col_tbl, col_pie = st.columns(2)
     with col_tbl:

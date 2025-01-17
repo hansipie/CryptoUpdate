@@ -3,7 +3,7 @@ import logging
 from modules.database.market import Market
 from modules.database.tokensdb import TokensDatabase
 from modules.plotter import plot_as_graph
-from modules.tools import load_db
+from modules.tools import UpdateDatabase, load_db
 from modules.database.operations import operations
 
 logger = logging.getLogger(__name__)
@@ -17,19 +17,21 @@ def join_dfs(df1, df2):
     df = df1.join(df2)
     return df
 
-def update_Market():
-    market = Market(st.session_state.dbfile, st.session_state.settings["coinmarketcap_token"])
-    market.updateMarket()
-    tokensdb = TokensDatabase(st.session_state.dbfile)
+def update():
+    try:
+        UpdateDatabase(st.session_state.dbfile, st.session_state.settings["coinmarketcap_token"])
+        st.toast("Prices updated", icon=":material/check:")
+    except Exception as e:
+        st.error(f"Error: {str(e)}")
 
 # Update prices
 if st.sidebar.button(
-    "Update",
+    "Update prices",
     key="update_prices",
     icon=":material/refresh:",
     use_container_width=True,
 ):
-    update_Market()
+    update()
 
 with st.container(border=True):
     col1, col2, col3 = st.columns(3)

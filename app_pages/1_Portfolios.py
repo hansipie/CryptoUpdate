@@ -4,6 +4,7 @@ import logging
 from modules.database.portfolios import Portfolios
 from modules.database.market import Market
 from modules.database.tokensdb import TokensDatabase
+from modules.tools import UpdateDatabase, create_portfolio_dataframe
 
 
 logger = logging.getLogger(__name__)
@@ -73,7 +74,7 @@ def portfolioUI(tabs: list):
     for i, tab in enumerate(tabs_widget):
         with tab:
             pf = g_portfolios.get_portfolio(tabs[i])
-            df = g_portfolios.create_portfolio_dataframe(pf)
+            df = create_portfolio_dataframe(pf)
             if not df.empty:  # Only create DataFrame if data exists
                 balance = df["value(€)"].sum()
                 st.write(f"Total value: €{round(balance, 2)}")
@@ -129,40 +130,12 @@ def portfolioUI(tabs: list):
                     danger_zone(tabs[i])
 
 
-def update_prices():
-    agg = g_portfolios.aggregate_portfolios()
-    if not agg:
-        logger.warning("No aggregated portfolios data available")
-        pf_tokens = []
-    else:
-        logger.debug(f"Aggregated portfolios: {agg}")
-        # save in a list the agg keys
-        pf_tokens = list(agg.keys())
-        logger.debug(f"portfolios tokens: {pf_tokens}")
-
-    market = Market(
-        st.session_state.dbfile, st.session_state.settings["coinmarketcap_token"]
-    )
-
-    market.updateMarket(pf_tokens)
-    tokens_prices = market.getLastMarket()
-    if tokens_prices is None:
-        st.error("No Market data available")
-        return
-
-    # merge agg and tokens_prices
-    new_entries = {}
-    for token in pf_tokens:
-        new_entries[token] = {
-            "amount": agg[token]["amount"],
-            "price": tokens_prices[token]["price"],
-            "timestamp": tokens_prices.index[0],
-        }
-    TokensDatabase(st.session_state.dbfile).add_data_df(new_entries)
-
-    market.updateCurrencies()
-
-    st.toast("Prices updated", icon="✔️")
+def update():
+    try:
+        UpdateDatabase(st.session_state.dbfile, st.session_state.settings["coinmarketcap_token"])
+        st.toast("Prices updated", icon=":material/check:")
+    except Exception as e:
+        st.error(f"Error: {str(e)}")
 
 
 def load_portfolios(dbfile: str) -> Portfolios:
@@ -199,7 +172,7 @@ if st.sidebar.button(
     icon=":material/refresh:",
     use_container_width=True,
 ):
-    update_prices()
+    update()
 
 st.sidebar.divider()
 

@@ -96,7 +96,7 @@ class TokensDatabase:
             df_tokencount = df_tokencount.reindex(sorted(df_tokencount.columns), axis=1)
             return df_tokencount
 
-    def add_data(self, timestamp: int, token: str, price: float, count: float):
+    def addToken(self, timestamp: int, token: str, price: float, count: float):
         with sqlite3.connect(self.db_path) as con:
             cur = con.cursor()
             cur.execute(
@@ -105,15 +105,14 @@ class TokensDatabase:
             )
             con.commit()
 
-    def add_data_df(self, tokens: dict):
-        logger.debug("Adding data to database")
+    def addTokens(self, tokens: dict):
+        logger.debug(f"Adding data to database:\n{tokens}")
         timestamp = int(pd.Timestamp.now(tz="UTC").timestamp())
 
         df: pd.DataFrame = pd.DataFrame(
             columns=["timestamp", "token", "price", "count"]
         )
         for token, data in tokens.items():
-            logger.debug(f"data: {data}")
             if "timestamp" in data:
                 df.loc[len(df)] = [
                     data["timestamp"],

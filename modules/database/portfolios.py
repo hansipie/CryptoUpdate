@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import logging
 import sqlite3
-from modules.tools import get_current_price
+from modules.database.market import Market
 from modules.utils import clean_price
 
 logging.getLogger("matplotlib").setLevel(logging.WARNING)
@@ -174,26 +174,6 @@ class Portfolios:
                 (name, token),
             )
             conn.commit()
-
-
-    def create_portfolio_dataframe(self, data: dict) -> pd.DataFrame:
-        logger.debug(f"Create portfolio dataframe - Data: {data}")
-        if not data:
-            logger.debug("No data")
-            return pd.DataFrame()
-        df = pd.DataFrame(data).T
-        df.index.name = "token"
-        df["amount"] = df.apply(lambda row: clean_price(row["amount"]), axis=1)
-        # Ajouter une colonne "Value" basée sur le cours actuel
-        df["value(€)"] = df.apply(
-            lambda row: round(
-                clean_price(row["amount"]) * get_current_price(row.name), 2
-            ),
-            axis=1,
-        )
-        #sort df by token
-        df = df.sort_index()
-        return df
 
     def aggregate_portfolios(self) -> dict:
         with sqlite3.connect(self.db_path) as conn:
