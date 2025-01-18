@@ -1,10 +1,7 @@
-import traceback
 import streamlit as st
 import pandas as pd
 import logging
 import os
-from modules.Notion import Notion
-from modules.Updater import Updater
 from modules.database.portfolios import Portfolios
 from modules.database.market import Market
 from modules.plotter import plot_as_graph, plot_as_pie
@@ -104,51 +101,6 @@ def build_tabs(df: pd.DataFrame, columns: list = None):
     else:
         st.error("The end date must be after the start date")
 
-
-@st.dialog("Sync. Notion Database")
-def syncNotionMarket():
-    with st.spinner("Running ..."):
-        try:
-            notion = Notion(st.session_state.settings["notion_token"])
-            db_id = notion.getObjectId(
-                st.session_state.settings["notion_database"],
-                "database",
-                st.session_state.settings["notion_parentpage"],
-            )
-            if db_id == None:
-                st.error("Error: Database not found")
-                st.rerun()
-            else:
-                updater = Updater(
-                    st.session_state.dbfile,
-                    st.session_state.settings["coinmarketcap_token"],
-                    st.session_state.settings["notion_token"],
-                    db_id,
-                )
-                updater.getCryptoPrices()
-        except KeyError as ke:
-            st.error("Error: " + type(ke).__name__ + " - " + str(ke))
-            st.error("Please set your settings in the settings page")
-            traceback.print_exc()
-            st.rerun()
-        except Exception as e:
-            st.error("Error: " + type(e).__name__ + " - " + str(e))
-            traceback.print_exc()
-            st.rerun()
-
-        updatetokens_bar = st.progress(0)
-        count = 0
-        for token, data in updater.notion_entries.items():
-            updatetokens_bar.progress(
-                count / len(updater.notion_entries), text=f"Updating {token}"
-            )
-            updater.updateNotionDatabase(pageId=data["page"], coinPrice=data["price"])
-            count += 1
-        updatetokens_bar.progress(100, text="Update completed")
-        updater.UpdateLastUpdate()
-    st.rerun()
-
-
 @st.cache_data(
     show_spinner=False,
     hash_funcs={str: lambda x: get_file_hash(x) if os.path.isfile(x) else hash(x)},
@@ -172,11 +124,6 @@ if add_selectbox != "Global":
         "Start date", value=pd.to_datetime("today") - pd.to_timedelta(365, unit="d")
     )
     enddate = st.sidebar.date_input("End date", value=pd.to_datetime("today"))
-
-if add_selectbox == "Market":
-    st.sidebar.divider()
-    if st.sidebar.button("Sync. Notion Database", icon=":material/refresh:"):
-        syncNotionMarket()
 
 if add_selectbox == "Global":
     logger.debug("Global")

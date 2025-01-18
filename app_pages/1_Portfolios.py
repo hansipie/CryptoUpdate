@@ -81,7 +81,10 @@ def portfolioUI(tabs: list):
                 height = (len(df) * 35) + 38
                 logger.debug(f"Dataframe:\n{df}")
                 updated_data = st.data_editor(
-                    df, use_container_width=True, height=height
+                    df, use_container_width=True, height=height,
+                    column_config={"amount": st.column_config.NumberColumn(
+                        format="%.8g"
+                    )}
                 )
                 if not updated_data.equals(df):
                     g_portfolios.update_portfolio(
@@ -134,6 +137,7 @@ def update():
     try:
         UpdateDatabase(st.session_state.dbfile, st.session_state.settings["coinmarketcap_token"])
         st.toast("Prices updated", icon=":material/check:")
+        st.rerun()
     except Exception as e:
         st.error(f"Error: {str(e)}")
 
@@ -156,31 +160,31 @@ def execute_search():
 
 g_portfolios = load_portfolios(st.session_state.dbfile)
 
-# Add new portfolio dialog
-if st.sidebar.button(
-    "Add new portfolio",
-    key="add_new_portfolio",
-    icon=":material/note_add:",
-    use_container_width=True,
-):
-    add_new_portfolio()
+with st.sidebar:
+    # Add new portfolio dialog
+    if st.button(
+        "Add new portfolio",
+        key="add_new_portfolio",
+        icon=":material/note_add:",
+        use_container_width=True,
+    ):
+        add_new_portfolio()
 
-# Update prices
-if st.sidebar.button(
-    "Update prices",
-    key="update_prices",
-    icon=":material/refresh:",
-    use_container_width=True,
-):
-    update()
+    # Update prices
+    if st.button(
+        "Update prices",
+        key="update_prices",
+        icon=":material/update:",
+        use_container_width=True,
+    ):
+        update()
 
-st.sidebar.divider()
+    st.divider()
 
-# search bar
+    # search bar
 
-tokens = g_portfolios.aggregate_portfolios().keys()
-if st.sidebar.selectbox("Search", tokens, index=None, label_visibility="collapsed", key="search_target"):
-    with st.sidebar:
+    tokens = g_portfolios.aggregate_portfolios().keys()
+    if st.selectbox("Search", tokens, index=None, label_visibility="collapsed", key="search_target"):
         execute_search()
 
 # Display portfolios

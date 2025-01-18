@@ -19,12 +19,13 @@ g_historybase = TokensDatabase(st.session_state.dbfile)
 g_tokens = g_historybase.getTokens()
 g_wallets = g_portfolios.get_portfolio_names()
 
+
 def submitbuy(timestamp, from_amount, form_currency, to_amount, to_token, to_wallet):
     logger.debug(
         f"submitbuy: timestamp={timestamp} from_amount={from_amount}, form_currency={form_currency}, to_amount={to_amount}, to_token={to_token}, to_wallet={to_wallet}"
     )
 
-    op.insert(
+    operation.insert(
         "buy", from_amount, to_amount, form_currency, to_token, timestamp, to_wallet
     )
 
@@ -46,7 +47,7 @@ def submitswap(
     st.warning("This feature is not implemented yet.")
 
 
-op = operations()
+operation = operations()
 swaps = swaps()
 
 buy_tab, swap_tab, tests_tab = st.tabs(["Buy", "Swap", "Tests"])
@@ -62,18 +63,29 @@ with buy_tab:
             col_from_amount, col_from_token = st.columns([3, 1])
             with col_from_amount:
                 from_amount = st.number_input(
-                    "From", min_value=0.0, format="%.8f", key="from_amount"
+                    "From", min_value=0.0, format="%.8g", key="from_amount"
                 )
             with col_from_token:
-                form_currency = st.selectbox("Currency", ["EUR", "USD"], key="form_currency", label_visibility="hidden")
+                form_currency = st.selectbox(
+                    "Currency",
+                    ["EUR", "USD"],
+                    key="form_currency",
+                    label_visibility="hidden",
+                )
         with col_to:
             col_to_amount, col_to_token = st.columns([3, 1])
             with col_to_amount:
                 to_amount = st.number_input(
-                    "To", min_value=0.0, format="%.8f", key="to_amount"
+                    "To", min_value=0.0, format="%.8g", key="to_amount"
                 )
             with col_to_token:
-                to_token = st.selectbox("Token", g_tokens, index=None, key="to_token", label_visibility="hidden")
+                to_token = st.selectbox(
+                    "Token",
+                    g_tokens,
+                    index=None,
+                    key="to_token",
+                    label_visibility="hidden",
+                )
             to_wallet = st.selectbox(
                 "Portfolio", g_wallets, key="to_wallet", index=None
             )
@@ -83,9 +95,9 @@ with buy_tab:
                 timestamp, from_amount, form_currency, to_amount, to_token, to_wallet
             )
 
-    buylist = op.get_operations_by_type("buy")
+    buylist = operation.get_operations_by_type("buy")
     # save buylist to a dataframe
-    df_swaplist = pd.DataFrame(
+    df_buylist = pd.DataFrame(
         buylist,
         columns=[
             "id",
@@ -99,18 +111,26 @@ with buy_tab:
         ],
     )
     # convert timestamp to datetime
-    df_swaplist["Date"] = pd.to_datetime(df_swaplist["timestamp"], unit="s", utc=True)
+    df_buylist["Date"] = pd.to_datetime(df_buylist["timestamp"], unit="s", utc=True)
     local_timezone = tzlocal.get_localzone()
     logger.debug(f"Timezone locale: {local_timezone}")
-    df_swaplist["Date"] = df_swaplist["Date"].dt.tz_convert(local_timezone)
-    # reorder columns
-    df_swaplist = df_swaplist[
-        ["Date", "From", "Currency", "To", "Token", "Portfolio"]
-    ]
-    # sort by timestamp in descending order
-    df_swaplist.sort_values(by="Date", ascending=False, inplace=True)
+    df_buylist["Date"] = df_buylist["Date"].dt.tz_convert(local_timezone)
 
-    st.dataframe(df_swaplist, use_container_width=True, hide_index=True)
+    # calculate performance
+    market = Market(st.session_state.dbfile, st.session_state.settings["coinmarketcap_token"])
+    market_df = market.getLastMarket()
+    df_buylist["Perf."] = (market_df[df_buylist["Dashboard"]][market_df.index[0]]/(df_buylist["From"] / df_buylist["To"]))-1
+    # reorder columns
+    df_buylist = df_buylist[["Date", "From", "Currency", "To", "Token", "Portfolio", "Perf."]]
+    # sort by timestamp in descending order
+    df_buylist.sort_values(by="Date", ascending=False, inplace=True)
+
+    st.dataframe(
+        df_buylist,
+        use_container_width=True,
+        hide_index=True,
+        column_config={"To": st.column_config.NumberColumn(format="%.8g")},
+    )
 
 with swap_tab:
     with st.form(key="swap"):
@@ -124,7 +144,7 @@ with swap_tab:
         with col_from:
             swap_token_from = st.text_input("Token", key="swap_token_from")
             swap_amount_from = st.number_input(
-                "Amount", min_value=0.0, format="%.8f", key="swap_amount_from"
+                "Amount", min_value=0.0, format="%.8g", key="swap_amount_from"
             )
             swap_wallet_from = st.selectbox(
                 "Wallet", g_wallets, index=None, key="swap_wallet_from"
@@ -132,7 +152,7 @@ with swap_tab:
         with col_to:
             swap_token_to = st.text_input("Token", key="swap_token_to")
             swap_amount_to = st.number_input(
-                "Amount", min_value=0.0, format="%.8f", key="swap_amount_to"
+                "Amount", min_value=0.0, format="%.8g", key="swap_amount_to"
             )
             swap_wallet_to = st.selectbox(
                 "Wallet", g_wallets, index=None, key="swap_wallet_to"
@@ -171,15 +191,91 @@ with swap_tab:
 
     # reorder columns
     df_swaplist = df_swaplist[
-        ["Date", "amount_from", "token_from", "amount_to", "token_to", "wallet_from", "wallet_to"]
+        [
+            "Date",
+            "amount_from",
+            "token_from",
+            "amount_to",
+            "token_to",
+            "wallet_from",
+            "wallet_to",
+        ]
     ]
     # sort by timestamp in descending order
     df_swaplist.sort_values(by="Date", ascending=False, inplace=True)
 
-    st.dataframe(df_swaplist, use_container_width=True, hide_index=True)
+    st.dataframe(
+        df_swaplist,
+        use_container_width=True,
+        hide_index=True,
+        column_config={
+            "amount_from": st.column_config.NumberColumn(format="%.8g"),
+            "amount_to": st.column_config.NumberColumn(format="%.8g"),
+        },
+    )
 
 with tests_tab:
-    market = Market(st.session_state.dbfile, st.session_state.settings["coinmarketcap_token"])
-    st.dataframe(market.getLastMarket(), use_container_width=True)
-    st.write(type(market.getLastMarket()))
-    pass
+    file = st.file_uploader("Upload Swap file", type=["csv"])
+    if file is not None:
+        df = pd.read_csv(file)
+
+        # clean up column names
+        df.columns = df.columns.str.strip().str.lower().str.replace(" ", "")
+
+        df.sort_values(by="timestamp", inplace=True)
+        st.dataframe(df)
+
+        if st.button("Import"):
+            for index, row in df.iterrows():
+                logger.debug(f"\n{row}")
+                swaps.insert(
+                    row["timestamp"],
+                    row["token_from"],
+                    row["amount_from"],
+                    None,
+                    row["token_to"],
+                    row["amount_to"],
+                    None,
+                )
+            st.success("Import successfully completed")
+
+    st.divider()
+
+    file = st.file_uploader("Upload Buy file", type=["csv"])
+    if file is not None:
+        df = pd.read_csv(file)
+
+        # Conversion de la date en timestamp
+        if "Creation Date" in df.columns:
+            df["Timestamp"] = (
+                pd.to_datetime(df["Creation Date"], format="%B %d, %Y %I:%M %p").astype(
+                    "int64"
+                )
+                // 10**9
+            )
+
+        # Nettoyage de la colonne Dashboard
+        if "Dashboard" in df.columns:
+            df["Dashboard"] = (
+                df["Dashboard"].str.replace(r"\s*\([^)]*\)", "", regex=True).str.strip()
+            )
+
+        # Nettoyage de la colonne Value HT (€)
+        if "Value HT (€)" in df.columns:
+            df["Value HT (€)"] = df["Value HT (€)"].str.replace("€", "").astype(float)
+
+        df.sort_values(by="Timestamp", inplace=True)
+        st.dataframe(df)
+
+        if st.button("Import"):
+            for index, row in df.iterrows():
+                operation.insert(
+                    "buy",
+                    row["Value HT (€)"],
+                    row["Coins Amount"],
+                    "EUR",
+                    row["Dashboard"],
+                    row["Timestamp"],
+                    None,
+                )
+            st.success("Import successfully completed")
