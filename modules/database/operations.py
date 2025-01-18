@@ -64,3 +64,4 @@ class operations:
             cursor = conn.cursor()
             cursor.execute("SELECT SUM(source) FROM Operations WHERE type = 'buy'")
             return cursor.fetchone()[0]
+        

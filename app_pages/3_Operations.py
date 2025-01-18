@@ -117,11 +117,28 @@ with buy_tab:
     df_buylist["Date"] = df_buylist["Date"].dt.tz_convert(local_timezone)
 
     # calculate performance
-    market = Market(st.session_state.dbfile, st.session_state.settings["coinmarketcap_token"])
+    market = Market(
+        st.session_state.dbfile, st.session_state.settings["coinmarketcap_token"]
+    )
     market_df = market.getLastMarket()
-    df_buylist["Perf."] = (market_df[df_buylist["Dashboard"]][market_df.index[0]]/(df_buylist["From"] / df_buylist["To"]))-1
+
+    df_buylist["Buy Rate"] = df_buylist["From"] / df_buylist["To"]
+    df_buylist["Current Rate"] = df_buylist["Token"].map(market_df["value"].to_dict())
+    df_buylist["Perf."] = (df_buylist["Current Rate"] * 100) / df_buylist["Buy Rate"] - 100
     # reorder columns
-    df_buylist = df_buylist[["Date", "From", "Currency", "To", "Token", "Portfolio", "Perf."]]
+    df_buylist = df_buylist[
+        [
+            "Date",
+            "From",
+            "Currency",
+            "To",
+            "Token",
+            "Portfolio",
+            "Buy Rate",
+            "Current Rate",
+            "Perf.",
+        ]
+    ]
     # sort by timestamp in descending order
     df_buylist.sort_values(by="Date", ascending=False, inplace=True)
 
@@ -129,7 +146,10 @@ with buy_tab:
         df_buylist,
         use_container_width=True,
         hide_index=True,
-        column_config={"To": st.column_config.NumberColumn(format="%.8g")},
+        column_config={
+            "To": st.column_config.NumberColumn(format="%.8g"),
+            "Perf.": st.column_config.NumberColumn(format="%.2f%%"),
+        },
     )
 
 with swap_tab:

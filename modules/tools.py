@@ -37,8 +37,8 @@ def UpdateDatabase(dbfile, cmc_apikey):
         logger.debug(f"Token: {tokens_prices[token]}")
         new_entries[token] = {
             "amount": aggregated[token]["amount"],
-            "price": tokens_prices[token][tokens_prices.index[0]],
-            "timestamp": tokens_prices.index[0],
+            "price": tokens_prices[token]["price"],
+            "timestamp": tokens_prices[token]["timestamp"],
         }
     TokensDatabase(dbfile).addTokens(new_entries)
 

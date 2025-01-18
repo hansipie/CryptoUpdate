@@ -157,6 +157,9 @@ def updateNotion(inifile: str):
         database = config["Notion"]["database"]
         parentpage = config["Notion"]["parentpage"]
         archive_path = os.path.join(os.getcwd(), config["Local"]["archive_path"])
+        debug_flag = True if config["Debug"]["flag"] == "True" else False
+        data_path = os.path.join(os.getcwd(), config["Local"]["data_path"])
+        dbfile = os.path.join(data_path, debug_prefix(config["Local"]["sqlite_file"], debug_flag))
 
     except KeyError as ke:
         logging.error("Error: " + type(ke).__name__ + " - " + str(ke))
@@ -170,7 +173,7 @@ def updateNotion(inifile: str):
         quit()
 
     # update database with current market values
-    Updater(coinmarketcap_api_token, notion_api_token, db_id).UpdateCrypto()
+    Updater(dbfile, coinmarketcap_api_token, notion_api_token, db_id).UpdateCrypto()
 
     # export database to file.
     # destination: {archive_path}/[epoch]/*.csv

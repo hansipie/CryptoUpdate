@@ -81,7 +81,7 @@ class Market:
             logger.warning("No tokens available")
             return None
         with sqlite3.connect(self.db_path) as con:
-            market_df = pd.DataFrame()
+            market_data = []
             for token in tokens_list:
                 df = pd.read_sql_query(
                     f"SELECT timestamp, price AS '{token}' FROM Market WHERE token = '{token}' ORDER BY timestamp DESC LIMIT 1;",
@@ -89,11 +89,17 @@ class Market:
                 )
                 if df.empty:
                     continue
-                market_df[token] = {
-                    df["timestamp"][0]: df[token][0],
-                    #"timestamp": df["timestamp"][0],
-                }
+                market_data.append(
+                    {
+                        "token": token,
+                        "timestamp": df["timestamp"][0],
+                        "value": df[token][0],
+                    }
+                )
+            market_df = pd.DataFrame(market_data)
+            market_df.set_index("token", inplace=True)
             logger.debug(f"Last Market get size: {len(market_df)}")
+            logger.debug(f"Last Market get:\n{market_df}")
             return market_df
 
     # update the market with the current prices

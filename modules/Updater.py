@@ -52,8 +52,8 @@ class Updater:
             if token not in tokens_prices:
                 logger.debug(f"Token {token} not found in market data")
                 continue
-            logger.debug(f"Updating {token} with price {tokens_prices[token]['price']} in Notion database")
-            self.notion_entries[token]["price"] = tokens_prices[token]["price"]
+            logger.debug(f"Updating {token} with price {tokens_prices[token]} in Notion database")
+            self.notion_entries[token]["price"] = tokens_prices[token]
   
 
     def UpdateDBHandleError(self, response):
