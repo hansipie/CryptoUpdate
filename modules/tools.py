@@ -34,11 +34,10 @@ def UpdateDatabase(dbfile, cmc_apikey):
     
     new_entries = {}
     for token in tokens:
-        logger.debug(f"Token: {tokens_prices[token]}")
         new_entries[token] = {
             "amount": aggregated[token]["amount"],
-            "price": tokens_prices[token]["price"],
-            "timestamp": tokens_prices[token]["timestamp"],
+            "price": tokens_prices.loc[token]["value"],
+            "timestamp": tokens_prices.loc[token]["timestamp"],
         }
     TokensDatabase(dbfile).addTokens(new_entries)
 
