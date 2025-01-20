@@ -1,3 +1,4 @@
+import traceback
 import streamlit as st
 import pandas as pd
 import logging
@@ -81,10 +82,12 @@ def portfolioUI(tabs: list):
                 height = (len(df) * 35) + 38
                 logger.debug(f"Dataframe:\n{df}")
                 updated_data = st.data_editor(
-                    df, use_container_width=True, height=height,
-                    column_config={"amount": st.column_config.NumberColumn(
-                        format="%.8g"
-                    )}
+                    df,
+                    use_container_width=True,
+                    height=height,
+                    column_config={
+                        "amount": st.column_config.NumberColumn(format="%.8g"),
+                    },
                 )
                 if not updated_data.equals(df):
                     g_portfolios.update_portfolio(
@@ -135,11 +138,13 @@ def portfolioUI(tabs: list):
 
 def update():
     try:
-        UpdateDatabase(st.session_state.dbfile, st.session_state.settings["coinmarketcap_token"])
+        UpdateDatabase(
+            st.session_state.dbfile, st.session_state.settings["coinmarketcap_token"]
+        )
         st.toast("Prices updated", icon=":material/check:")
         st.rerun()
     except Exception as e:
-        st.error(f"Error: {str(e)}")
+        st.error(f"Update Error: {str(e)}")
 
 
 def load_portfolios(dbfile: str) -> Portfolios:
@@ -184,7 +189,9 @@ with st.sidebar:
     # search bar
 
     tokens = g_portfolios.aggregate_portfolios().keys()
-    if st.selectbox("Search", tokens, index=None, label_visibility="collapsed", key="search_target"):
+    if st.selectbox(
+        "Search", tokens, index=None, label_visibility="collapsed", key="search_target"
+    ):
         execute_search()
 
 # Display portfolios
@@ -194,4 +201,5 @@ logger.debug(f"Portfolios: {tabs}")
 try:
     portfolioUI(tabs)
 except Exception as e:
-    st.error(f"Error: {str(e)}")
+    st.error(f"UI Error: {str(e)}")
+    traceback.print_exc()

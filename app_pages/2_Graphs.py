@@ -19,6 +19,7 @@ def load_portfolios(dbfile: str) -> Portfolios:
 def aggregaterUI():
     portfolios = load_portfolios(st.session_state.dbfile)
     agg = portfolios.aggregate_portfolios()
+    logger.debug(f"Aggregated: {agg}")
     df = create_portfolio_dataframe(agg)
 
     col_tbl, col_pie = st.columns(2)
@@ -29,9 +30,7 @@ def aggregaterUI():
             height = min(height, 650)
 
             df = df.groupby("token").agg({"amount": "sum", "value(€)": "sum"})
-            df["Repartition(%)"] = round(
-                (df["value(€)"] / df["value(€)"].sum()) * 100, 2
-            )
+            df["Repartition(%)"] = (df["value(€)"] / df["value(€)"].sum()) * 100
             df = df.rename(columns={"amount": "Amount", "value(€)": "Value(€)"})
             df = df.sort_values(by="Repartition(%)", ascending=False)
             st.dataframe(df, use_container_width=True, height=height)

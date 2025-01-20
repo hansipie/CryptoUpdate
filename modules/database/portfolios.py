@@ -2,8 +2,6 @@ import streamlit as st
 import pandas as pd
 import logging
 import sqlite3
-from modules.database.market import Market
-from modules.utils import clean_price
 
 logging.getLogger("matplotlib").setLevel(logging.WARNING)
 logging.getLogger("PIL").setLevel(logging.WARNING)
@@ -49,7 +47,7 @@ class Portfolios:
             logger.debug(f"Getting portfolios from database {list}")
             list.sort()
             return list
-        
+
     def get_portfolio(self, name: str) -> dict:
         logger.debug(f"Getting portfolio {name} from database")
         with sqlite3.connect(self.db_path) as conn:
@@ -76,11 +74,12 @@ class Portfolios:
             cursor.execute("DELETE FROM Portfolios WHERE name = ?", (name,))
             conn.commit()
 
-
     def rename_portfolio(self, old_name: str, new_name: str):
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
-            cursor.execute("UPDATE Portfolios SET name = ? WHERE name = ?", (new_name, old_name))
+            cursor.execute(
+                "UPDATE Portfolios SET name = ? WHERE name = ?", (new_name, old_name)
+            )
             conn.commit()
 
     def get_tokens(self, name: str) -> dict:
@@ -95,7 +94,7 @@ class Portfolios:
                 (name,),
             )
             return {row[0]: row[1] for row in cursor.fetchall()}
-        
+
     def get_token_by_portfolio(self, token: str) -> dict:
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
@@ -124,9 +123,8 @@ class Portfolios:
                 (name, token, str(amount)),
             )
 
-
     def set_token_add(self, name: str, token: str, amount: float):
-        #add amout to the amount of an existing token in portfolio
+        # add amout to the amount of an existing token in portfolio
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
             cursor.execute(
@@ -162,7 +160,6 @@ class Portfolios:
                 )
             conn.commit()
 
-
     def delete_token(self, name: str, token: str):
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
@@ -180,20 +177,19 @@ class Portfolios:
             cursor = conn.cursor()
             cursor.execute(
                 """
-                SELECT token, amount FROM Portfolios_Tokens
+                SELECT token, SUM(amount) FROM Portfolios_Tokens
                 JOIN Portfolios ON Portfolios_Tokens.portfolio_id = Portfolios.id
+                GROUP BY token
             """
             )
-            data = cursor.fetchall()
-            df = pd.DataFrame(data, columns=["token", "amount"])
-            logger.debug(f"Aggregate portfolios - Data: \n{df}")
-            df["amount"] = df.apply(lambda row: clean_price(row["amount"]), axis=1)
-            return df.groupby("token").agg({"amount": "sum"}).to_dict(orient="index")
-        
+            return {row[0]: row[1] for row in cursor.fetchall()}
+
     def update_portfolio(self, input_data: dict):
         logger.debug(f"Update portfolio - Data: {input_data.items()}")
         for portfolio_name, tokens in input_data.items():
-            logger.debug(f"Update portfolio - Name: {portfolio_name} - Tokens: {tokens.items()}")
+            logger.debug(
+                f"Update portfolio - Name: {portfolio_name} - Tokens: {tokens.items()}"
+            )
             for token_name, token_details in tokens.items():
-                self.set_token(portfolio_name, token_name, token_details["amount"])  
+                self.set_token(portfolio_name, token_name, token_details["amount"])
         return True

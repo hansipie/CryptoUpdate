@@ -44,7 +44,18 @@ def submitswap(
     swap_amount_to,
     swap_wallet_to,
 ):
-    st.warning("This feature is not implemented yet.")
+    logger.debug(
+        f"submitswap: timestamp={timestamp} swap_token_from={swap_token_from}, swap_amount_from={swap_amount_from}, swap_wallet_from={swap_wallet_from}, swap_token_to={swap_token_to}, swap_amount_to={swap_amount_to}, swap_wallet_to={swap_wallet_to}"
+    )
+    swaps.insert(
+        timestamp,
+        swap_token_from,
+        swap_amount_from,
+        swap_wallet_from,
+        swap_token_to,
+        swap_amount_to,
+        swap_wallet_to,
+    )
 
 
 operation = operations()
@@ -124,7 +135,9 @@ with buy_tab:
 
     df_buylist["Buy Rate"] = df_buylist["From"] / df_buylist["To"]
     df_buylist["Current Rate"] = df_buylist["Token"].map(market_df["value"].to_dict())
-    df_buylist["Perf."] = (df_buylist["Current Rate"] * 100) / df_buylist["Buy Rate"] - 100
+    df_buylist["Perf."] = (df_buylist["Current Rate"] * 100) / df_buylist[
+        "Buy Rate"
+    ] - 100
     # reorder columns
     df_buylist = df_buylist[
         [
@@ -159,23 +172,26 @@ with swap_tab:
             date = st.date_input("Date", key="swap_date")
         with col_time:
             time = st.time_input("Time", key="swap_time")
-        col_from, col_to = st.columns(2)
-        col_from, col_to = st.columns(2)
-        with col_from:
-            swap_token_from = st.text_input("Token", key="swap_token_from")
-            swap_amount_from = st.number_input(
-                "Amount", min_value=0.0, format="%.8g", key="swap_amount_from"
-            )
-            swap_wallet_from = st.selectbox(
-                "Wallet", g_wallets, index=None, key="swap_wallet_from"
-            )
-        with col_to:
-            swap_token_to = st.text_input("Token", key="swap_token_to")
+        col_token, col_amount, col_portfolio = st.columns(3)
+        with col_token:
+            swap_token_from = st.text_input("From Token", key="swap_token_from")
+            swap_token_to = st.text_input("To Token", key="swap_token_to")
+
+        
+        with col_amount:
             swap_amount_to = st.number_input(
-                "Amount", min_value=0.0, format="%.8g", key="swap_amount_to"
+                "From Amount", min_value=0.0, format="%.8g", key="swap_amount_to"
+            )
+            swap_amount_from = st.number_input(
+                "To Amount", min_value=0.0, format="%.8g", key="swap_amount_from"
+            )
+
+        with col_portfolio:
+            swap_wallet_from = st.selectbox(
+                "From Wallet", g_wallets, index=None, key="swap_wallet_from"
             )
             swap_wallet_to = st.selectbox(
-                "Wallet", g_wallets, index=None, key="swap_wallet_to"
+                "To Wallet", g_wallets, index=None, key="swap_wallet_to"
             )
         if st.form_submit_button("Submit", use_container_width=True):
             timestamp = toTimestamp(date, time)
@@ -209,16 +225,29 @@ with swap_tab:
     logger.debug(f"Timezone locale: {local_timezone}")
     df_swaplist["Date"] = df_swaplist["Date"].dt.tz_convert(local_timezone)
 
+    # Rename colmuns
+    df_swaplist.rename(
+        columns={
+            "amount_from": "From Amount",
+            "token_from": "Token From",
+            "amount_to": "To Amount",
+            "token_to": "Token To",
+            "wallet_from": "From Wallet",
+            "wallet_to": "To Wallet",
+        },
+        inplace=True
+    )
+
     # reorder columns
     df_swaplist = df_swaplist[
         [
             "Date",
-            "amount_from",
-            "token_from",
-            "amount_to",
-            "token_to",
-            "wallet_from",
-            "wallet_to",
+            "From Amount",
+            "Token From",
+            "To Amount",
+            "Token To",
+            "From Wallet",
+            "To Wallet",
         ]
     ]
     # sort by timestamp in descending order

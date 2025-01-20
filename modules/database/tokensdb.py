@@ -141,14 +141,6 @@ class TokensDatabase:
             )
             return df["timestamp"][0]
 
-    def get_last_price(self, token: str) -> float:
-        with sqlite3.connect(self.db_path) as con:
-            df = pd.read_sql_query(
-                f"SELECT price from TokensDatabase WHERE token = '{token}' ORDER BY timestamp DESC LIMIT 1;",
-                con,
-            )
-            return df["price"][0]
-
     def dropDuplicate(self):
         with sqlite3.connect(self.db_path) as con:
             df = pd.read_sql_query("SELECT * from TokensDatabase;", con)

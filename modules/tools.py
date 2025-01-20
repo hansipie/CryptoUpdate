@@ -6,7 +6,7 @@ import streamlit as st
 from modules.database.market import Market
 from modules.database.portfolios import Portfolios
 from modules.database.tokensdb import TokensDatabase
-from modules.utils import clean_price, debug_prefix, get_file_hash
+from modules.utils import debug_prefix, get_file_hash
 from modules.cmc import cmc
 
 logger = logging.getLogger(__name__)
@@ -31,11 +31,11 @@ def UpdateDatabase(dbfile, cmc_apikey):
     if tokens_prices is None:
         logger.error("No Market data available")
         return None
-    
+
     new_entries = {}
     for token in tokens:
         new_entries[token] = {
-            "amount": aggregated[token]["amount"],
+            "amount": aggregated[token],
             "price": tokens_prices.loc[token]["value"],
             "timestamp": tokens_prices.loc[token]["timestamp"],
         }
@@ -46,14 +46,13 @@ def create_portfolio_dataframe(data: dict) -> pd.DataFrame:
     if not data:
         logger.debug("No data")
         return pd.DataFrame()
-    df = pd.DataFrame(data).T
+    df = pd.DataFrame.from_dict(data, columns=["amount"], orient="index")
+    df["amount"] = df["amount"].astype(float)
     df.index.name = "token"
-    df["amount"] = df.apply(lambda row: clean_price(row["amount"]), axis=1)
-    # Ajouter une colonne "Value" basée sur le cours actuel
+    logger.debug(f"Create portfolio dataframe - Dataframe:\n{df}")
+    market = Market(st.session_state.dbfile, st.session_state.settings["coinmarketcap_token"])
     df["value(€)"] = df.apply(
-        lambda row: round(
-            clean_price(row["amount"]) * get_current_price(row.name), 2
-        ),
+        lambda row: row["amount"] * market.getLastPrice(row.name),
         axis=1,
     )
     #sort df by token
@@ -70,26 +69,6 @@ def getDateFrame(inputfile):
     dfret = dftemp.copy()
     logger.debug(f"Found {len(dfret)} rows")
     return dfret
-
-
-def get_current_price(token: str) -> float:
-    # Récupérer la valeur brute 
-    try:
-        tokensdb = TokensDatabase(st.session_state.dbfile)
-        raw_price = tokensdb.get_last_price(token)
-    except KeyError:
-        logger.warning(f"Pas de prix pour {token}")
-        return 0.0
-
-    # Nettoyer et convertir la valeur
-    try:
-        # Supprimer les caractères non numériques et convertir en float
-        price = clean_price(raw_price)
-        logger.debug(f"get_current_price - Token: {token} - Price: {price}")
-        return price
-    except (ValueError, TypeError):
-        logger.warning(f"Impossible de convertir le prix pour {token}: {raw_price}")
-        return 0.0
 
 def loadSettings(settings: dict):
     logger.debug("Loading settings")

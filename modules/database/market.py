@@ -144,7 +144,10 @@ class Market:
                 f"SELECT price from Market WHERE token = '{token}' ORDER BY timestamp DESC LIMIT 1;",
                 con,
             )
-            return df["price"][0]
+            try:
+                return df["price"][0]
+            except IndexError:
+                return 0.0
 
     # get the prices of a token
     def getPrices(self, token: str) -> pd.DataFrame:

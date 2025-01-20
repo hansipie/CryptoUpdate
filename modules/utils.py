@@ -68,11 +68,6 @@ def listfilesrecursive(directory, fileslist=None):
     #logger.debug(f"Return {fileslist}")
     return fileslist
 
-def clean_price(price: str) -> float:
-    logger.debug(f"Clean price: {price}")
-    cleaned_price = str(price).replace("$", "").replace("€", "").replace(",", ".").replace(" ", "")
-    return float(cleaned_price)
-
 def debug_prefix(input : str, flag = False) -> str:
     if flag:
         return f"debug_{input}"

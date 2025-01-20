@@ -30,7 +30,8 @@ def update():
         st.toast("Prices updated", icon=":material/check:")
         st.rerun()
     except Exception as e:
-        st.error(f"Error: {str(e)}")
+        st.error(f"Update Error: {str(e)}")
+        traceback.print_exc()
 
 
 @st.dialog("Sync. Notion Database")
