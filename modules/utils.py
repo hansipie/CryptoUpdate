@@ -26,11 +26,28 @@ def interpolate(x1, y1, x2, y2, x):
     a, b = __find_linear_function(x1, y1, x2, y2)
     return a * x + b
 
-def toTimestamp(date, time):
+
+def toTimestamp_A(date, time):
     # date if formated as yyyy-mm-dd, time as hh:mm:00
     # merge them to a datetime object, convert to UTC and then to epoch timestamp
     logger.debug(f"toTimestamp: date={date}, time={time}")
     datetime_local = pd.to_datetime(f"{date} {time}")
+    local_timezone = tzlocal.get_localzone()
+    logger.debug(f"Timezone locale: {local_timezone}")
+    datetime_utc = datetime_local.tz_localize(local_timezone).tz_convert("UTC")
+    timestamp = datetime_utc.timestamp()
+    logger.debug(
+        f"timestamp={timestamp} [local_time={datetime_local}, utc_time={datetime_utc}]"
+    )
+    return timestamp
+
+def toTimestamp_B(date: str,  time : str = "") -> float:
+    # date if formated as ISO 8601
+    # convert to a datetime object, convert to UTC and then to epoch timestamp
+    if time:
+        date = f"{date}T{time}"
+    logger.debug(f"toTimestamp: date={date}")
+    datetime_local = pd.to_datetime(date)
     local_timezone = tzlocal.get_localzone()
     logger.debug(f"Timezone locale: {local_timezone}")
     datetime_utc = datetime_local.tz_localize(local_timezone).tz_convert("UTC")

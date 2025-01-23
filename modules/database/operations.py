@@ -56,7 +56,7 @@ class operations:
     def get_operations_by_type(self, type: str) -> list:
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT * FROM Operations WHERE type = ?", (type,))
+            cursor.execute("SELECT * FROM Operations WHERE type = ? ORDER BY timestamp DESC", (type,))
             return cursor.fetchall()
         
     def sum_buyoperations(self) -> float:

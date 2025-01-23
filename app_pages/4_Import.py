@@ -1,14 +1,13 @@
-from json import loads, dumps
+from json import loads
 import traceback
 import streamlit as st
 import io
-import os
-import configparser
 import logging
 import pandas as pd
 from modules import aiprocessing
 from modules.database import portfolios as pf
-from modules import cmc
+from modules.database.operations import operations
+from modules.database.swaps import swaps
 
 logging.getLogger("PIL").setLevel(logging.WARNING)
 from PIL import Image
@@ -169,31 +168,102 @@ g_portfolio = pf.Portfolios()
 
 st.title("Import")
 
-file = st.file_uploader(
-    "Upload a file", type=["png", "jpg", "jpeg", "csv"], on_change=cleanSessionState
-)
+ai_tab, tests_tab = st.tabs(["AI", "Test"])
 
-if file is None:
-    if st.session_state.import_page["input"] is not None:
-        logger.debug("Data already imported")
-        if st.button("Clear Data", use_container_width=True, icon=":material/delete:"):
-            cleanSessionState()
+with ai_tab:
+    file = st.file_uploader(
+        "Upload a file", type=["png", "jpg", "jpeg", "csv"], on_change=cleanSessionState
+    )
+
+    if file is None:
+        if st.session_state.import_page["input"] is not None:
+            logger.debug("Data already imported")
+            if st.button("Clear Data", use_container_width=True, icon=":material/delete:"):
+                cleanSessionState()
+            else:
+                drawUI()
         else:
-            drawUI()
+            logger.debug("No file uploaded")
+            cleanSessionState()
     else:
-        logger.debug("No file uploaded")
-        cleanSessionState()
-else:
-    logger.debug(f"File: {file.name} - file type: {file.type}")
+        logger.debug(f"File: {file.name} - file type: {file.type}")
 
-    if file.type == "application/vnd.ms-excel":
-        logger.debug("CSV file detectimport_pageed")
-        input = processCSV(file)
-    else:
-        logger.debug("Image file detected")
-        input = processImg(file)
-    st.session_state.import_page["type"] = file.type
-    st.session_state.import_page["input"] = input
-    drawUI()
+        if file.type == "application/vnd.ms-excel":
+            logger.debug("CSV file detectimport_pageed")
+            input = processCSV(file)
+        else:
+            logger.debug("Image file detected")
+            input = processImg(file)
+        st.session_state.import_page["type"] = file.type
+        st.session_state.import_page["input"] = input
+        drawUI()
+
+with tests_tab:
+    file = st.file_uploader("Upload Swap file", type=["csv"])
+    if file is not None:
+        df = pd.read_csv(file)
+
+        # clean up column names
+        df.columns = df.columns.str.strip().str.lower().str.replace(" ", "")
+
+        df.sort_values(by="timestamp", inplace=True)
+        st.dataframe(df)
+
+        if st.button("Import"):
+            swaps = swaps()
+            for index, row in df.iterrows():
+                logger.debug(f"\n{row}")
+                swaps.insert(
+                    row["timestamp"],
+                    row["token_from"],
+                    row["amount_from"],
+                    None,
+                    row["token_to"],
+                    row["amount_to"],
+                    None,
+                )
+            st.success("Import successfully completed")
+
+    st.divider()
+
+    file = st.file_uploader("Upload Buy file", type=["csv"])
+    if file is not None:
+        df = pd.read_csv(file)
+
+        # Conversion de la date en timestamp
+        if "Creation Date" in df.columns:
+            df["Timestamp"] = (
+                pd.to_datetime(df["Creation Date"], format="%B %d, %Y %I:%M %p").astype(
+                    "int64"
+                )
+                // 10**9
+            )
+
+        # Nettoyage de la colonne Dashboard
+        if "Dashboard" in df.columns:
+            df["Dashboard"] = (
+                df["Dashboard"].str.replace(r"\s*\([^)]*\)", "", regex=True).str.strip()
+            )
+
+        # Nettoyage de la colonne Value HT (€)
+        if "Value HT (€)" in df.columns:
+            df["Value HT (€)"] = df["Value HT (€)"].str.replace("€", "").astype(float)
+
+        df.sort_values(by="Timestamp", inplace=True)
+        st.dataframe(df)
+
+        if st.button("Import"):
+            operation = operations()
+            for index, row in df.iterrows():
+                operation.insert(
+                    "buy",
+                    row["Value HT (€)"],
+                    row["Coins Amount"],
+                    "EUR",
+                    row["Dashboard"],
+                    row["Timestamp"],
+                    None,
+                )
+            st.success("Import successfully completed")   
 
 logger.debug("## ended ##")
