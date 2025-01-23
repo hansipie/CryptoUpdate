@@ -1,8 +1,6 @@
 import streamlit as st
 import logging
 import traceback
-from modules.database.market import Market
-from modules.database.tokensdb import TokensDatabase
 from modules.plotter import plot_as_graph
 from modules.tools import UpdateDatabase, load_db
 from modules.database.operations import operations
@@ -44,7 +42,7 @@ def syncNotionMarket():
                 "database",
                 st.session_state.settings["notion_parentpage"],
             )
-            if db_id == None:
+            if db_id is None:
                 st.error("Error: Database not found")
                 st.rerun()
             else:

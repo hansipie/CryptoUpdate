@@ -9,4 +9,4 @@ python-dotenv
 typer
 openai
 plotly
-
+ruff

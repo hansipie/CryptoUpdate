@@ -33,10 +33,10 @@ class Notion:
                         #check Object type
                         if result["object"] == "database":
                             if result["title"][0]["text"]["content"] != name:
-                                continue;
+                                continue
                         elif result["object"] == "page":
                             if "title" not in result["properties"] or result["properties"]["title"]["title"][0]["text"]["content"] != name:
-                                continue;
+                                continue
                         else:
                             continue
 
@@ -53,9 +53,9 @@ class Notion:
                             break
                     logging.debug(f"Returned {type} {name} id: {result_id}")
                     return result_id
-                except:
-                    traceback.print_exc()   
-                    logging.error(f"Error getting {type} {name} id.")
+                except Exception as e:
+                    traceback.print_exc()
+                    logging.error(f"Error getting {type} {name} id: {e}")
                     return None
             else:
                 logging.error(f"Error getting {type} {name} id. code: {response.status_code}")
@@ -217,8 +217,8 @@ class Notion:
                 # token
                 try:
                     token = properties["Token"]["title"][0]["text"]["content"]
-                except:
-                    logging.warning(f"Invalid token entry in Dashboard: {entry["id"]}")
+                except KeyError:
+                    logging.warning(f"Invalid token entry in Dashboard: {entry['id']}")
                     continue
 
                 # price
@@ -233,7 +233,7 @@ class Notion:
                     count = float(properties["Coins in wallet"]["number"])
                 elif properties["Coins in wallet"]["type"] == "rollup":
                     page_json = self.getNotionPageProperties(entry["id"], properties["Coins in wallet"]["id"])
-                    if page_json == None:
+                    if page_json is None:
                         logging.warning(f"Invalid property id {properties["Coins in wallet"]["id"]}")
                         continue
                     if page_json["type"] == "property_item":

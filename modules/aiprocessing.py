@@ -3,13 +3,14 @@ import pandas as pd
 import io
 import traceback
 import logging
-import pandas as pd
+
+from openai import OpenAI
+from PIL import Image
 
 logging.getLogger("openai").setLevel(logging.WARNING)
 logging.getLogger("PIL").setLevel(logging.WARNING)
 logging.getLogger("httpcore").setLevel(logging.WARNING)
-from openai import OpenAI
-from PIL import Image
+
 
 logger = logging.getLogger(__name__)
 
@@ -136,7 +137,7 @@ def call_ai(messages: list, api_key: str):
             messages=messages,
             response_format={"type": "json_object"},
         )
-    except Exception as e:
+    except Exception:
         traceback.print_exc()
         return None, None
 

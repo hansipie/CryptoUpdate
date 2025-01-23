@@ -4,8 +4,6 @@ import logging
 import typer
 import csv
 import configparser
-import logging
-import typer
 
 from modules.Exporter import Exporter
 from modules.Notion import Notion
@@ -168,7 +166,7 @@ def updateNotion(inifile: str):
 
     notion = Notion(notion_api_token)
     db_id = notion.getObjectId(database, "database", parentpage)
-    if db_id == None:
+    if db_id is None:
         logging.error("Error: Database not found")
         quit()
 

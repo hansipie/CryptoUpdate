@@ -1,5 +1,4 @@
 import streamlit as st
-import traceback
 import logging
 
 from modules.Notion import Notion

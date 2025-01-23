@@ -8,9 +8,10 @@ from modules import aiprocessing
 from modules.database import portfolios as pf
 from modules.database.operations import operations
 from modules.database.swaps import swaps
+from PIL import Image
 
 logging.getLogger("PIL").setLevel(logging.WARNING)
-from PIL import Image
+
 
 logger = logging.getLogger(__name__)
 

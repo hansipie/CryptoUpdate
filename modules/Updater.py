@@ -3,7 +3,7 @@ import time
 import traceback
 import logging
 from alive_progress import alive_bar
-from modules import Notion, cmc
+from modules import Notion
 from modules.database.market import Market
 
 logger = logging.getLogger(__name__)
@@ -24,7 +24,7 @@ class Updater:
         for v in self.notion.getNotionDatabaseEntities(self.notion_dbid):
             try:
                 text = v["properties"]["Token"]["title"][0]["text"]["content"]
-            except:
+            except KeyError:
                 logger.error("Invalid entry in Dashboard: ", v["id"])
                 continue
             logger.debug(f"Found entry: {text}")
@@ -59,10 +59,10 @@ class Updater:
     def UpdateDBHandleError(self, response):
         logger.error("Error updating Notion database. code: ", response.status_code)
         if response.status_code == 429:
+            retry_after = int(response.headers["Retry-After"])
             logger.warning(
                 " - Rate limit exceeded. Retry after ", retry_after, " seconds"
             )
-            retry_after = int(response.headers["Retry-After"])
         elif response.status_code == 522:
             logger.warning(" - Connection timed out. Retry.")
             retry_after = 2
@@ -133,7 +133,7 @@ class Updater:
             try:
                 self.UpdateCrypto()
                 time.sleep(1 * 60)
-            except Exception as e:
+            except Exception:
                 traceback.print_exc()
                 break
 

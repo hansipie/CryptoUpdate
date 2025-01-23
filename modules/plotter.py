@@ -7,7 +7,7 @@ logger = logging.getLogger(__name__)
 
 
 def plot_as_pie(df: pd.DataFrame, column):
-    logger.debug(f"Plot with Plotly")
+    logger.debug("Plot with Plotly")
     if df.empty:
         st.error("No data to plot")
         return
