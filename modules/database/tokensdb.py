@@ -63,7 +63,6 @@ class TokensDatabase:
                 else:
                     df_balance = df_balance.merge(df, on="timestamp", how="outer")
             df_balance = df_balance.fillna(0) # c'est OK de remplir les NaN ici
-            logger.debug("Dataframe:\n%s", df_balance.to_string())
             df_balance["timestamp"] = pd.to_datetime(
                 df_balance["timestamp"], unit="s", utc=True
             )

@@ -160,13 +160,6 @@ def interpolate_token(token: str, timestamp: int, dbfile: str) -> float:
         )
         df_high = df_low.copy()
 
-    logger.debug(
-        "Interpolate token - token: %s - timestamp: %d\n- low:\n%s\n- high:\n%s",
-        token,
-        timestamp,
-        df_low.to_string(),
-        df_high.to_string(),
-    )
     # Interpoler la valeur
     price_low = df_low["price"][0]
     price_high = df_high["price"][0]
@@ -175,7 +168,7 @@ def interpolate_token(token: str, timestamp: int, dbfile: str) -> float:
     price = interpolate(
         timestamp_low, price_low, timestamp_high, price_high, timestamp
     )
-    logger.debug("Interpolate token - Price: %d", price)
+    logger.debug("Interpolate token - Price: %f", price)
     return price
 
 def interpolate_eurusd(timestamp: int, dbfile: str) -> float:
@@ -195,10 +188,6 @@ def calculate_crypto_rate(token_a: str, token_b: str, timestamp: int, dbfile: st
     value_b = interpolate_token(token_b, timestamp, dbfile)
     if value_a is None or value_b is None:
         return None
-    
-
-    # Get the price of token A in EUR
-    market = Market(
-        st.session_state.dbfile, st.session_state.settings["coinmarketcap_token"]
-    )
-    price_a = market.get_price(token_a, timestamp)
+    rate = value_a / value_b
+    logger.debug("Calculate crypto rate - 1 %s = %f %s", token_a, rate, token_b)
+    return rate

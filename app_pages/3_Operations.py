@@ -6,6 +6,7 @@ as well as displaying operation history and performance metrics.
 """
 
 import logging
+import os
 import streamlit as st
 import pandas as pd
 import tzlocal
@@ -14,7 +15,8 @@ from modules.database.tokensdb import TokensDatabase
 from modules.database.operations import operations
 from modules.database.market import Market
 from modules.database.swaps import swaps
-from modules.utils import toTimestamp_A
+from modules.tools import calculate_crypto_rate
+from modules.utils import get_file_hash, toTimestamp_A
 
 logger = logging.getLogger(__name__)
 
@@ -60,6 +62,7 @@ def submit_swap(
 
 
 def swap_row_selected():
+    """Get the selected row index in the swap table"""
     logger.debug(f"Row selection: {st.session_state.swapselection}")
     if (
         "selection" in st.session_state.swapselection
@@ -117,7 +120,9 @@ def buy_add():
     to_wallet = st.selectbox("Portfolio", g_wallets, key="to_wallet", index=None)
     if st.button("Submit", use_container_width=True):
         timestamp = toTimestamp_A(date, time)
-        submit_buy(timestamp, from_amount, form_currency, to_amount, to_token, to_wallet)
+        submit_buy(
+            timestamp, from_amount, form_currency, to_amount, to_token, to_wallet
+        )
         st.rerun()
 
 
@@ -134,10 +139,10 @@ def swap_add():
         swap_token_to = st.text_input("To Token", key="swap_token_to")
 
     with col_amount:
-        swap_amount_to = st.number_input(
+        swap_amount_from = st.number_input(
             "From Amount", min_value=0.0, format="%.8g", key="swap_amount_to"
         )
-        swap_amount_from = st.number_input(
+        swap_amount_to = st.number_input(
             "To Amount", min_value=0.0, format="%.8g", key="swap_amount_from"
         )
 
@@ -161,6 +166,7 @@ def swap_add():
         )
         st.rerun()
 
+
 @st.dialog("Edit Buy")
 def buy_edit_dialog(rowidx: int):
     logger.debug(f"Dialog Edit row: {rowidx}")
@@ -173,9 +179,14 @@ def buy_edit_dialog(rowidx: int):
     col_amount, col_unit = st.columns(2)
     with col_amount:
         from_amount = st.number_input(
-            "From", min_value=0.0, format="%.8g", key="from_amount", value=float(data["From"])
+            "From",
+            min_value=0.0,
+            format="%.8g",
+            key="from_amount",
+            value=float(data["From"]),
         )
-        to_amount = st.number_input("To", min_value=0.0, format="%.8g", key="to_amount", value=float(data["To"])
+        to_amount = st.number_input(
+            "To", min_value=0.0, format="%.8g", key="to_amount", value=float(data["To"])
         )
 
     with col_unit:
@@ -204,9 +215,11 @@ def buy_edit_dialog(rowidx: int):
     if st.button("Submit", use_container_width=True):
         timestamp = toTimestamp_A(date, time)
         g_operation.delete(data["id"])
-        submit_buy(timestamp, from_amount, form_currency, to_amount, to_token, to_wallet)
+        submit_buy(
+            timestamp, from_amount, form_currency, to_amount, to_token, to_wallet
+        )
         st.rerun()
-    
+
 
 @st.dialog("Edit Swap")
 def swap_edit_dialog(rowidx: int):
@@ -227,14 +240,14 @@ def swap_edit_dialog(rowidx: int):
         )
 
     with col_amount:
-        swap_amount_to = st.number_input(
+        swap_amount_from = st.number_input(
             "From Amount",
             min_value=0.0,
             format="%.8g",
             key="swap_amount_to",
             value=float(data["From Amount"]),
         )
-        swap_amount_from = st.number_input(
+        swap_amount_to = st.number_input(
             "To Amount",
             min_value=0.0,
             format="%.8g",
@@ -271,6 +284,7 @@ def swap_edit_dialog(rowidx: int):
         )
         st.rerun()
 
+
 @st.dialog("Delete Buy")
 def buy_delete_dialog(rowidx: int):
     logger.debug("Dialog Delete row: %s", rowidx)
@@ -281,6 +295,7 @@ def buy_delete_dialog(rowidx: int):
         logger.debug(f"Delete row: {data} - {type(data['id'])}")
         g_operation.delete(data["id"])
         st.rerun()
+
 
 @st.dialog("Delete Swap")
 def swap_delete_dialog(rowidx: int):
@@ -329,12 +344,84 @@ def swap_delete():
         swap_delete_dialog(rowidx)
 
 
+def swap_perf(token_a: str, token_b: str, timestamp: int, dbfile: str) -> float:
+    """Calculate the performance of a swap"""
+
+    rate_swap = calculate_crypto_rate(
+        token_a, token_b, timestamp, dbfile
+    )
+
+    rate_now = calculate_crypto_rate(
+        token_a,
+        token_b,
+        int(pd.Timestamp.now(tz="UTC").timestamp()),
+        dbfile,
+    )
+
+    if rate_swap is None or rate_now is None:
+        return None
+    return (rate_now * 100) / rate_swap - 100
+
+
+@st.cache_data(
+    hash_funcs={str: lambda x: get_file_hash(x) if os.path.isfile(x) else hash(x)},
+)
+def build_buy_table(buytable: pd.DataFrame, dbfile: str) -> pd.DataFrame:
+    """Build the buy table with performance metrics"""
+
+    # convert timestamp to datetime
+    buytable["Date"] = pd.to_datetime(buytable["timestamp"], unit="s", utc=True)
+    local_timezone = tzlocal.get_localzone()
+    logger.debug("Timezone locale: %s", local_timezone)
+    buytable["Date"] = buytable["Date"].dt.tz_convert(local_timezone)
+
+    # calculate performance
+    market = Market(
+        dbfile, st.session_state.settings["coinmarketcap_token"]
+    )
+    market_df = market.getLastMarket()
+    if market_df is None:
+        st.error("No market data available")
+        st.stop()
+    logger.debug("Market data:\n%s", market_df.to_string())
+
+    buytable["Buy Rate"] = buytable["From"] / buytable["To"]
+    buytable["Current Rate"] = buytable["Token"].map(market_df["value"].to_dict())
+    buytable["Perf."] = (buytable["Current Rate"] * 100) / buytable["Buy Rate"] - 100
+
+    return buytable
+
+
+@st.cache_data(
+    hash_funcs={str: lambda x: get_file_hash(x) if os.path.isfile(x) else hash(x)},
+)
+def build_swap_table(swaptable: pd.DataFrame, dbfile: str) -> pd.DataFrame:
+    """Build the swap table with performance metrics"""
+
+    # convert timestamp to datetime
+    swaptable["Date"] = pd.to_datetime(swaptable["timestamp"], unit="s", utc=True)
+    local_timezone = tzlocal.get_localzone()
+    logger.debug("Timezone locale: %s", local_timezone)
+    swaptable["Date"] = swaptable["Date"].dt.tz_convert(local_timezone)
+
+    # Calculate performance for each swap
+    swaptable["Perf."] = swaptable.apply(
+        lambda row: swap_perf(row["To Token"], row["From Token"], row["timestamp"], dbfile),
+        axis=1,
+    )
+
+    return swaptable
+
+
 g_portfolios = Portfolios(st.session_state.dbfile)
 g_historybase = TokensDatabase(st.session_state.dbfile)
 g_tokens = g_historybase.getTokens()
 g_wallets = g_portfolios.get_portfolio_names()
 g_operation = operations()
 g_swaps = swaps()
+
+if "cryto_rate" not in st.session_state:
+    st.session_state.cryto_rate = {}
 
 buy_tab, swap_tab = st.tabs(["Buy", "Swap"])
 with buy_tab:
@@ -353,35 +440,9 @@ with buy_tab:
             "Portfolio",
         ],
     )
-    # convert timestamp to datetime
-    st.session_state.buylist["Date"] = pd.to_datetime(
-        st.session_state.buylist["timestamp"], unit="s", utc=True
-    )
-    local_timezone = tzlocal.get_localzone()
-    logger.debug("Timezone locale: %s", local_timezone)
-    st.session_state.buylist["Date"] = st.session_state.buylist["Date"].dt.tz_convert(
-        local_timezone
-    )
 
-    # calculate performance
-    market = Market(
-        st.session_state.dbfile, st.session_state.settings["coinmarketcap_token"]
-    )
-    market_df = market.getLastMarket()
-    if market_df is None:
-        st.error("No market data available")
-        st.stop()
-    logger.debug("Market data:\n%s", market_df.to_string())
-
-    st.session_state.buylist["Buy Rate"] = (
-        st.session_state.buylist["From"] / st.session_state.buylist["To"]
-    )
-    st.session_state.buylist["Current Rate"] = st.session_state.buylist["Token"].map(
-        market_df["value"].to_dict()
-    )
-    st.session_state.buylist["Perf."] = (
-        st.session_state.buylist["Current Rate"] * 100
-    ) / st.session_state.buylist["Buy Rate"] - 100
+    # build buy table with performance metrics
+    st.session_state.buylist = build_buy_table(st.session_state.buylist, st.session_state.dbfile)
 
     col_buylist, col_buybtns = st.columns([8, 1])
     with col_buylist:
@@ -451,15 +512,9 @@ with swap_tab:
             "tag",
         ],
     )
-    # convert timestamp to datetime
-    st.session_state.swaplist["Date"] = pd.to_datetime(
-        st.session_state.swaplist["timestamp"], unit="s", utc=True
-    )
-    local_timezone = tzlocal.get_localzone()
-    logger.debug("Timezone locale: %s", {local_timezone})
-    st.session_state.swaplist["Date"] = st.session_state.swaplist["Date"].dt.tz_convert(
-        local_timezone
-    )
+
+    # build swap table with performance metrics
+    st.session_state.swaplist = build_swap_table(st.session_state.swaplist, st.session_state.dbfile)
 
     col_swaplist, col_swapbtns = st.columns([8, 1])
     with col_swaplist:
@@ -476,10 +531,14 @@ with swap_tab:
                 "To Token",
                 "From Wallet",
                 "To Wallet",
+                "Perf.",  # Ajout de la colonne Perf. dans l'ordre des colonnes
             ),
             column_config={
                 "From Amount": st.column_config.NumberColumn(format="%.8g"),
                 "To Amount": st.column_config.NumberColumn(format="%.8g"),
+                "Perf.": st.column_config.NumberColumn(
+                    format="%.2f%%"
+                ),  # Configuration du format pour Perf.
             },
             on_select="rerun",
             selection_mode="single-row",
