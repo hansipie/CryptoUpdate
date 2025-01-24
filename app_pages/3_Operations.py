@@ -1,3 +1,10 @@
+"""Operations module for CryptoUpdate application.
+
+This module handles buy and swap operations for cryptocurrencies.
+It provides interfaces for adding, editing and deleting operations,
+as well as displaying operation history and performance metrics.
+"""
+
 import logging
 import streamlit as st
 import pandas as pd

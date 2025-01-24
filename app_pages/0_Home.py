@@ -1,3 +1,10 @@
+"""Home page module for CryptoUpdate application.
+
+This module displays the main dashboard with portfolio metrics,
+performance graphs and provides functionality for updating prices
+and synchronizing with Notion database.
+"""
+
 import streamlit as st
 import logging
 import traceback

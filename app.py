@@ -1,3 +1,11 @@
+"""Main entry point for CryptoUpdate application.
+
+This module initializes the Streamlit application, sets up logging,
+loads configuration and defines the navigation structure.
+The application provides a web interface for tracking and managing
+cryptocurrency portfolios.
+"""
+
 import streamlit as st
 import logging
 import sys
@@ -48,4 +56,3 @@ logger.debug("### End Render ###")
 
 if st.session_state.settings["debug_flag"]:
     st.write(st.session_state)
-    

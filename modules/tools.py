@@ -1,3 +1,12 @@
+"""Utility functions module for CryptoUpdate application.
+
+This module provides various utility functions for:
+- Database operations and updates
+- Data frame manipulations
+- Settings management
+- Price calculations and interpolations
+"""
+
 import logging
 import os
 import sqlite3
