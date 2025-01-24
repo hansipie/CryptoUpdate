@@ -111,7 +111,7 @@ def saveToDB(inifile):
     ) as bar:
         for item in archiveFiles:
             if item.endswith(".csv"):
-                df = tools.getDateFrame(item)
+                df = tools.get_dataframe(item)
                 df.to_sql("TokensDatabase", conn, if_exists="append", index=False)
             else:
                 logger.debug(f"ignore: {item}")

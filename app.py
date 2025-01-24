@@ -23,7 +23,7 @@ except FileNotFoundError:
     st.error("Settings file not found. Please verify your configuration file exists and is accessible.")
     st.stop()
 
-tools.loadSettings(config.conf)
+tools.load_settings(config.conf)
 
 home_page = st.Page("app_pages/0_Home.py", title="Home", icon="🏠", default=True)
 pfolios_page = st.Page("app_pages/1_Portfolios.py", title="Portfolios", icon="📊")

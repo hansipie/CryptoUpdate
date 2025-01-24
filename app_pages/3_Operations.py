@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 st.title("Operations")
 
 
-def submitbuy(timestamp, from_amount, form_currency, to_amount, to_token, to_wallet):
+def submit_buy(timestamp, from_amount, form_currency, to_amount, to_token, to_wallet):
     logger.debug(
         f"submitbuy: timestamp={timestamp} from_amount={from_amount}, form_currency={form_currency}, to_amount={to_amount}, to_token={to_token}, to_wallet={to_wallet}"
     )
@@ -29,7 +29,7 @@ def submitbuy(timestamp, from_amount, form_currency, to_amount, to_token, to_wal
     st.success("Operation submitted")
 
 
-def submitswap(
+def submit_swap(
     timestamp,
     swap_token_from,
     swap_amount_from,
@@ -52,7 +52,7 @@ def submitswap(
     )
 
 
-def swapRowSelected():
+def swap_row_selected():
     logger.debug(f"Row selection: {st.session_state.swapselection}")
     if (
         "selection" in st.session_state.swapselection
@@ -66,7 +66,7 @@ def swapRowSelected():
         return None
 
 
-def buyRowSelected():
+def buy_row_selected():
     logger.debug(f"Row selection: {st.session_state.buyselection}")
     if (
         "selection" in st.session_state.buyselection
@@ -81,7 +81,7 @@ def buyRowSelected():
 
 
 @st.dialog("Add Buy")
-def buyAdd():
+def buy_add():
     col_date, col_time = st.columns(2)
     with col_date:
         date = st.date_input("Date", key="buy_date")
@@ -110,12 +110,12 @@ def buyAdd():
     to_wallet = st.selectbox("Portfolio", g_wallets, key="to_wallet", index=None)
     if st.button("Submit", use_container_width=True):
         timestamp = toTimestamp_A(date, time)
-        submitbuy(timestamp, from_amount, form_currency, to_amount, to_token, to_wallet)
+        submit_buy(timestamp, from_amount, form_currency, to_amount, to_token, to_wallet)
         st.rerun()
 
 
 @st.dialog("Add Swap")
-def swapAdd():
+def swap_add():
     col_date, col_time = st.columns(2)
     with col_date:
         date = st.date_input("Date", key="swap_date")
@@ -143,7 +143,7 @@ def swapAdd():
         )
     if st.button("Submit", use_container_width=True):
         timestamp = toTimestamp_A(date, time)
-        submitswap(
+        submit_swap(
             timestamp,
             swap_token_from,
             swap_amount_from,
@@ -155,7 +155,7 @@ def swapAdd():
         st.rerun()
 
 @st.dialog("Edit Buy")
-def buyEditDialog(rowidx: int):
+def buy_edit_dialog(rowidx: int):
     logger.debug(f"Dialog Edit row: {rowidx}")
     data = st.session_state.buylist.iloc[rowidx].to_dict()
     col_date, col_time = st.columns(2)
@@ -197,12 +197,12 @@ def buyEditDialog(rowidx: int):
     if st.button("Submit", use_container_width=True):
         timestamp = toTimestamp_A(date, time)
         g_operation.delete(data["id"])
-        submitbuy(timestamp, from_amount, form_currency, to_amount, to_token, to_wallet)
+        submit_buy(timestamp, from_amount, form_currency, to_amount, to_token, to_wallet)
         st.rerun()
     
 
 @st.dialog("Edit Swap")
-def swapEditDialog(rowidx: int):
+def swap_edit_dialog(rowidx: int):
     logger.debug(f"Dialog Edit row: {rowidx}")
     data = st.session_state.swaplist.iloc[rowidx].to_dict()
     col_date, col_time = st.columns(2)
@@ -253,7 +253,7 @@ def swapEditDialog(rowidx: int):
     if st.button("Submit", use_container_width=True):
         timestamp = toTimestamp_A(date, time)
         g_swaps.delete(data["id"])
-        submitswap(
+        submit_swap(
             timestamp,
             swap_token_from,
             swap_amount_from,
@@ -265,7 +265,7 @@ def swapEditDialog(rowidx: int):
         st.rerun()
 
 @st.dialog("Delete Buy")
-def buyDeleteDialog(rowidx: int):
+def buy_delete_dialog(rowidx: int):
     logger.debug("Dialog Delete row: %s", rowidx)
     data = st.session_state.buylist.iloc[rowidx].to_dict()
     st.dataframe(data, use_container_width=True)
@@ -276,7 +276,7 @@ def buyDeleteDialog(rowidx: int):
         st.rerun()
 
 @st.dialog("Delete Swap")
-def swapDeleteDialog(rowidx: int):
+def swap_delete_dialog(rowidx: int):
     logger.debug("Dialog Delete row: %s", rowidx)
     data = st.session_state.swaplist.iloc[rowidx].to_dict()
     st.dataframe(data, use_container_width=True)
@@ -287,39 +287,39 @@ def swapDeleteDialog(rowidx: int):
         st.rerun()
 
 
-def buyEdit():
-    rowidx = buyRowSelected()
+def buy_edit():
+    rowidx = buy_row_selected()
     if rowidx is None:
         st.toast("Please select a row", icon=":material/warning:")
     else:
-        buyEditDialog(rowidx)
+        buy_edit_dialog(rowidx)
 
 
-def swapEdit():
-    rowidx = swapRowSelected()
+def swap_edit():
+    rowidx = swap_row_selected()
     if rowidx is None:
         st.toast("Please select a row", icon=":material/warning:")
     else:
-        swapEditDialog(rowidx)
+        swap_edit_dialog(rowidx)
 
 
-def buyDelete():
+def buy_delete():
     logger.debug("Delete row")
-    rowidx = buyRowSelected()
+    rowidx = buy_row_selected()
     if rowidx is None:
         st.toast("Please select a row", icon=":material/warning:")
     else:
-        buyDeleteDialog(rowidx)
+        buy_delete_dialog(rowidx)
     pass
 
 
-def swapDelete():
+def swap_delete():
     logger.debug("Delete row")
-    rowidx = swapRowSelected()
+    rowidx = swap_row_selected()
     if rowidx is None:
         st.toast("Please select a row", icon=":material/warning:")
     else:
-        swapDeleteDialog(rowidx)
+        swap_delete_dialog(rowidx)
 
 
 g_portfolios = Portfolios(st.session_state.dbfile)
@@ -404,21 +404,21 @@ with buy_tab:
     with col_buybtns:
         st.button(
             "New",
-            on_click=buyAdd,
+            on_click=buy_add,
             use_container_width=True,
             icon=":material/add:",
             key="buy_new",
         )
         st.button(
             "Edit",
-            on_click=buyEdit,
+            on_click=buy_edit,
             use_container_width=True,
             icon=":material/edit:",
             key="buy_edit",
         )
         st.button(
             "Delete",
-            on_click=buyDelete,
+            on_click=buy_delete,
             use_container_width=True,
             icon=":material/delete:",
             key="buy_delete",
@@ -477,21 +477,21 @@ with swap_tab:
     with col_swapbtns:
         st.button(
             "New",
-            on_click=swapAdd,
+            on_click=swap_add,
             use_container_width=True,
             icon=":material/add:",
             key="swap_new",
         )
         st.button(
             "Edit",
-            on_click=swapEdit,
+            on_click=swap_edit,
             use_container_width=True,
             icon=":material/edit:",
             key="swap_edit",
         )
         st.button(
             "Delete",
-            on_click=swapDelete,
+            on_click=swap_delete,
             use_container_width=True,
             icon=":material/delete:",
             key="swap_delete",

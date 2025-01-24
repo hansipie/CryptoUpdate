@@ -12,7 +12,7 @@ def __find_linear_function(x1, y1, x2, y2):
     # Calculer la pente a
     a = (y2 - y1) / (x2 - x1)
     # Calculer l'ordonnée à l'origine b
-    b = y1 - a * x1  
+    b = y1 - a * x1
     return a, b
 
 def interpolate(x1, y1, x2, y2, x):
@@ -89,3 +89,4 @@ def debug_prefix(input : str, flag = False) -> str:
     if flag:
         return f"debug_{input}"
     return input
+

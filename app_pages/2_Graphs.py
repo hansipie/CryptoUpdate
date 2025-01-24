@@ -5,7 +5,7 @@ import os
 from modules.database.portfolios import Portfolios
 from modules.database.market import Market
 from modules.plotter import plot_as_graph, plot_as_pie
-from modules.tools import create_portfolio_dataframe, interpolate_EURUSD, load_db
+from modules.tools import create_portfolio_dataframe, interpolate_eurusd, load_db
 from modules.utils import get_file_hash, toTimestamp_A
 
 
@@ -164,7 +164,7 @@ if add_selectbox == "Currency (EURUSD)":
         with col_btn:
             if st.form_submit_button("Submit", use_container_width=True, ):
                 timestamp = toTimestamp_A(date, time)
-                interpolated = interpolate_EURUSD(timestamp, st.session_state.dbfile)
+                interpolated = interpolate_eurusd(timestamp, st.session_state.dbfile)
         if interpolated is not None:
             if interpolated != 0.0:
                 st.info(f"Interpolated value: {interpolated} USD")

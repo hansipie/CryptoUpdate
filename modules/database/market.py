@@ -138,12 +138,18 @@ class Market:
             return df["timestamp"][0]
 
     # get the last price of a token
-    def getLastPrice(self, token: str) -> float:
+    def get_price(self, token: str, timestamp: int = None) -> float:
         with sqlite3.connect(self.db_path) as con:
-            df = pd.read_sql_query(
-                f"SELECT price from Market WHERE token = '{token}' ORDER BY timestamp DESC LIMIT 1;",
-                con,
-            )
+            if timestamp:
+                df = pd.read_sql_query(
+                    f"SELECT price from Market WHERE token = '{token}' AND timestamp <= {timestamp} ORDER BY timestamp DESC LIMIT 1;",
+                    con,
+                )
+            else:
+                df = pd.read_sql_query(
+                    f"SELECT price from Market WHERE token = '{token}' ORDER BY timestamp DESC LIMIT 1;",
+                    con,
+                )
             try:
                 return df["price"][0]
             except IndexError:
@@ -190,7 +196,7 @@ class Market:
             now_timestamp = int(pd.Timestamp.now(tz=pytz.UTC).timestamp())
             logger.debug(f"Now timestamp: {now_timestamp}")
             logger.debug(
-                f"to remove: {len(df_timestamps[df_timestamps["timestamp"] > now_timestamp])}"
+                f"to remove: {len(df_timestamps[df_timestamps['timestamp'] > now_timestamp])}"
             )
             df_timestamps = df_timestamps[df_timestamps["timestamp"] <= now_timestamp]
 
@@ -238,7 +244,7 @@ class Market:
                 resp = response.json()
 
                 logger.debug(
-                    f"Rate Timestamp: {rate_timestamp}  - Rate: {resp["data"]["rates"]["USD"]}"
+                    f"Rate Timestamp: {rate_timestamp}  - Rate: {resp['data']['rates']['USD']}"
                 )
                 self.addCurrency(rate_timestamp, "USD", resp["data"]["rates"]["USD"])
 

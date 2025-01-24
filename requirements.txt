@@ -176,6 +176,8 @@ rpds-py==0.22.3
     # via
     #   jsonschema
     #   referencing
+ruff==0.9.3
+    # via -r .\requirements.in
 shellingham==1.5.4
     # via typer
 six==1.17.0

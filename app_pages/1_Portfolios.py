@@ -3,7 +3,7 @@ import streamlit as st
 import pandas as pd
 import logging
 from modules.database.portfolios import Portfolios
-from modules.tools import UpdateDatabase, create_portfolio_dataframe
+from modules.tools import update_database, create_portfolio_dataframe
 
 
 logger = logging.getLogger(__name__)
@@ -136,7 +136,7 @@ def portfolioUI(tabs: list):
 
 def update():
     try:
-        UpdateDatabase(
+        update_database(
             st.session_state.dbfile, st.session_state.settings["coinmarketcap_token"]
         )
         st.toast("Prices updated", icon=":material/check:")

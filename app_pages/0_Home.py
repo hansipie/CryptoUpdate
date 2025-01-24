@@ -2,7 +2,7 @@ import streamlit as st
 import logging
 import traceback
 from modules.plotter import plot_as_graph
-from modules.tools import UpdateDatabase, load_db
+from modules.tools import update_database, load_db
 from modules.database.operations import operations
 from modules.Notion import Notion
 from modules.Updater import Updater
@@ -22,7 +22,7 @@ def join_dfs(df1, df2):
 
 def update():
     try:
-        UpdateDatabase(
+        update_database(
             st.session_state.dbfile, st.session_state.settings["coinmarketcap_token"]
         )
         st.toast("Prices updated", icon=":material/check:")
