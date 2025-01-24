@@ -1,48 +1,70 @@
-import configparser
+"""Configuration management module for CryptoUpdate application."""
+
+import json
 import logging
 import os
 
 logger = logging.getLogger(__name__)
 
 class configuration:
+    """Manages application configuration from JSON file."""
 
-    def __init__(self, inifile: str = "./settings.ini"):
+    def __init__(self, config_file: str = "./settings.json"):
+        """Initialize configuration manager.
+        
+        Args:
+            config_file: Path to JSON configuration file
+        """
         logger.debug("Loading configuration")
-        self.inifile = inifile
+        self.config_file = config_file
         self.conf = None
 
     def readConfig(self):
-        if not os.path.exists(self.inifile):
-            logger.error("Settings file not found: " + self.inifile)
+        """Read configuration from JSON file.
+        
+        Raises:
+            FileNotFoundError: If settings file doesn't exist
+            JSONDecodeError: If settings file is invalid JSON
+        """
+        if not os.path.exists(self.config_file):
+            logger.error("Settings file not found: " + self.config_file)
             raise FileNotFoundError
-        self.conf = configparser.ConfigParser()
-        self.conf.read(self.inifile)
+        
+        with open(self.config_file, 'r') as f:
+            self.conf = json.load(f)
 
     def saveConfig(self, settings: dict):
+        """Save configuration to JSON file.
+        
+        Args:
+            settings: Dictionary containing settings to save
+        """
         logger.debug("Saving configuration")
-        if self.conf is None:
-            try:
-                self.readConfig()
-            except FileNotFoundError:
-                self.conf = configparser.ConfigParser()
-        try:
-            self.conf["Notion"] = {
+        config = {
+            "Notion": {
                 "token": settings["notion_token"],
-                "database": settings["notion_database"],
-                "parentpage": settings["notion_parentpage"],
+                "database": settings["notion_database"], 
+                "parentpage": settings["notion_parentpage"]
+            },
+            "Coinmarketcap": {
+                "token": settings["coinmarketcap_token"]
+            },
+            "OpenAI": {
+                "token": settings["openai_token"]
+            },
+            "Debug": {
+                "flag": str(settings["debug_flag"])
+            },
+            "Local": {
+                "archive_path": "archive",
+                "data_path": "data", 
+                "sqlite_file": "cryptodb.sqlite"
             }
-            self.conf["Coinmarketcap"] = {
-                "token": settings["coinmarketcap_token"],
-            }
-            self.conf["OpenAI"] = {
-                "token": settings["openai_token"],
-            }
-            self.conf["Debug"] = {
-                "flag": str(settings["debug_flag"]),
-            }
+        }
 
-            with open(self.inifile, "w") as configfile:
-                self.conf.write(configfile)
+        try:
+            with open(self.config_file, 'w') as f:
+                json.dump(config, f, indent=4)
         except Exception as e:
-            logger.error("Error: " + type(e).__name__ + " - " + str(e))
-            quit()
+            logger.error("Error saving configuration: %s - %s", type(e).__name__, str(e))
+            raise

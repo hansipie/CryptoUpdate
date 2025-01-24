@@ -368,6 +368,10 @@ with buy_tab:
         st.session_state.dbfile, st.session_state.settings["coinmarketcap_token"]
     )
     market_df = market.getLastMarket()
+    if market_df is None:
+        st.error("No market data available")
+        st.stop()
+    logger.debug("Market data:\n%s", market_df.to_string())
 
     st.session_state.buylist["Buy Rate"] = (
         st.session_state.buylist["From"] / st.session_state.buylist["To"]

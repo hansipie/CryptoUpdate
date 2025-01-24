@@ -48,6 +48,10 @@ class TokensDatabase:
         logger.debug("Get balances")
         with sqlite3.connect(self.db_path) as con:
             df_tokens = pd.read_sql_query("select DISTINCT token from TokensDatabase", con)
+            logger.debug("Tokens:\n%s", df_tokens.to_string())
+            if df_tokens.empty:
+                logger.warning("No token found in database")
+                return None
             df_balance = pd.DataFrame()
             for token in df_tokens["token"]:
                 df = pd.read_sql_query(
@@ -59,6 +63,7 @@ class TokensDatabase:
                 else:
                     df_balance = df_balance.merge(df, on="timestamp", how="outer")
             df_balance = df_balance.fillna(0) # c'est OK de remplir les NaN ici
+            logger.debug("Dataframe:\n%s", df_balance.to_string())
             df_balance["timestamp"] = pd.to_datetime(
                 df_balance["timestamp"], unit="s", utc=True
             )
@@ -74,6 +79,10 @@ class TokensDatabase:
         logger.debug("Get token counts")
         with sqlite3.connect(self.db_path) as con:
             df_tokens = pd.read_sql_query("select DISTINCT token from TokensDatabase", con)
+            logger.debug("Tokens:\n%s", df_tokens.to_string())
+            if df_tokens.empty:
+                logger.warning("No token found in database")
+                return None
             df_tokencount = pd.DataFrame()
             for token in df_tokens["token"]:
                 df = pd.read_sql_query(

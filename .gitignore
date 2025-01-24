@@ -10,6 +10,7 @@ data/
 inputs/
 notebooks/
 settings.ini
+settings.json
 
 # files not ready to diffuse
 syncArchives.py

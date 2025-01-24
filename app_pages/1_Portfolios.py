@@ -195,9 +195,12 @@ with st.sidebar:
 # Display portfolios
 tabs = g_portfolios.get_portfolio_names()
 logger.debug(f"Portfolios: {tabs}")
-
-try:
-    portfolioUI(tabs)
-except Exception as e:
-    st.error(f"UI Error: {str(e)}")
-    traceback.print_exc()
+if not tabs:
+    st.write("No portfolios found")
+    st.stop()
+else:
+    try:
+        portfolioUI(tabs)
+    except Exception as e:
+        st.error(f"UI Error: {str(e)}")
+        traceback.print_exc()

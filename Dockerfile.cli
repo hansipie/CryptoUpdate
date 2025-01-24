@@ -33,4 +33,4 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
 # Définissez la commande pour exécuter votre application
-ENTRYPOINT python cli_tools.py updatenotion ./settings.ini
+ENTRYPOINT python cli_tools.py updatenotion ./settings.json
