@@ -14,7 +14,6 @@ import sqlite3
 import pandas as pd
 import streamlit as st
 
-from modules.cmc import cmc
 from modules.database.market import Market
 from modules.database.portfolios import Portfolios
 from modules.database.tokensdb import TokensDatabase
@@ -137,102 +136,51 @@ def load_db(dbfile: str) -> pd.DataFrame:
         return df_balance, df_sums, df_tokencount
 
 
-def interpolate_eurusd(timestamp: int, dbfile: str) -> float:
-    """Interpolate the EURUSD value at a given timestamp"""
-    with sqlite3.connect(dbfile) as con:
-        df_low = pd.read_sql_query(
-            f"SELECT timestamp, price from Currency WHERE timestamp <= {timestamp} ORDER BY timestamp DESC LIMIT 1;",
-            con,
-        )
-        df_high = pd.read_sql_query(
-            f"SELECT timestamp, price from Currency WHERE timestamp >= {timestamp} ORDER BY timestamp ASC LIMIT 1;",
-            con,
-        )
-        if len(df_low) == 0:
-            logger.warning(
-                "Interpolate EURUSD - No data found for timestamp: %d", timestamp
-            )
-            return None
-        if len(df_high) == 0:
-            cmc_price = cmc(st.session_state.settings["coinmarketcap_token"])
-            prices = cmc_price.getCurrentFiatPrices(
-                ["USD"], "EUR", 1, st.session_state.settings["debug_flag"]
-            )
-            try:
-                df_high = pd.DataFrame(prices["USD"], index=[0])
-            except KeyError:
-                logger.warning(
-                    "Interpolate EURUSD - No data found for timestamp: %d", timestamp
-                )
-                return None
-            if df_high["timestamp"][0] < timestamp:
-                logger.warning(
-                    "Interpolate EURUSD - No data found for timestamp: %d", timestamp
-                )
-                return None
-
-        logger.debug(
-            "Interpolate EURUSD - timestamp: %d\n- low:\n%s\n- high:\n%s",
-            timestamp,
-            df_low.to_string(),
-            df_high.to_string(),
-        )
-        # Interpoler la valeur
-        price_low = df_low["price"][0]
-        price_high = df_high["price"][0]
-        timestamp_low = df_low["timestamp"][0]
-        timestamp_high = df_high["timestamp"][0]
-        price = interpolate(
-            timestamp_low, price_low, timestamp_high, price_high, timestamp
-        )
-        logger.debug("Interpolate EURUSD - Price: %d", price)
-        return price
-
-
 def interpolate_token(token: str, timestamp: int, dbfile: str) -> float:
     """Interpolate the token value at a given timestamp"""
-    with sqlite3.connect(dbfile) as con:
-        df_low = pd.read_sql_query(
-            f"SELECT timestamp, price from Market WHERE token = '{token}' AND timestamp <= {timestamp} ORDER BY timestamp DESC LIMIT 1;",
-            con,
-        )
-        df_high = pd.read_sql_query(
-            f"SELECT timestamp, price from Market WHERE token = '{token}' AND timestamp >= {timestamp} ORDER BY timestamp ASC LIMIT 1;",
-            con,
-        )
-        if len(df_low) == 0:
-            logger.warning(
-                "Interpolate token - No data found for token: %s and timestamp: %d",
-                token,
-                timestamp,
-            )
-            return None
-        if len(df_high) == 0:
-            logger.warning(
-                "Interpolate token - No data found for token: %s and timestamp: %d",
-                token,
-                timestamp,
-            )
-            return None
+    
+    market = Market(dbfile, st.session_state.settings["coinmarketcap_token"])
+    if token == "EURUSD":
+        df_low, df_high = market.get_currency_lowhigh(timestamp)
+    else:
+        df_low, df_high = market.get_token_lowhigh(token, timestamp)
 
-        logger.debug(
-            "Interpolate token - token: %s - timestamp: %d\n- low:\n%s\n- high:\n%s",
+    if len(df_low) == 0:
+        logger.warning(
+            "Interpolate token - No data found for token: %s and timestamp: %d",
             token,
             timestamp,
-            df_low.to_string(),
-            df_high.to_string(),
         )
-        # Interpoler la valeur
-        price_low = df_low["price"][0]
-        price_high = df_high["price"][0]
-        timestamp_low = df_low["timestamp"][0]
-        timestamp_high = df_high["timestamp"][0]
-        price = interpolate(
-            timestamp_low, price_low, timestamp_high, price_high, timestamp
+        return None
+    if len(df_high) == 0:
+        logger.debug(
+            "Interpolate token - No high data found for token: %s and timestamp: %d - using low data",
+            token,
+            timestamp
         )
-        logger.debug("Interpolate token - Price: %d", price)
-        return price
+        df_high = df_low.copy()
 
+    logger.debug(
+        "Interpolate token - token: %s - timestamp: %d\n- low:\n%s\n- high:\n%s",
+        token,
+        timestamp,
+        df_low.to_string(),
+        df_high.to_string(),
+    )
+    # Interpoler la valeur
+    price_low = df_low["price"][0]
+    price_high = df_high["price"][0]
+    timestamp_low = df_low["timestamp"][0]
+    timestamp_high = df_high["timestamp"][0]
+    price = interpolate(
+        timestamp_low, price_low, timestamp_high, price_high, timestamp
+    )
+    logger.debug("Interpolate token - Price: %d", price)
+    return price
+
+def interpolate_eurusd(timestamp: int, dbfile: str) -> float:
+    """Interpolate the EURUSD value at a given timestamp"""
+    return interpolate_token("EURUSD", timestamp, dbfile)
 
 def calculate_crypto_rate(token_a: str, token_b: str, timestamp: int, dbfile: str) -> float:
     """Calculate the rate between two cryptocurrencies at a given timestamp"""
