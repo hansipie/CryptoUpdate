@@ -23,7 +23,18 @@ logger = logging.getLogger(__name__)
 st.title("Operations")
 
 
-def submit_buy(timestamp, from_amount, form_currency, to_amount, to_token, to_wallet):
+def submit_buy(timestamp: int, from_amount: float, form_currency: str, 
+              to_amount: float, to_token: str, to_wallet: str) -> None:
+    """Submit a buy operation to the database.
+    
+    Args:
+        timestamp: Unix timestamp of the operation
+        from_amount: Amount in source currency
+        form_currency: Source currency code (EUR/USD)
+        to_amount: Amount in target token
+        to_token: Target token symbol
+        to_wallet: Destination wallet name
+    """
     logger.debug(
         f"submitbuy: timestamp={timestamp} from_amount={from_amount}, form_currency={form_currency}, to_amount={to_amount}, to_token={to_token}, to_wallet={to_wallet}"
     )
@@ -38,15 +49,20 @@ def submit_buy(timestamp, from_amount, form_currency, to_amount, to_token, to_wa
     st.success("Operation submitted")
 
 
-def submit_swap(
-    timestamp,
-    swap_token_from,
-    swap_amount_from,
-    swap_wallet_from,
-    swap_token_to,
-    swap_amount_to,
-    swap_wallet_to,
-):
+def submit_swap(timestamp: int, swap_token_from: str, swap_amount_from: float,
+               swap_wallet_from: str, swap_token_to: str, swap_amount_to: float,
+               swap_wallet_to: str) -> None:
+    """Submit a swap operation to the database.
+    
+    Args:
+        timestamp: Unix timestamp of the operation
+        swap_token_from: Source token symbol
+        swap_amount_from: Amount of source token
+        swap_wallet_from: Source wallet name
+        swap_token_to: Target token symbol
+        swap_amount_to: Amount of target token
+        swap_wallet_to: Target wallet name
+    """
     logger.debug(
         f"submitswap: timestamp={timestamp} swap_token_from={swap_token_from}, swap_amount_from={swap_amount_from}, swap_wallet_from={swap_wallet_from}, swap_token_to={swap_token_to}, swap_amount_to={swap_amount_to}, swap_wallet_to={swap_wallet_to}"
     )
@@ -77,6 +93,7 @@ def swap_row_selected():
 
 
 def buy_row_selected():
+    """Get the selected row index in the buy table"""
     logger.debug(f"Row selection: {st.session_state.buyselection}")
     if (
         "selection" in st.session_state.buyselection
@@ -91,7 +108,12 @@ def buy_row_selected():
 
 
 @st.dialog("Add Buy")
-def buy_add():
+def buy_add() -> None:
+    """Display dialog for adding a new buy operation.
+    
+    Shows a form with fields for date, time, amounts, currencies
+    and wallet selection. On submit, creates a new buy operation.
+    """
     col_date, col_time = st.columns(2)
     with col_date:
         date = st.date_input("Date", key="buy_date")
@@ -127,7 +149,12 @@ def buy_add():
 
 
 @st.dialog("Add Swap")
-def swap_add():
+def swap_add() -> None:
+    """Display dialog for adding a new swap operation.
+    
+    Shows a form with fields for date, time, tokens, amounts
+    and wallet selection. On submit, creates a new swap operation.
+    """
     col_date, col_time = st.columns(2)
     with col_date:
         date = st.date_input("Date", key="swap_date")
@@ -168,7 +195,15 @@ def swap_add():
 
 
 @st.dialog("Edit Buy")
-def buy_edit_dialog(rowidx: int):
+def buy_edit_dialog(rowidx: int) -> None:
+    """Display dialog for editing an existing buy operation.
+    
+    Args:
+        rowidx: Index of the row to edit in the buy list
+        
+    Shows a form pre-filled with the selected operation's data.
+    On submit, updates the existing operation.
+    """
     logger.debug(f"Dialog Edit row: {rowidx}")
     data = st.session_state.buylist.iloc[rowidx].to_dict()
     col_date, col_time = st.columns(2)
@@ -345,8 +380,18 @@ def swap_delete():
 
 
 def swap_perf(token_a: str, token_b: str, timestamp: int, dbfile: str) -> float:
-    """Calculate the performance of a swap"""
-
+    """Calculate the performance of a swap operation.
+    
+    Args:
+        token_a: First token symbol
+        token_b: Second token symbol
+        timestamp: Unix timestamp of the swap
+        dbfile: Path to the database file
+        
+    Returns:
+        Float percentage change in exchange rate between tokens,
+        or None if calculation fails
+    """
     rate_swap = calculate_crypto_rate(
         token_a, token_b, timestamp, dbfile
     )
@@ -367,8 +412,21 @@ def swap_perf(token_a: str, token_b: str, timestamp: int, dbfile: str) -> float:
     hash_funcs={str: lambda x: get_file_hash(x) if os.path.isfile(x) else hash(x)},
 )
 def build_buy_table(buytable: pd.DataFrame, dbfile: str) -> pd.DataFrame:
-    """Build the buy table with performance metrics"""
-
+    """Build the buy operations table with performance metrics.
+    
+    Args:
+        buytable: DataFrame containing raw buy operations
+        dbfile: Path to the database file
+        
+    Returns:
+        DataFrame with added Date and performance columns
+        
+    Adds columns for:
+    - Date (localized timestamp)
+    - Buy Rate (original price)
+    - Current Rate (current price)
+    - Performance (% change)
+    """
     # convert timestamp to datetime
     buytable["Date"] = pd.to_datetime(buytable["timestamp"], unit="s", utc=True)
     local_timezone = tzlocal.get_localzone()
@@ -396,8 +454,19 @@ def build_buy_table(buytable: pd.DataFrame, dbfile: str) -> pd.DataFrame:
     hash_funcs={str: lambda x: get_file_hash(x) if os.path.isfile(x) else hash(x)},
 )
 def build_swap_table(swaptable: pd.DataFrame, dbfile: str) -> pd.DataFrame:
-    """Build the swap table with performance metrics"""
-
+    """Build the swap operations table with performance metrics.
+    
+    Args:
+        swaptable: DataFrame containing raw swap operations
+        dbfile: Path to the database file
+        
+    Returns:
+        DataFrame with added Date and performance columns
+        
+    Adds columns for:
+    - Date (localized timestamp) 
+    - Performance (% change in exchange rate)
+    """
     # convert timestamp to datetime
     swaptable["Date"] = pd.to_datetime(swaptable["timestamp"], unit="s", utc=True)
     local_timezone = tzlocal.get_localzone()

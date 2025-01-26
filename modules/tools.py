@@ -9,7 +9,6 @@ This module provides various utility functions for:
 
 import logging
 import os
-import sqlite3
 
 import pandas as pd
 import streamlit as st

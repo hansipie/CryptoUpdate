@@ -5,13 +5,15 @@ performance graphs and provides functionality for updating prices
 and synchronizing with Notion database.
 """
 
-import streamlit as st
 import logging
 import traceback
-from modules.plotter import plot_as_graph
-from modules.tools import update_database, load_db
+
+import streamlit as st
+
 from modules.database.operations import operations
 from modules.Notion import Notion
+from modules.plotter import plot_as_graph
+from modules.tools import load_db, update_database
 from modules.Updater import Updater
 
 logger = logging.getLogger(__name__)
@@ -34,13 +36,13 @@ def update():
         )
         st.toast("Prices updated", icon=":material/check:")
         st.rerun()
-    except Exception as e:
+    except (ConnectionError, ValueError) as e:
         st.error(f"Update Error: {str(e)}")
         traceback.print_exc()
 
 
 @st.dialog("Sync. Notion Database")
-def syncNotionMarket():
+def sync_notion_market():
     with st.spinner("Running ..."):
         try:
             notion = Notion(st.session_state.settings["notion_token"])
@@ -65,7 +67,7 @@ def syncNotionMarket():
             st.error("Please set your settings in the settings page")
             traceback.print_exc()
             st.rerun()
-        except Exception as e:
+        except (ConnectionError, ValueError) as e:
             st.error("Error: " + type(e).__name__ + " - " + str(e))
             traceback.print_exc()
             st.rerun()
@@ -96,7 +98,7 @@ with st.sidebar:
     if st.button(
         "Sync. Notion Database", icon=":material/publish:", use_container_width=True
     ):
-        syncNotionMarket()
+        sync_notion_market()
 
 with st.container(border=True):
     col1, col2, col3 = st.columns(3)
