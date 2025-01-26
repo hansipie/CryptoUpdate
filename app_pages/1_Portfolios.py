@@ -85,6 +85,7 @@ def portfolioUI(tabs: list):
                     height=height,
                     column_config={
                         "amount": st.column_config.NumberColumn(format="%.8g"),
+                        "value(€)": st.column_config.NumberColumn(format="%.2f €"),
                     },
                 )
                 if not updated_data.equals(df):

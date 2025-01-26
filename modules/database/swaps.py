@@ -1,3 +1,11 @@
+"""Swap operations management module.
+
+This module handles cryptocurrency swap operations including:
+- Token exchange tracking
+- Swap history management
+- Cross-rate calculations
+"""
+
 import logging
 import sqlite3
 import traceback

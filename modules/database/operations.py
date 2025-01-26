@@ -1,3 +1,11 @@
+"""Operations management module.
+
+This module handles cryptocurrency operations including:
+- Buy and sell transactions
+- Operation history tracking
+- Performance calculations
+"""
+
 import logging
 import sqlite3
 
@@ -64,4 +72,3 @@ class operations:
             cursor = conn.cursor()
             cursor.execute("SELECT SUM(source) FROM Operations WHERE type = 'buy'")
             return cursor.fetchone()[0]
-        

@@ -1,3 +1,11 @@
+"""Portfolio management module.
+
+This module handles cryptocurrency portfolios including:
+- Portfolio creation and deletion
+- Token balances tracking
+- Portfolio aggregation and analysis
+"""
+
 import logging
 import sqlite3
 

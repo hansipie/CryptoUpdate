@@ -123,7 +123,11 @@ def drawUI():
     with col_input:
         if st.session_state.import_page["type"] == "application/vnd.ms-excel":
             st.dataframe(
-                st.session_state.import_page["input"], use_container_width=True
+                st.session_state.import_page["input"],
+                column_config={
+                    "amount": st.column_config.NumberColumn(format="%.8g"),
+                },
+                use_container_width=True,
             )
         else:
             st.image(st.session_state.import_page["input"])
@@ -179,7 +183,9 @@ with ai_tab:
     if file is None:
         if st.session_state.import_page["input"] is not None:
             logger.debug("Data already imported")
-            if st.button("Clear Data", use_container_width=True, icon=":material/delete:"):
+            if st.button(
+                "Clear Data", use_container_width=True, icon=":material/delete:"
+            ):
                 cleanSessionState()
             else:
                 drawUI()
@@ -265,6 +271,6 @@ with tests_tab:
                     row["Timestamp"],
                     None,
                 )
-            st.success("Import successfully completed")   
+            st.success("Import successfully completed")
 
 logger.debug("## ended ##")
