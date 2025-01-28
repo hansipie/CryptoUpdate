@@ -12,6 +12,7 @@ import traceback
 
 logger = logging.getLogger(__name__)
 
+
 class swaps:
     def __init__(self, db_path: str = "./data/db.sqlite3"):
         logger.debug("Initializing swaps database")
@@ -37,7 +38,7 @@ class swaps:
             conn.commit()
 
     def get(self) -> list:
-        logger.debug("Getting swaps")   
+        logger.debug("Getting swaps")
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
             cursor.execute(
@@ -47,8 +48,17 @@ class swaps:
             """
             )
             return cursor.fetchall()
-        
-    def insert(self, timestamp, token_from, amount_from, wallet_from, token_to, amount_to, wallet_to):
+
+    def insert(
+        self,
+        timestamp,
+        token_from,
+        amount_from,
+        wallet_from,
+        token_to,
+        amount_to,
+        wallet_to,
+    ):
         logger.debug("Inserting swap")
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
@@ -57,7 +67,16 @@ class swaps:
                 INSERT INTO Swaps (timestamp, token_from, amount_from, wallet_from, token_to, amount_to, wallet_to, tag)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """,
-                (timestamp, token_from, amount_from, wallet_from, token_to, amount_to, wallet_to, None),
+                (
+                    timestamp,
+                    token_from,
+                    amount_from,
+                    wallet_from,
+                    token_to,
+                    amount_to,
+                    wallet_to,
+                    None,
+                ),
             )
             conn.commit()
             logger.debug("Swap inserted")

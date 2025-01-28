@@ -4,8 +4,6 @@ import logging
 import tzlocal
 
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
-
 
 class TokensDatabase:
     def __init__(self, db_path: str):

@@ -139,7 +139,9 @@ def interpolate_token(token: str, timestamp: int, dbfile: str) -> float:
     """Interpolate the token value at a given timestamp"""
     
     market = Market(dbfile, st.session_state.settings["coinmarketcap_token"])
-    if token == "EURUSD":
+    if token == "EUR":
+        return 1.0
+    if token == "EURUSD" or token == "USD":
         df_low, df_high = market.get_currency_lowhigh(timestamp)
     else:
         df_low, df_high = market.get_token_lowhigh(token, timestamp)
