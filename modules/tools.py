@@ -130,7 +130,7 @@ def load_db(dbfile: str) -> pd.DataFrame:
         logger.debug("Load database")
         tokensdb = TokensDatabase(dbfile)
         df_balance = tokensdb.getBalances()
-        df_sums = tokensdb.getSums()
+        df_sums = tokensdb.get_sums()
         df_tokencount = tokensdb.getTokenCounts()
         return df_balance, df_sums, df_tokencount
 

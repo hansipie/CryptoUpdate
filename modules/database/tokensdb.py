@@ -8,10 +8,10 @@ logger = logging.getLogger(__name__)
 class TokensDatabase:
     def __init__(self, db_path: str):
         self.db_path = db_path
-        self.__initDatabase()
+        self.__init_database()
         self.local_timezone = tzlocal.get_localzone()
 
-    def __initDatabase(self):
+    def __init_database(self):
         logger.debug("Init database")
         with sqlite3.connect(self.db_path) as con:
             cur = con.cursor()
@@ -20,7 +20,7 @@ class TokensDatabase:
             )
             con.commit()
 
-    def getSums(self) -> pd.DataFrame:
+    def get_sums(self) -> pd.DataFrame:
         """Get the sum of all tokens through time"""
         logger.debug("Get sums")
         with sqlite3.connect(self.db_path) as con:
