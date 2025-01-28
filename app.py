@@ -6,9 +6,11 @@ The application provides a web interface for tracking and managing
 cryptocurrency portfolios.
 """
 
-import streamlit as st
 import logging
 import sys
+
+import streamlit as st
+
 from modules import tools
 from modules.configuration import configuration as cfg
 
@@ -35,7 +37,6 @@ tools.load_settings(config.conf)
 
 home_page = st.Page("app_pages/0_Home.py", title="Home", icon="🏠", default=True)
 pfolios_page = st.Page("app_pages/1_Portfolios.py", title="Portfolios", icon="📊")
-tools_page = st.Page("app_pages/1_Tools.py", title="Tools", icon="🛠️")
 graphs_page = st.Page("app_pages/2_Graphs.py", title="Graphs", icon="💰")
 operations_page = st.Page("app_pages/3_Operations.py", title="Operations", icon="💱")
 import_page = st.Page("app_pages/4_Import.py", title="Import", icon="📥")
@@ -43,7 +44,7 @@ settings_page = st.Page("app_pages/6_Settings.py", title="Settings", icon="⚙�
 
 pg = st.navigation(
     {
-        "Main": [home_page, pfolios_page, tools_page, graphs_page],
+        "Main": [home_page, pfolios_page, graphs_page],
         "Inputs": [operations_page, import_page],
         "Settings": [settings_page],
     }

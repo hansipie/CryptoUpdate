@@ -23,6 +23,7 @@ class TokensDatabase:
             con.commit()
 
     def getSums(self) -> pd.DataFrame:
+        """Get the sum of all tokens through time"""
         logger.debug("Get sums")
         with sqlite3.connect(self.db_path) as con:
             df = pd.read_sql_query(
@@ -45,6 +46,7 @@ class TokensDatabase:
             return df_sum
 
     def getBalances(self) -> pd.DataFrame:
+        """Get the balances of each token through time"""
         logger.debug("Get balances")
         with sqlite3.connect(self.db_path) as con:
             df_tokens = pd.read_sql_query("select DISTINCT token from TokensDatabase", con)
@@ -75,6 +77,7 @@ class TokensDatabase:
             return df_balance
 
     def getTokenCounts(self) -> pd.DataFrame:
+        """Get the count of each token through time"""
         logger.debug("Get token counts")
         with sqlite3.connect(self.db_path) as con:
             df_tokens = pd.read_sql_query("select DISTINCT token from TokensDatabase", con)

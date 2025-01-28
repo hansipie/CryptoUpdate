@@ -8,12 +8,14 @@ import tzlocal
 
 logger = logging.getLogger(__name__)
 
+
 def __find_linear_function(x1, y1, x2, y2):
     # Calculer la pente a
     a = (y2 - y1) / (x2 - x1)
     # Calculer l'ordonnée à l'origine b
     b = y1 - a * x1
     return a, b
+
 
 def interpolate(x1, y1, x2, y2, x):
     if x1 == x2 or y1 == y2:
@@ -41,7 +43,8 @@ def toTimestamp_A(date, time):
     )
     return timestamp
 
-def toTimestamp_B(date: str,  time : str = "") -> float:
+
+def toTimestamp_B(date: str, time: str = "") -> float:
     # date if formated as ISO 8601
     # convert to a datetime object, convert to UTC and then to epoch timestamp
     if time:
@@ -57,6 +60,7 @@ def toTimestamp_B(date: str,  time : str = "") -> float:
     )
     return timestamp
 
+
 def get_file_hash(filename):
     """Calculate MD5 hash of file"""
     md5_hash = hashlib.md5()
@@ -66,6 +70,7 @@ def get_file_hash(filename):
             md5_hash.update(chunk)
     return md5_hash.hexdigest()
 
+
 def listfilesrecursive(directory, fileslist=None):
     # list all files in directory recurcively
 
@@ -73,20 +78,29 @@ def listfilesrecursive(directory, fileslist=None):
         fileslist = []
 
     items = os.listdir(directory)
-    #logger.debug(f"list directory {directory}: {items}")
+    # logger.debug(f"list directory {directory}: {items}")
     for item in items:
         path = os.path.join(directory, item)
         if os.path.isdir(path):
-            #logger.debug(f"{path} is a directory.")
+            # logger.debug(f"{path} is a directory.")
             listfilesrecursive(path, fileslist)
         else:
-            #logger.debug(f"Add file {path}")
+            # logger.debug(f"Add file {path}")
             fileslist.append(path)
-    #logger.debug(f"Return {fileslist}")
+    # logger.debug(f"Return {fileslist}")
     return fileslist
 
-def debug_prefix(input : str, flag = False) -> str:
-    if flag:
-        return f"debug_{input}"
-    return input
 
+def debug_prefix(input_str: str, flag=False) -> str:
+    """Add debug prefix to string if flag is True"""
+    if flag:
+        return f"debug_{input_str}"
+    return input_str
+
+
+def dataframe_diff(df1, df2):
+    """Find rows that are different between two DataFrames"""
+    comparison_df = df1.merge(df2, indicator=True, how="outer")
+    logger.debug("comparison_df:\n%s", comparison_df.to_string())
+    diff_df = comparison_df[comparison_df["_merge"] != "both"]
+    return diff_df

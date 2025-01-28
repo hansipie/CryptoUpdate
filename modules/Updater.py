@@ -41,8 +41,8 @@ class Updater:
         """
         tokens = list(self.notion_entries.keys())
         market = Market(self.dbfile, self.coinmarketcap_token)
-        market.updateMarket(tokens)
-        market.updateCurrencies()
+        market.update_market(tokens)
+        market.update_currencies()
         tokens_prices = market.getLastMarket()
         if tokens_prices is None:
             logger.error("No Market data available")

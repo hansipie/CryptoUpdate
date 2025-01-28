@@ -71,4 +71,7 @@ class operations:
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
             cursor.execute("SELECT SUM(source) FROM Operations WHERE type = 'buy'")
-            return cursor.fetchone()[0]
+            ret = cursor.fetchone()[0]
+            if ret is None:
+                return 0
+            return ret

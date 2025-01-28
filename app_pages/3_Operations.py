@@ -635,5 +635,3 @@ with swap_tab:
             icon=":material/delete:",
             key="swap_delete",
         )
-
-st.write(st.session_state)

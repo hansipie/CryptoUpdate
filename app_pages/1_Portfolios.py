@@ -4,6 +4,7 @@ import pandas as pd
 import logging
 from modules.database.portfolios import Portfolios
 from modules.tools import update_database, create_portfolio_dataframe
+from modules.utils import dataframe_diff
 
 
 logger = logging.getLogger(__name__)
@@ -14,9 +15,10 @@ st.title("Portfolios")
 @st.dialog("Add new portfolio")
 def add_new_portfolio():
     name = st.text_input("Name")
+    isbundle = st.checkbox("Is a Bundle ?", value=False)
     if st.button("Submit"):
-        logger.debug(f"Adding portfolio {name}")
-        g_portfolios.add_portfolio(name)
+        logger.debug("Adding portfolio %s", name)
+        g_portfolios.add_portfolio(name, (1 if isbundle else 0))
         # Close dialog
         st.rerun()
 
@@ -34,7 +36,7 @@ def danger_zone(name: str):
 def rename_portfolio(name: str):
     new_name = st.text_input("New name")
     if st.button("Submit"):
-        g_portfolios.rename(name, new_name)
+        g_portfolios.rename_portfolio(name, new_name)
         st.rerun()
 
 
@@ -51,16 +53,16 @@ def add_token(name: str):
 
 
 @st.dialog("Delete Token")
-def delete_token(name: str):
-    st.write(f"Delete token from {name}")
+def delete_token(portfolio_name: str):
+    st.write(f"Delete token from {portfolio_name}")
     tokens = st.multiselect(
         "Token(s)",
-        g_portfolios.get_tokens(name),
+        g_portfolios.get_tokens(portfolio_name),
         placeholder="Select a token",
     )
     if st.button("Submit"):
         for token in tokens:
-            g_portfolios.delete_token(name, token)
+            g_portfolios.delete_token_A(portfolio_name, token)
         # Close dialog
         st.rerun()
 
@@ -76,19 +78,22 @@ def portfolioUI(tabs: list):
             df = create_portfolio_dataframe(pf)
             if not df.empty:  # Only create DataFrame if data exists
                 balance = df["value(€)"].sum()
+                df.sort_values(by=["value(€)"], ascending=False, inplace=True)
                 st.write(f"Total value: €{round(balance, 2)}")
                 height = (len(df) * 35) + 38
-                logger.debug(f"Dataframe:\n{df}")
+                logger.debug("Dataframe:\n%s", df.to_string())
                 updated_data = st.data_editor(
                     df,
                     use_container_width=True,
                     height=height,
                     column_config={
+                        "token": st.column_config.TextColumn(disabled=True),
                         "amount": st.column_config.NumberColumn(format="%.8g"),
-                        "value(€)": st.column_config.NumberColumn(format="%.2f €"),
+                        "value(€)": st.column_config.NumberColumn(format="%.2f €", disabled=True),
                     },
                 )
-                if not updated_data.equals(df):
+                df_diff = dataframe_diff(df, updated_data)
+                if not df_diff.empty:
                     g_portfolios.update_portfolio(
                         {tabs[i]: updated_data.to_dict(orient="index")}
                     )
@@ -113,7 +118,7 @@ def portfolioUI(tabs: list):
                     "Delete Token",
                     key=f"deleteT_{i}",
                     use_container_width=True,
-                    icon=":material/delete:",
+                    icon=":material/remove:",
                 ):
                     delete_token(tabs[i])
             with buttons_col3:

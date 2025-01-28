@@ -107,8 +107,8 @@ def build_tabs(df: pd.DataFrame, columns: list = None):
 def load_market(dbfile: str) -> pd.DataFrame:
     with st.spinner("Loading market..."):
         logger.debug("Load market")
-        market = Market(dbfile, st.session_state.settings["coinmarketcap_token"])
-        return market.getMarket()
+        ret = Market(dbfile, st.session_state.settings["coinmarketcap_token"])
+        return ret.getMarket()
 
 
 df_balance, df_sums, df_tokencount = load_db(st.session_state.dbfile)
@@ -151,7 +151,7 @@ if add_selectbox == "Currency (EURUSD)":
     logger.debug("Currency (EURUSD)")
     st.title("Currency (EURUSD)")
     market = Market(st.session_state.dbfile, st.session_state.settings["coinmarketcap_token"])
-    df_currency = market.getCurrency()
+    df_currency = market.get_currency()
     build_tabs(df_currency, ["price"])
     
     interpolated = 0.0

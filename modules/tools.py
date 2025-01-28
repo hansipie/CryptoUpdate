@@ -34,8 +34,8 @@ def update_database(dbfile, cmc_apikey):
         tokens = list(aggregated.keys())
         logger.debug("Tokens: %s", str(tokens))
 
-    market.updateMarket(tokens)
-    market.updateCurrencies()
+    market.update_market(tokens)
+    market.update_currencies()
 
     tokens_prices = market.getLastMarket()
     if tokens_prices is None:

@@ -26,7 +26,8 @@ class Portfolios:
                 """
                 CREATE TABLE IF NOT EXISTS Portfolios (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    name TEXT UNIQUE NOT NULL
+                    name TEXT UNIQUE NOT NULL,
+                    bundle INTEGER NOT NULL DEFAULT 0
                 )
             """
             )
@@ -68,10 +69,10 @@ class Portfolios:
             )
             return {row[0]: {"amount": row[1]} for row in cursor.fetchall()}
 
-    def add_portfolio(self, name: str):
+    def add_portfolio(self, name: str, bundle: int = 0):
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
-            cursor.execute("INSERT INTO Portfolios (name) VALUES (?)", (name,))
+            cursor.execute("INSERT INTO Portfolios (name, bundle) VALUES (?, ?)", (name, bundle))
             conn.commit()
 
     def delete_portfolio(self, name: str):
@@ -114,7 +115,7 @@ class Portfolios:
             )
             return {row[0]: row[1] for row in cursor.fetchall()}
 
-    def set_token(self, name: str, token: str, amount: float):
+    def set_token(self, portfolio_name: str, token: str, amount: float):
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
             cursor.execute(
@@ -126,7 +127,7 @@ class Portfolios:
                     ?
                 )
             """,
-                (name, token, str(amount)),
+                (portfolio_name, token, str(amount)),
             )
 
     def set_token_add(self, name: str, token: str, amount: float):
@@ -166,7 +167,7 @@ class Portfolios:
                 )
             conn.commit()
 
-    def delete_token(self, name: str, token: str):
+    def delete_token_A(self, name: str, token: str):
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
             cursor.execute(
@@ -175,6 +176,15 @@ class Portfolios:
                 WHERE portfolio_id = (SELECT id FROM Portfolios WHERE name = ?) AND token = ?
             """,
                 (name, token),
+            )
+            conn.commit()
+
+    def delete_token_B(self, portfolio_id: int, token: str):
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "DELETE FROM Portfolios_Tokens WHERE portfolio_id = ? AND token = ?",
+                (portfolio_id, token),
             )
             conn.commit()
 
@@ -191,11 +201,13 @@ class Portfolios:
             return {row[0]: row[1] for row in cursor.fetchall()}
 
     def update_portfolio(self, input_data: dict):
-        logger.debug(f"Update portfolio - Data: {input_data.items()}")
+        """Update portfolio balances."""
+        logger.debug("Update portfolio - Data: %s", input_data.items())
         for portfolio_name, tokens in input_data.items():
             logger.debug(
-                f"Update portfolio - Name: {portfolio_name} - Tokens: {tokens.items()}"
+                "Update portfolio - Name: %s - Tokens: %s", portfolio_name, tokens.items()
             )
             for token_name, token_details in tokens.items():
                 self.set_token(portfolio_name, token_name, token_details["amount"])
         return True
+

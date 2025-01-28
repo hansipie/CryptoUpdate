@@ -18,11 +18,6 @@ from modules.Updater import Updater
 
 logger = logging.getLogger(__name__)
 
-st.title("Crypto Update")
-
-df_balance, df_sums, _ = load_db(st.session_state.dbfile)
-
-
 @st.cache_data
 def join_dfs(df1, df2):
     df = df1.join(df2)
@@ -85,6 +80,10 @@ def sync_notion_market():
     st.rerun()
 
 
+st.title("Crypto Update")
+
+df_balance, df_sums, _ = load_db(st.session_state.dbfile)
+
 # Update prices
 with st.sidebar:
     if st.button(
@@ -102,11 +101,9 @@ with st.sidebar:
 
 with st.container(border=True):
     col1, col2, col3 = st.columns(3)
+    total = operations(st.session_state.dbfile).sum_buyoperations()
     with col1:
-        sum = operations(st.session_state.dbfile).sum_buyoperations()
-        if sum is None:
-            sum = 0
-        st.metric("Invested", value=f"{sum} €")
+        st.metric("Invested", value=f"{total} €")
     with col2:
         # get last values
         if df_balance is None or df_balance.empty:
@@ -118,8 +115,8 @@ with st.container(border=True):
     with col3:
         st.metric(
             "Profit",
-            value=f"{round(balance - sum, 2)} €",
-            delta=f"{round((((balance - sum) / sum) * 100) if sum != 0 else 0, 2)} %",
+            value=f"{round(balance - total, 2)} €",
+            delta=f"{round((((balance - total) / total) * 100) if total != 0 else 0, 2)} %",
         )
 
 with st.container(border=True):
