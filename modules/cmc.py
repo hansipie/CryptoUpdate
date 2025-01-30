@@ -73,6 +73,7 @@ class cmc:
         Get the price of the cryptocurrencies from the Coinmarketcap API
         """
         logger.debug(f"Get current maket prices form Coinmarketcap for:\n{tokens}")
+
         names = str(",").join(tokens)
         logger.info(f"Request tokens current prices for {names}")
         if debug:
@@ -94,12 +95,12 @@ class cmc:
 
         response = requests.get(url, headers=headers, params=params)
         if response.status_code == 200:
-            crypto_prices = {}
-            content = response.json()
             logger.info("Get current market prices from Coinmarketcap successfully")
+            content = response.json()
+            crypto_prices = {}
             for name in content["data"]:
                 # Initialiser l'entrée pour chaque token
-                crypto_prices[name] = {"price": 0}
+                crypto_prices[name] = {"price": 0, "unit": unit}
                 try:
                     price_data = content["data"][name][0]["quote"][unit]["price"]
                     if price_data is not None:
@@ -107,7 +108,7 @@ class cmc:
                     logger.debug(f"Price for {name}: {crypto_prices[name]['price']}")
                 except (KeyError, IndexError, TypeError) as e:
                     logger.error(f"Error getting price for {name}: {str(e)}")
-                    logger.error(f"Data received: {content['data'][name]}")
+                    logger.debug(f"Data received: {content['data'][name]}")
             return crypto_prices
         else:
             logger.error(f"Error: {response.status_code}")

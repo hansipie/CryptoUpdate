@@ -34,6 +34,11 @@ def update_database(dbfile, cmc_apikey):
         tokens = list(aggregated.keys())
         logger.debug("Tokens: %s", str(tokens))
 
+    # remove EUR from tokens
+    not_tokens = ["USD", "EUR"]
+    tokens = [token for token in tokens if token not in not_tokens]
+    logger.debug("Tokens after clean up: %s", str(tokens))
+
     market.update_market(tokens)
     market.update_currencies()
 
@@ -66,7 +71,7 @@ def create_portfolio_dataframe(data: dict) -> pd.DataFrame:
         st.session_state.dbfile, st.session_state.settings["coinmarketcap_token"]
     )
     df["value(€)"] = df.apply(
-        lambda row: row["amount"] * market.get_price(row.name),
+        lambda row: row["amount"] * (market.get_price(row.name) if row.name != "EUR" else 1.0),
         axis=1,
     )
     # sort df by token

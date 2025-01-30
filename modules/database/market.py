@@ -133,7 +133,7 @@ class Market:
             logger.debug("Last Market get:\n%s", market_df.to_string())
             return market_df
 
-    def update_market(self, tokens: list = []):
+    def update_market(self, tokens: list = None):
         """Update market data with current prices and add new tokens.
         
         Args:
