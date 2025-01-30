@@ -15,7 +15,7 @@ st.title("Portfolios")
 @st.dialog("Add new portfolio")
 def add_new_portfolio():
     name = st.text_input("Name")
-    isbundle = st.checkbox("Is a Bundle ?", value=False)
+    isbundle = st.checkbox("Is a Bundle", value=False)
     if st.button("Submit"):
         logger.debug("Adding portfolio %s", name)
         g_portfolios.add_portfolio(name, (1 if isbundle else 0))
