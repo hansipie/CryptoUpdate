@@ -143,7 +143,7 @@ def portfolioUI(tabs: list):
 def update():
     try:
         update_database(
-            st.session_state.dbfile, st.session_state.settings["coinmarketcap_token"]
+            st.session_state.settings["dbfile"], st.session_state.settings["coinmarketcap_token"]
         )
         st.toast("Prices updated", icon=":material/check:")
         st.rerun()
@@ -167,7 +167,7 @@ def execute_search():
     st.dataframe(df_search, use_container_width=True)
 
 
-g_portfolios = load_portfolios(st.session_state.dbfile)
+g_portfolios = load_portfolios(st.session_state.settings["dbfile"])
 
 with st.sidebar:
     # Add new portfolio dialog

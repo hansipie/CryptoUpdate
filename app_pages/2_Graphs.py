@@ -17,7 +17,7 @@ def load_portfolios(dbfile: str) -> Portfolios:
 
 
 def aggregaterUI():
-    portfolios = load_portfolios(st.session_state.dbfile)
+    portfolios = load_portfolios(st.session_state.settings["dbfile"])
     agg = portfolios.aggregate_portfolios()
     logger.debug(f"Aggregated: {agg}")
     df = create_portfolio_dataframe(agg)
@@ -111,7 +111,7 @@ def load_market(dbfile: str) -> pd.DataFrame:
         return ret.getMarket()
 
 
-df_balance, df_sums, df_tokencount = load_db(st.session_state.dbfile)
+df_balance, df_sums, df_tokencount = load_db(st.session_state.settings["dbfile"])
 
 add_selectbox = st.sidebar.selectbox(
     "Assets View", ("Global", "Assets Value", "Assets Count", "Market", "Currency (EURUSD)")
@@ -143,14 +143,14 @@ if add_selectbox == "Assets Count":
 if add_selectbox == "Market":
     logger.debug("Market")
     st.title("Market")
-    df_market = load_market(st.session_state.dbfile)
+    df_market = load_market(st.session_state.settings["dbfile"])
     build_tabs(df_market)
     st.dataframe(df_market)
 
 if add_selectbox == "Currency (EURUSD)":
     logger.debug("Currency (EURUSD)")
     st.title("Currency (EURUSD)")
-    market = Market(st.session_state.dbfile, st.session_state.settings["coinmarketcap_token"])
+    market = Market(st.session_state.settings["dbfile"], st.session_state.settings["coinmarketcap_token"])
     df_currency = market.get_currency()
     build_tabs(df_currency, ["price"])
     
@@ -164,7 +164,7 @@ if add_selectbox == "Currency (EURUSD)":
         with col_btn:
             if st.form_submit_button("Submit", use_container_width=True, ):
                 timestamp = toTimestamp_A(date, time)
-                interpolated = interpolate_eurusd(timestamp, st.session_state.dbfile)
+                interpolated = interpolate_eurusd(timestamp, st.session_state.settings["dbfile"])
         if interpolated is not None:
             if interpolated != 0.0:
                 st.info(f"Interpolated value: {interpolated} USD")

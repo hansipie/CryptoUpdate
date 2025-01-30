@@ -68,7 +68,7 @@ def create_portfolio_dataframe(data: dict) -> pd.DataFrame:
     df.index.name = "token"
     logger.debug("Create portfolio dataframe - Dataframe:\n%s", df.to_string())
     market = Market(
-        st.session_state.dbfile, st.session_state.settings["coinmarketcap_token"]
+        st.session_state.settings["dbfile"], st.session_state.settings["coinmarketcap_token"]
     )
     df["value(€)"] = df.apply(
         lambda row: row["amount"] * (market.get_price(row.name) if row.name != "EUR" else 1.0),
@@ -107,17 +107,17 @@ def load_settings(settings: dict):
         True if settings["Debug"]["flag"] == "True" else False
     )
 
-    st.session_state.archive_path = os.path.join(
+    st.session_state.settings["archive_path"] = os.path.join(
         os.getcwd(),
         debug_prefix(
             settings["Local"]["archive_path"], st.session_state.settings["debug_flag"]
         ),
     )
-    st.session_state.data_path = os.path.join(
+    st.session_state.settings["data_path"] = os.path.join(
         os.getcwd(), settings["Local"]["data_path"]
     )
-    st.session_state.dbfile = os.path.join(
-        st.session_state.data_path,
+    st.session_state.settings["dbfile"] = os.path.join(
+        st.session_state.settings["data_path"],
         debug_prefix(
             settings["Local"]["sqlite_file"], st.session_state.settings["debug_flag"]
         ),

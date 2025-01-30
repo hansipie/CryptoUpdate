@@ -56,7 +56,7 @@ def submit_buy(
     )
 
     if to_wallet is not None:
-        Portfolios(st.session_state.dbfile).set_token_add(to_wallet, to_token, to_amount)
+        Portfolios(st.session_state.settings["dbfile"]).set_token_add(to_wallet, to_token, to_amount)
 
     st.success("Operation submitted")
 
@@ -508,12 +508,12 @@ def build_swap_table(swaptable: pd.DataFrame, dbfile: str) -> pd.DataFrame:
     return swaptable
 
 
-g_wallets = Portfolios(st.session_state.dbfile).get_portfolio_names()
-g_tokens = TokensDatabase(st.session_state.dbfile).getTokens()
+g_wallets = Portfolios(st.session_state.settings["dbfile"]).get_portfolio_names()
+g_tokens = TokensDatabase(st.session_state.settings["dbfile"]).getTokens()
 
 
-g_operation = operations(st.session_state.dbfile)
-g_swaps = swaps(st.session_state.dbfile)
+g_operation = operations(st.session_state.settings["dbfile"])
+g_swaps = swaps(st.session_state.settings["dbfile"])
 
 
 if "cryto_rate" not in st.session_state:
@@ -539,7 +539,7 @@ with buy_tab:
 
     # build buy table with performance metrics
     st.session_state.buylist = build_buy_table(
-        st.session_state.buylist, st.session_state.dbfile
+        st.session_state.buylist, st.session_state.settings["dbfile"]
     )
 
     col_buylist, col_buybtns = st.columns([8, 1])
@@ -616,7 +616,7 @@ with swap_tab:
 
     # build swap table with performance metrics
     st.session_state.swaplist = build_swap_table(
-        st.session_state.swaplist, st.session_state.dbfile
+        st.session_state.swaplist, st.session_state.settings["dbfile"]
     )
 
     col_swaplist, col_swapbtns = st.columns([8, 1])

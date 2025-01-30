@@ -56,14 +56,14 @@ class configuration:
                 "flag": str(settings["debug_flag"])
             },
             "Local": {
-                "archive_path": "archive",
-                "data_path": "data", 
-                "sqlite_file": "cryptodb.sqlite"
+                "archive_path": os.path.basename(settings["archive_path"]).replace("debug_", ""),
+                "data_path": os.path.basename(settings["data_path"]), 
+                "sqlite_file": os.path.basename(settings["dbfile"]).replace("debug_", "")
             }
         }
 
         try:
-            with open(self.config_file, 'w') as f:
+            with open(self.config_file, 'w', encoding='utf-8') as f:
                 json.dump(config, f, indent=4)
         except Exception as e:
             logger.error("Error saving configuration: %s - %s", type(e).__name__, str(e))

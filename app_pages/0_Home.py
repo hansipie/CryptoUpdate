@@ -27,7 +27,7 @@ def join_dfs(df1, df2):
 def update():
     try:
         update_database(
-            st.session_state.dbfile, st.session_state.settings["coinmarketcap_token"]
+            st.session_state.settings["dbfile"], st.session_state.settings["coinmarketcap_token"]
         )
         st.toast("Prices updated", icon=":material/check:")
         st.rerun()
@@ -51,7 +51,7 @@ def sync_notion_market():
                 st.rerun()
             else:
                 updater = Updater(
-                    st.session_state.dbfile,
+                    st.session_state.settings["dbfile"],
                     st.session_state.settings["coinmarketcap_token"],
                     st.session_state.settings["notion_token"],
                     db_id,
@@ -82,7 +82,7 @@ def sync_notion_market():
 
 st.title("Crypto Update")
 
-df_balance, df_sums, _ = load_db(st.session_state.dbfile)
+df_balance, df_sums, _ = load_db(st.session_state.settings["dbfile"])
 
 # Update prices
 with st.sidebar:
@@ -101,7 +101,7 @@ with st.sidebar:
 
 with st.container(border=True):
     col1, col2, col3 = st.columns(3)
-    total = operations(st.session_state.dbfile).sum_buyoperations()
+    total = operations(st.session_state.settings["dbfile"]).sum_buyoperations()
     with col1:
         st.metric("Invested", value=f"{total} €")
     with col2:
