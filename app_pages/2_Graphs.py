@@ -36,7 +36,7 @@ def aggregaterUI():
             st.dataframe(df, use_container_width=True, height=height)
             st.write("Total value: €" + str(round(df["Value(€)"].sum(), 2)))
         else:
-            st.warning("No data available")
+            st.info("No data available")
     with col_pie:
         st.header("Tokens repartition")
         if not df.empty:
@@ -45,13 +45,13 @@ def aggregaterUI():
             except Exception as e:
                 st.error(f"Error: {str(e)}")
         else:
-            st.warning("No data available")
+            st.info("No data available")
 
 
 def build_tabs(df: pd.DataFrame, columns: list = None):
     logger.debug("Build tabs")
     if df is None or df.empty:
-        st.warning("No data available")
+        st.info("No data available")
         return
     if startdate < enddate:
         if columns is None:
@@ -169,4 +169,4 @@ if add_selectbox == "Currency (EURUSD)":
             if interpolated != 0.0:
                 st.info(f"Interpolated value: {interpolated} USD")
         else:
-            st.error("No data available")
+            st.info("No data available")

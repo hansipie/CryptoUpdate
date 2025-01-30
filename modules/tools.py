@@ -28,7 +28,7 @@ def update_database(dbfile, cmc_apikey):
 
     aggregated = portfolio.aggregate_portfolios()
     if len(aggregated) == 0:
-        logger.warning("No data found in portfolios")
+        logger.info("No data available")
         tokens = []
     else:
         tokens = list(aggregated.keys())

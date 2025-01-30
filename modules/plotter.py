@@ -9,7 +9,7 @@ logger = logging.getLogger(__name__)
 def plot_as_pie(df: pd.DataFrame, column):
     logger.debug("Plot with Plotly")
     if df.empty:
-        st.error("No data to plot")
+        st.info("No data available")
         return
     
     total = df[column].sum()
@@ -37,7 +37,7 @@ def plot_as_pie(df: pd.DataFrame, column):
 def plot_as_graph(df: pd.DataFrame, st_object=None):
     logger.debug(f"Plot with Plotly - StreamlitObject: {st_object}")
     if df.empty:
-        st.error("No data to plot")
+        st.info("No data available")
         return
     # Create custom chart with linear time scale
     fig = px.line(df, x=df.index, y=df.columns)

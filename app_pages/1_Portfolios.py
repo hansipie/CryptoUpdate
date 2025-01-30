@@ -102,7 +102,7 @@ def portfolioUI(tabs: list):
                 else:
                     logger.debug("## No Rerun ##")
             else:
-                st.write("No data available")
+                st.info("No data available")
 
             buttons_col1, buttons_col2, buttons_col3, buttons_col4 = st.columns(4)
             with buttons_col1:
@@ -202,7 +202,7 @@ with st.sidebar:
 tabs = g_portfolios.get_portfolio_names()
 logger.debug(f"Portfolios: {tabs}")
 if not tabs:
-    st.write("No portfolios found")
+    st.info("No portfolios found")
     st.stop()
 else:
     try:

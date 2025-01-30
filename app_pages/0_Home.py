@@ -126,7 +126,7 @@ with st.container(border=True):
 # show last values"
 st.header("Last values")
 if df_balance is None or df_balance.empty:
-    st.write("No data found")
+    st.info("No data available")
 else:
     last_V = df_balance.tail(5).copy()
     last_V = last_V.astype(str) + " €"

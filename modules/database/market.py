@@ -149,7 +149,7 @@ class Market:
         cmc_prices = cmc(self.cmc_token)
         tokens_prices = cmc_prices.getCryptoPrices(tokens)
         if not tokens_prices:
-            logger.warning("No data available")
+            logger.info("No data available")
             return
 
         logger.debug("Adding %d tokens to database", len(tokens_prices))
