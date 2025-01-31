@@ -30,7 +30,7 @@ APP_PAGES = {
 def setup_logging():
     """Configure application logging."""
     logging.basicConfig(
-        level=logging.DEBUG,
+        level=logging.INFO,
         format="%(asctime)s - %(levelname)s - %(name)s - %(pathname)s:%(lineno)d - %(message)s",
         handlers=[logging.StreamHandler(sys.stdout)]
     )

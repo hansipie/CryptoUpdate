@@ -8,6 +8,11 @@ logger = logging.getLogger(__name__)
 
 
 def createNotionDB():
+    """Create a new Notion database for cryptocurrency tracking.
+    
+    Attempts to create database using configured settings.
+    Shows success/failure status messages.
+    """
     notion = Notion(st.session_state.notion_token)
     with st.spinner("Creating database..."):
         dbid = notion.createDatabase(

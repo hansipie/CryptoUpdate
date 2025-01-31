@@ -355,6 +355,14 @@ def swap_edit_dialog(data: dict):
 
 @st.dialog("Delete Buy")
 def buy_delete_dialog(data: dict):
+    """Display confirmation dialog for deleting a buy operation.
+    
+    Args:
+        data: Dictionary containing the buy operation data to delete
+        
+    Shows a confirmation prompt with operation details.
+    On confirm, deletes the operation.
+    """
     logger.debug("Dialog Delete row: %s", data["id"])
     st.dataframe(data, use_container_width=True)
     st.write("Are you sure you want to delete this buy operation?")
@@ -366,6 +374,14 @@ def buy_delete_dialog(data: dict):
 
 @st.dialog("Delete Swap")
 def swap_delete_dialog(data: dict):
+    """Display confirmation dialog for deleting a swap operation.
+    
+    Args:
+        data: Dictionary containing the swap operation data to delete
+        
+    Shows a confirmation prompt with operation details.
+    On confirm, deletes the operation.
+    """
     logger.debug("Dialog Delete row: %s", data["id"])
     st.dataframe(data, use_container_width=True)
     st.write("Are you sure you want to delete this swap?")
@@ -513,6 +529,14 @@ def build_buy_dataframe() -> pd.DataFrame:
 #     hash_funcs={str: lambda x: get_file_hash(x) if os.path.isfile(x) else hash(x)},
 # )
 def build_buy_avg_table():
+    """Build a table showing average purchase metrics per token.
+    
+    Calculates average rates and performance metrics for each token
+    bought across all buy operations.
+    
+    Returns:
+        DataFrame containing token averages and performance indicators
+    """
     df = pd.DataFrame(
         g_operation.get_averages(),
         columns=[

@@ -157,9 +157,10 @@ def interpolate_token(token: str, timestamp: int, dbfile: str) -> float:
 
     if len(df_low) == 0:
         logger.warning(
-            "Interpolate token - No data found for token: %s and timestamp: %d",
+            "Interpolate token - No data found for token: %s at timestamp: %d (%s)",
             token,
             timestamp,
+            pd.Timestamp.fromtimestamp(int(timestamp), tz="UTC")
         )
         return None
     if len(df_high) == 0:

@@ -15,6 +15,11 @@ st.title("Portfolios")
 
 @st.dialog("Add new portfolio")
 def add_new_portfolio():
+    """Display dialog for creating a new portfolio.
+    
+    Shows a form with name input and bundle flag checkbox.
+    On submit, creates the new portfolio.
+    """
     name = st.text_input("Name")
     isbundle = st.checkbox("Is a Bundle", value=False)
     if st.button("Submit"):
@@ -26,6 +31,13 @@ def add_new_portfolio():
 
 @st.dialog("Danger Zone")
 def danger_zone(name: str):
+    """Display confirmation dialog for deleting a portfolio.
+    
+    Args:
+        name: Name of portfolio to delete
+        
+    Shows a confirmation prompt requiring typing 'delete'.
+    """
     st.write(f"Delete portfolio {name}?")
     confirm = st.text_input("Type 'delete' to confirm")
     if st.button("Delete") and confirm == "delete":
@@ -35,6 +47,13 @@ def danger_zone(name: str):
 
 @st.dialog("Rename portfolio")
 def rename_portfolio(name: str):
+    """Display dialog for renaming a portfolio.
+    
+    Args:
+        name: Current name of portfolio to rename
+        
+    Shows input for new name and updates on submit.
+    """
     new_name = st.text_input("New name")
     if st.button("Submit"):
         g_portfolios.rename_portfolio(name, new_name)
@@ -43,6 +62,13 @@ def rename_portfolio(name: str):
 
 @st.dialog("Add Token")
 def add_token(name: str):
+    """Display dialog for adding a token to a portfolio.
+    
+    Args:
+        name: Name of portfolio to add token to
+        
+    Shows inputs for token symbol and amount.
+    """
     st.write(f"Add token to {name}")
     token = st.text_input("Token")
     token = token.upper()
@@ -55,6 +81,13 @@ def add_token(name: str):
 
 @st.dialog("Delete Token")
 def delete_token(portfolio_name: str):
+    """Display dialog for removing tokens from a portfolio.
+    
+    Args:
+        portfolio_name: Name of portfolio to remove tokens from
+        
+    Shows multi-select for choosing tokens to delete.
+    """
     st.write(f"Delete token from {portfolio_name}")
     tokens = st.multiselect(
         "Token(s)",
@@ -69,6 +102,14 @@ def delete_token(portfolio_name: str):
 
 
 def portfolioUI(tabs: list):
+    """Display portfolio management interface.
+    
+    Args:
+        tabs: List of portfolio names to display
+        
+    Shows editable tables of token holdings and management buttons
+    for each portfolio.
+    """
     logger.debug(f"portfolioUI - Tabs: {tabs}")
 
     tabs_widget = st.tabs(tabs)
@@ -142,6 +183,11 @@ def portfolioUI(tabs: list):
 
 
 def update():
+    """Update cryptocurrency prices in database.
+    
+    Attempts to fetch latest prices and update the database.
+    Shows success toast or error message on completion.
+    """
     try:
         update_database(
             st.session_state.settings["dbfile"], st.session_state.settings["coinmarketcap_token"]
@@ -153,11 +199,24 @@ def update():
 
 
 def load_portfolios(dbfile: str) -> Portfolios:
+    """Load portfolios from database file.
+    
+    Args:
+        dbfile: Path to database file
+        
+    Returns:
+        Portfolios instance initialized with the database
+    """
     return Portfolios(dbfile)
 
 
 @st.fragment
 def execute_search():
+    """Execute token search and display results.
+    
+    Shows a table of portfolios containing the searched token
+    and their respective amounts.
+    """
     df_search = pd.DataFrame.from_dict(
         g_portfolios.get_token_by_portfolio(st.session_state.search_target),
         orient="index",

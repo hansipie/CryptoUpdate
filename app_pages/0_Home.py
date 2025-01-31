@@ -14,8 +14,9 @@ import streamlit as st
 from modules.database.customdata import Customdata
 from modules.database.operations import operations
 from modules.Notion import Notion
-from modules.plotter import plot_as_graph
-from modules.tools import load_db, update_database
+from modules.database.portfolios import Portfolios
+from modules.plotter import plot_as_graph, plot_as_pie
+from modules.tools import create_portfolio_dataframe, load_db, update_database
 from modules.Updater import Updater
 
 logger = logging.getLogger(__name__)
@@ -23,11 +24,25 @@ logger = logging.getLogger(__name__)
 
 @st.cache_data
 def join_dfs(df1, df2):
+    """Join two dataframes.
+    
+    Args:
+        df1: First DataFrame to join
+        df2: Second DataFrame to join
+        
+    Returns:
+        DataFrame resulting from joining df1 and df2
+    """
     df = df1.join(df2)
     return df
 
 
 def update():
+    """Update cryptocurrency prices in database.
+    
+    Attempts to fetch latest prices and update the database.
+    Shows success toast or error message on completion.
+    """
     try:
         update_database(
             st.session_state.settings["dbfile"],
@@ -42,6 +57,11 @@ def update():
 
 @st.dialog("Sync. Notion Database")
 def sync_notion_market():
+    """Synchronize cryptocurrency data with Notion database.
+    
+    Fetches current prices and updates configured Notion database.
+    Shows progress bar during sync and handles various error cases.
+    """
     with st.spinner("Running ..."):
         try:
             notion = Notion(st.session_state.settings["notion_token"])
