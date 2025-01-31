@@ -284,6 +284,14 @@ def buy_edit_dialog(data: dict) -> None:
 
 @st.dialog("Edit Swap")
 def swap_edit_dialog(data: dict):
+    """Display dialog for editing an existing swap operation.
+    
+    Args:
+        data: Dictionary containing the swap operation data to edit
+    
+    Shows a form pre-filled with the selected operation's data.
+    On submit, updates the existing operation.
+    """
     logger.debug("Dialog Edit row: %d", data["id"])
     col_date, col_time = st.columns(2)
     with col_date:
@@ -368,6 +376,11 @@ def swap_delete_dialog(data: dict):
 
 
 def buy_edit():
+    """Handle editing of selected buy operation.
+    
+    Shows edit dialog if a row is selected.
+    Otherwise displays a warning toast.
+    """
     rowidx = buy_row_selected()
     if rowidx is None:
         st.toast("Please select a row", icon=":material/warning:")
@@ -376,6 +389,11 @@ def buy_edit():
 
 
 def swap_edit():
+    """Handle editing of selected swap operation.
+    
+    Shows edit dialog if a row is selected. 
+    Otherwise displays a warning toast.
+    """
     rowidx = swap_row_selected()
     if rowidx is None:
         st.toast("Please select a row", icon=":material/warning:")
@@ -384,6 +402,11 @@ def swap_edit():
 
 
 def buy_delete():
+    """Handle deletion of selected buy operation.
+    
+    Shows confirmation dialog if a row is selected.
+    Otherwise displays a warning toast.
+    """
     logger.debug("Delete row")
     rowidx = buy_row_selected()
     if rowidx is None:
@@ -394,6 +417,11 @@ def buy_delete():
 
 
 def swap_delete():
+    """Handle deletion of selected swap operation.
+    
+    Shows confirmation dialog if a row is selected.
+    Otherwise displays a warning toast.
+    """
     logger.debug("Delete row")
     rowidx = swap_row_selected()
     if rowidx is None:
@@ -429,7 +457,16 @@ def swap_perf(token_a: str, token_b: str, timestamp: int, dbfile: str) -> float:
     return (rate_now * 100) / rate_swap - 100
 
 def calc_perf(df: pd.DataFrame, col_token: str, col_rate: str) -> pd.DataFrame:
-    """Calculate performance for each operation in the dataframe"""
+    """Calculate current performance metrics for operations.
+
+    Args:
+        df: DataFrame containing operations data
+        col_token: Name of column containing token symbols
+        col_rate: Name of column containing original rates
+        
+    Returns:
+        DataFrame with added columns for current rates and performance percentages
+    """
     market = Market(st.session_state.settings["dbfile"], st.session_state.settings["coinmarketcap_token"])
     market_df = market.getLastMarket()
     if market_df is None:
@@ -444,7 +481,7 @@ def calc_perf(df: pd.DataFrame, col_token: str, col_rate: str) -> pd.DataFrame:
 @st.cache_data(
     hash_funcs={str: lambda x: get_file_hash(x) if os.path.isfile(x) else hash(x)},
 )
-def build_buy_dataframe(dbfile: str) -> pd.DataFrame:
+def build_buy_dataframe() -> pd.DataFrame:
     # save buylist to a dataframe
     df = pd.DataFrame(
         g_operation.get_operations_by_type("buy"),
@@ -532,6 +569,7 @@ def build_swap_dataframe(dbfile: str) -> pd.DataFrame:
     logger.debug("Timezone locale: %s", local_timezone)
     df["Date"] = df["Date"].dt.tz_convert(local_timezone)
 
+    df["Rate"] = df.apply(lambda row: float(row["To Amount"]) / float(row["From Amount"]), axis=1)
     # Calculate performance for each swap
     df["Perf."] = df.apply(
         lambda row: swap_perf(
@@ -552,7 +590,7 @@ g_swaps = swaps(st.session_state.settings["dbfile"])
 buy_tab, swap_tab = st.tabs(["Buy", "Swap"])
 with buy_tab:
     # build buy table with performance metrics
-    df_buy = build_buy_dataframe(st.session_state.settings["dbfile"])
+    df_buy = build_buy_dataframe()
 
     col_buylist, col_buybtns = st.columns([8, 1])
     with col_buylist:
@@ -651,6 +689,7 @@ with swap_tab:
                     "From Token",
                     "To Amount",
                     "To Token",
+                    "Rate",
                     "From Wallet",
                     "To Wallet",
                     "Perf.",  # Ajout de la colonne Perf. dans l'ordre des colonnes
@@ -658,6 +697,7 @@ with swap_tab:
                 column_config={
                     "From Amount": st.column_config.NumberColumn(format="%.8g"),
                     "To Amount": st.column_config.NumberColumn(format="%.8g"),
+                    "Rate": st.column_config.NumberColumn(format="%.8g"),
                     "Perf.": st.column_config.NumberColumn(
                         format="%.2f%%"
                     ),  # Configuration du format pour Perf.

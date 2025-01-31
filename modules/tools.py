@@ -58,7 +58,7 @@ def update_database(dbfile, cmc_apikey):
     TokensDatabase(dbfile).addTokens(new_entries)
 
     custom = Customdata(dbfile)
-    custom.set("last_update", str(pd.Timestamp.now(tz="UTC").timestamp()), "int")
+    custom.set("last_update", str(pd.Timestamp.now(tz="UTC").timestamp()), "float")
 
 
 def create_portfolio_dataframe(data: dict) -> pd.DataFrame:
