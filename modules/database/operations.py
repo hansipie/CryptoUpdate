@@ -75,3 +75,9 @@ class operations:
             if ret is None:
                 return 0
             return ret
+    
+    def get_averages(self) -> list:
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT destination_unit, SUM(source), source_unit, SUM(destination) FROM Operations WHERE type = 'buy' GROUP BY destination_unit, source_unit")
+            return cursor.fetchall()

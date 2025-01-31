@@ -3,6 +3,7 @@ import streamlit as st
 import pandas as pd
 import logging
 from modules.database.portfolios import Portfolios
+from modules.database.customdata import Customdata
 from modules.tools import update_database, create_portfolio_dataframe
 from modules.utils import dataframe_diff
 
@@ -163,7 +164,7 @@ def execute_search():
         columns=["Amount"],
     )
     df_search.sort_index(inplace=True)
-    logger.debug(f"Search result:\n{df_search}")
+    logger.debug("Search result:\n%s", df_search.to_string())
     st.dataframe(df_search, use_container_width=True)
 
 
@@ -187,12 +188,21 @@ with st.sidebar:
         use_container_width=True,
     ):
         update()
+    # display time since last update
+    last_update = Customdata(st.session_state.settings["dbfile"]).get("last_update")
+    if last_update:
+        last_update = pd.Timestamp.fromtimestamp(float(last_update[0]), tz="UTC")
+        last_update = pd.Timestamp.now(tz="UTC") - last_update
+        st.markdown(" - *Last update: " + str(last_update).split('.', maxsplit=1)[0] + "*")
+    else:
+        st.markdown(" - *No update yet*")
 
     st.divider()
 
     # search bar
 
     tokens = g_portfolios.aggregate_portfolios().keys()
+    st.write("Search for a token:")
     if st.selectbox(
         "Search", tokens, index=None, label_visibility="collapsed", key="search_target"
     ):

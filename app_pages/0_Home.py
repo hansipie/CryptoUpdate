@@ -8,8 +8,10 @@ and synchronizing with Notion database.
 import logging
 import traceback
 
+import pandas as pd
 import streamlit as st
 
+from modules.database.customdata import Customdata
 from modules.database.operations import operations
 from modules.Notion import Notion
 from modules.plotter import plot_as_graph
@@ -95,6 +97,14 @@ with st.sidebar:
         use_container_width=True,
     ):
         update()
+    # display time since last update
+    last_update = Customdata(st.session_state.settings["dbfile"]).get("last_update")
+    if last_update:
+        last_update = pd.Timestamp.fromtimestamp(float(last_update[0]), tz="UTC")
+        last_update = pd.Timestamp.now(tz="UTC") - last_update
+        st.markdown(" - *Last update: " + str(last_update).split('.', maxsplit=1)[0] + "*")
+    else:
+        st.markdown(" - *No update yet*")
 
     if st.button(
         "Sync. Notion Database",

@@ -13,6 +13,7 @@ import os
 import pandas as pd
 import streamlit as st
 
+from modules.database.customdata import Customdata
 from modules.database.market import Market
 from modules.database.portfolios import Portfolios
 from modules.database.tokensdb import TokensDatabase
@@ -55,6 +56,9 @@ def update_database(dbfile, cmc_apikey):
             "timestamp": tokens_prices.loc[token]["timestamp"],
         }
     TokensDatabase(dbfile).addTokens(new_entries)
+
+    custom = Customdata(dbfile)
+    custom.set("last_update", str(pd.Timestamp.now(tz="UTC").timestamp()), "int")
 
 
 def create_portfolio_dataframe(data: dict) -> pd.DataFrame:

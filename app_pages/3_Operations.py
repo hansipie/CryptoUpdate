@@ -56,7 +56,9 @@ def submit_buy(
     )
 
     if to_wallet is not None:
-        Portfolios(st.session_state.settings["dbfile"]).set_token_add(to_wallet, to_token, to_amount)
+        Portfolios(st.session_state.settings["dbfile"]).set_token_add(
+            to_wallet, to_token, to_amount
+        )
 
     st.success("Operation submitted")
 
@@ -282,7 +284,7 @@ def buy_edit_dialog(data: dict) -> None:
 
 @st.dialog("Edit Swap")
 def swap_edit_dialog(data: dict):
-    logger.debug("Dialog Edit row: %d",  data["id"])
+    logger.debug("Dialog Edit row: %d", data["id"])
     col_date, col_time = st.columns(2)
     with col_date:
         date = st.date_input("Date", key="swap_date", value=data["Date"])
@@ -349,7 +351,7 @@ def buy_delete_dialog(data: dict):
     st.dataframe(data, use_container_width=True)
     st.write("Are you sure you want to delete this buy operation?")
     if st.button("Confirm"):
-        logger.debug("Delete row: %s - %s", data, type(data['id']))
+        logger.debug("Delete row: %s - %s", data, type(data["id"]))
         g_operation.delete(data["id"])
         st.rerun()
 
@@ -360,7 +362,7 @@ def swap_delete_dialog(data: dict):
     st.dataframe(data, use_container_width=True)
     st.write("Are you sure you want to delete this swap?")
     if st.button("Confirm"):
-        logger.debug("Delete row: %s - %s", data, type(data['id']))
+        logger.debug("Delete row: %s - %s", data, type(data["id"]))
         g_swaps.delete(data["id"])
         st.rerun()
 
@@ -378,8 +380,7 @@ def swap_edit():
     if rowidx is None:
         st.toast("Please select a row", icon=":material/warning:")
     else:
-        swap_edit_dialog(df_swap.iloc[rowidx].to_dict()
-)
+        swap_edit_dialog(df_swap.iloc[rowidx].to_dict())
 
 
 def buy_delete():
@@ -427,6 +428,18 @@ def swap_perf(token_a: str, token_b: str, timestamp: int, dbfile: str) -> float:
         return None
     return (rate_now * 100) / rate_swap - 100
 
+def calc_perf(df: pd.DataFrame, col_token: str, col_rate: str) -> pd.DataFrame:
+    """Calculate performance for each operation in the dataframe"""
+    market = Market(st.session_state.settings["dbfile"], st.session_state.settings["coinmarketcap_token"])
+    market_df = market.getLastMarket()
+    if market_df is None:
+        df["Current Rate"] = None
+        df["Perf."] = None
+    else:
+        logger.debug("Market data:\n%s", market_df.to_string())
+        df["Current Rate"] = df[col_token].map(market_df["value"].to_dict())
+        df["Perf."] = ((df["Current Rate"] * 100) / df[col_rate]) - 100
+    return df
 
 @st.cache_data(
     hash_funcs={str: lambda x: get_file_hash(x) if os.path.isfile(x) else hash(x)},
@@ -454,28 +467,48 @@ def build_buy_dataframe(dbfile: str) -> pd.DataFrame:
     df["Date"] = df["Date"].dt.tz_convert(local_timezone)
     df["Buy Rate"] = df["From"] / df["To"]
 
-    # calculate performance
-    market = Market(dbfile, st.session_state.settings["coinmarketcap_token"])
-    market_df = market.getLastMarket()
-    if market_df is None:
-        df["Current Rate"] = None
-        df["Perf."] = None
-    else:
-        logger.debug("Market data:\n%s", market_df.to_string())
-        df["Current Rate"] = df["Token"].map(market_df["value"].to_dict())
-        df["Perf."] = ((df["Current Rate"] * 100) / df["Buy Rate"]) - 100
+    df = calc_perf(df, "Token", "Buy Rate")
 
     return df
 
+
+# @st.cache_data(
+#     hash_funcs={str: lambda x: get_file_hash(x) if os.path.isfile(x) else hash(x)},
+# )
 def build_buy_avg_table():
-    pass
+    df = pd.DataFrame(
+        g_operation.get_averages(),
+        columns=[
+            "Token",
+            "Total Bought",
+            "Currency",
+            "Tokens Obtained",
+        ],
+    )
+
+
+    if df.empty:
+        return df
+    
+    green_icon = "🟩"
+    yellow_icon = "🟨"
+    red_icon = "🟥"
+
+    df["Avg. Rate"] =  df["Total Bought"] / df["Tokens Obtained"]
+    df = calc_perf(df, "Token", "Avg. Rate")
+    df["icon"] = df["Perf."].apply(lambda x: green_icon if x > 0 else (red_icon if x < -50 else yellow_icon))
+    logger.debug("Average table:\n%s", df.to_string())
+    # order by Perf.
+    df = df.sort_values(by=["Perf."], ascending=False)
+    return df
+
 
 @st.cache_data(
     hash_funcs={str: lambda x: get_file_hash(x) if os.path.isfile(x) else hash(x)},
 )
 def build_swap_dataframe(dbfile: str) -> pd.DataFrame:
     # save swaps list to a dataframe
-    swaptable = pd.DataFrame(
+    df = pd.DataFrame(
         g_swaps.get(),
         columns=[
             "id",
@@ -490,24 +523,24 @@ def build_swap_dataframe(dbfile: str) -> pd.DataFrame:
         ],
     )
 
-    if swaptable.empty:
-        return swaptable
+    if df.empty:
+        return df
 
     # convert timestamp to datetime
-    swaptable["Date"] = pd.to_datetime(swaptable["timestamp"], unit="s", utc=True)
+    df["Date"] = pd.to_datetime(df["timestamp"], unit="s", utc=True)
     local_timezone = tzlocal.get_localzone()
     logger.debug("Timezone locale: %s", local_timezone)
-    swaptable["Date"] = swaptable["Date"].dt.tz_convert(local_timezone)
+    df["Date"] = df["Date"].dt.tz_convert(local_timezone)
 
     # Calculate performance for each swap
-    swaptable["Perf."] = swaptable.apply(
+    df["Perf."] = df.apply(
         lambda row: swap_perf(
             row["To Token"], row["From Token"], row["timestamp"], dbfile
         ),
         axis=1,
     )
 
-    return swaptable
+    return df
 
 
 g_wallets = Portfolios(st.session_state.settings["dbfile"]).get_portfolio_names()
@@ -519,9 +552,7 @@ g_swaps = swaps(st.session_state.settings["dbfile"])
 buy_tab, swap_tab = st.tabs(["Buy", "Swap"])
 with buy_tab:
     # build buy table with performance metrics
-    df_buy = build_buy_dataframe(
-        st.session_state.settings["dbfile"]
-    )
+    df_buy = build_buy_dataframe(st.session_state.settings["dbfile"])
 
     col_buylist, col_buybtns = st.columns([8, 1])
     with col_buylist:
@@ -531,7 +562,7 @@ with buy_tab:
             st.dataframe(
                 df_buy,
                 use_container_width=True,
-                height=700,
+                height=600,
                 hide_index=True,
                 column_order=(
                     "Date",
@@ -577,9 +608,28 @@ with buy_tab:
             icon=":material/delete:",
             key="buy_delete",
         )
-    
+
     # aquisition average table
-    build_buy_avg_table()
+    st.title("Aquisition Averages")
+    df_avg = build_buy_avg_table()
+    if df_avg.empty:
+        st.info("No data available")
+    else:
+        height = (len(df_avg) * 35) + 38
+        st.dataframe(
+            df_avg,
+            use_container_width=True,
+            hide_index=True,
+            height=height,
+            column_order=("icon", "Token", "Total Bought", "Currency", "Tokens Obtained", "Avg. Rate", "Current Rate", "Perf."),
+            column_config={
+                "icon": st.column_config.TextColumn(label=""),
+                "Avg. Rate": st.column_config.NumberColumn(format="%.8f"),
+                "Current Rate": st.column_config.NumberColumn(format="%.8f"),
+                "Perf.": st.column_config.NumberColumn(format="%.2f%%")
+            },
+            key="avgselection",
+        )
 
 with swap_tab:
     # build swap table with performance metrics
