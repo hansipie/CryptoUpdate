@@ -18,6 +18,7 @@ from modules.Updater import Updater
 
 logger = logging.getLogger(__name__)
 
+
 @st.cache_data
 def join_dfs(df1, df2):
     df = df1.join(df2)
@@ -27,7 +28,8 @@ def join_dfs(df1, df2):
 def update():
     try:
         update_database(
-            st.session_state.settings["dbfile"], st.session_state.settings["coinmarketcap_token"]
+            st.session_state.settings["dbfile"],
+            st.session_state.settings["coinmarketcap_token"],
         )
         st.toast("Prices updated", icon=":material/check:")
         st.rerun()
@@ -95,7 +97,10 @@ with st.sidebar:
         update()
 
     if st.button(
-        "Sync. Notion Database", icon=":material/publish:", use_container_width=True
+        "Sync. Notion Database",
+        icon=":material/publish:",
+        use_container_width=True,
+        disabled=st.session_state.settings["debug_flag"] is True,
     ):
         sync_notion_market()
 

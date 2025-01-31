@@ -133,7 +133,7 @@ class Market:
             logger.debug("Last Market get:\n%s", market_df.to_string())
             return market_df
 
-    def update_market(self, tokens: list = None):
+    def update_market(self, tokens: list = None, debug: bool = False):
         """Update market data with current prices and add new tokens.
         
         Args:
@@ -147,7 +147,7 @@ class Market:
 
         timestamp = int(pd.Timestamp.now(tz=pytz.UTC).timestamp())
         cmc_prices = cmc(self.cmc_token)
-        tokens_prices = cmc_prices.getCryptoPrices(tokens)
+        tokens_prices = cmc_prices.getCryptoPrices(tokens, debug=debug)
         if not tokens_prices:
             logger.info("No data available")
             return
@@ -274,7 +274,7 @@ class Market:
             logging.debug("Missing timestamps: %d", len(df_ret))
             return df_ret
 
-    def update_currencies(self):
+    def update_currencies(self, debug: bool = False):
         """Update currency rates and add missing timestamps."""
         logger.debug("Update currencies")
 
@@ -325,8 +325,8 @@ class Market:
 
         # add current rate to Currency from CMC
         cmc_prices = cmc(self.cmc_token)
-        price = cmc_prices.getCurrentFiatPrices()
-        logger.debug("Adding current rate to Currency: %f", price)
+        price = cmc_prices.getCurrentFiatPrices(debug=debug)
+        logger.debug("Adding current rate to Currency: %s", price)
         for currency in price:
             self.add_currency(
                 price[currency]["timestamp"], currency, price[currency]["price"]

@@ -39,8 +39,8 @@ def update_database(dbfile, cmc_apikey):
     tokens = [token for token in tokens if token not in not_tokens]
     logger.debug("Tokens after clean up: %s", str(tokens))
 
-    market.update_market(tokens)
-    market.update_currencies()
+    market.update_market(tokens, debug=st.session_state.settings["debug_flag"])
+    market.update_currencies(debug=st.session_state.settings["debug_flag"])
 
     tokens_prices = market.getLastMarket()
     if tokens_prices is None:
