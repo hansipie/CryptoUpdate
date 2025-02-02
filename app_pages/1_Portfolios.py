@@ -123,7 +123,7 @@ def portfolioUI(tabs: list):
                 df.sort_values(by=["value(€)"], ascending=False, inplace=True)
                 st.write(f"Total value: €{round(balance, 2)}")
                 height = (len(df) * 35) + 38
-                logger.debug("Dataframe:\n%s", df.to_string())
+                logger.debug("Dataframe:\n%s", df)
                 updated_data = st.data_editor(
                     df,
                     use_container_width=True,
@@ -223,7 +223,7 @@ def execute_search():
         columns=["Amount"],
     )
     df_search.sort_index(inplace=True)
-    logger.debug("Search result:\n%s", df_search.to_string())
+    logger.debug("Search result:\n%s", df_search)
     st.dataframe(df_search, use_container_width=True)
 
 

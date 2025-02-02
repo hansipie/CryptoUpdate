@@ -60,7 +60,7 @@ def submit_buy(
             to_wallet, to_token, to_amount
         )
 
-    st.success("Operation submitted")
+    st.toast("Operation submitted", icon=":material/check:")
 
 
 def submit_swap(
@@ -489,14 +489,14 @@ def calc_perf(df: pd.DataFrame, col_token: str, col_rate: str) -> pd.DataFrame:
         df["Current Rate"] = None
         df["Perf."] = None
     else:
-        logger.debug("Market data:\n%s", market_df.to_string())
+        logger.debug("Market data:\n%s", market_df)
         df["Current Rate"] = df[col_token].map(market_df["value"].to_dict())
         df["Perf."] = ((df["Current Rate"] * 100) / df[col_rate]) - 100
     return df
 
-@st.cache_data(
-    hash_funcs={str: lambda x: get_file_hash(x) if os.path.isfile(x) else hash(x)},
-)
+# @st.cache_data(
+#     hash_funcs={str: lambda x: get_file_hash(x) if os.path.isfile(x) else hash(x)},
+# )
 def build_buy_dataframe() -> pd.DataFrame:
     # save buylist to a dataframe
     df = pd.DataFrame(
@@ -558,15 +558,15 @@ def build_buy_avg_table():
     df["Avg. Rate"] =  df["Total Bought"] / df["Tokens Obtained"]
     df = calc_perf(df, "Token", "Avg. Rate")
     df["icon"] = df["Perf."].apply(lambda x: green_icon if x > 0 else (red_icon if x < -50 else yellow_icon))
-    logger.debug("Average table:\n%s", df.to_string())
+    logger.debug("Average table:\n%s", df)
     # order by Perf.
     df = df.sort_values(by=["Perf."], ascending=False)
     return df
 
 
-@st.cache_data(
-    hash_funcs={str: lambda x: get_file_hash(x) if os.path.isfile(x) else hash(x)},
-)
+# @st.cache_data(
+#     hash_funcs={str: lambda x: get_file_hash(x) if os.path.isfile(x) else hash(x)},
+# )
 def build_swap_dataframe(dbfile: str) -> pd.DataFrame:
     # save swaps list to a dataframe
     df = pd.DataFrame(
@@ -606,7 +606,7 @@ def build_swap_dataframe(dbfile: str) -> pd.DataFrame:
 
 
 g_wallets = Portfolios(st.session_state.settings["dbfile"]).get_portfolio_names()
-g_tokens = TokensDatabase(st.session_state.settings["dbfile"]).getTokens()
+g_tokens = TokensDatabase(st.session_state.settings["dbfile"]).get_tokens()
 
 g_operation = operations(st.session_state.settings["dbfile"])
 g_swaps = swaps(st.session_state.settings["dbfile"])

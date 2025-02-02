@@ -77,7 +77,7 @@ class Market:
             df_market = pd.DataFrame()
             for token in df_tokens["token"]:
                 df = pd.read_sql_query(
-                    f"SELECT timestamp, price AS '{token}' FROM Market WHERE token = '{token}' ORDER BY timestamp;",
+                    f"SELECT timestamp, price AS '{token}' FROM Market WHERE token = '{token}'",
                     con,
                 )
                 if df.empty:
@@ -97,6 +97,7 @@ class Market:
             )
             df_market.rename(columns={"timestamp": "Date"}, inplace=True)
             df_market.set_index("Date", inplace=True)
+            df_market.sort_index(inplace=True)
             df_market = df_market.reindex(sorted(df_market.columns), axis=1)
             return df_market
 
@@ -130,7 +131,7 @@ class Market:
             market_df = pd.DataFrame(market_data)
             market_df.set_index("token", inplace=True)
             logger.debug("Last Market get size: %d", len(market_df))
-            logger.debug("Last Market get:\n%s", market_df.to_string())
+            logger.debug("Last Market get:\n%s", market_df)
             return market_df
 
     def update_market(self, tokens: list = None, debug: bool = False):
@@ -196,7 +197,7 @@ class Market:
                     f"SELECT price from Market WHERE token = '{token}' ORDER BY timestamp DESC LIMIT 1;",
                     con,
                 )
-        logger.debug("Get price: %s", df.to_string())
+        logger.debug("Get price: %s", df)
         if df.empty:
             return 0.0
         return df["price"][0]
@@ -360,13 +361,14 @@ class Market:
         """
         logger.debug("Get currency")
         with sqlite3.connect(self.db_path) as con:
-            df = pd.read_sql_query("SELECT * from Currency ORDER BY timestamp", con)
+            df = pd.read_sql_query("SELECT * from Currency", con)
             if df.empty:
                 return None
             df["timestamp"] = pd.to_datetime(df["timestamp"], unit="s", utc=True)
             df["timestamp"] = df["timestamp"].dt.tz_convert(self.local_timezone)
             df.rename(columns={"timestamp": "Date"}, inplace=True)
             df.set_index("Date", inplace=True)
+            df.sort_index(inplace=True)
             return df
 
     def get_token_lowhigh(self, token: str, timestamp: int) -> pd.DataFrame:

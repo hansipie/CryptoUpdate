@@ -14,32 +14,17 @@ import streamlit as st
 from modules.database.customdata import Customdata
 from modules.database.operations import operations
 from modules.Notion import Notion
-from modules.database.portfolios import Portfolios
-from modules.plotter import plot_as_graph, plot_as_pie
-from modules.tools import create_portfolio_dataframe, load_db, update_database
+from modules.database.tokensdb import TokensDatabase
+from modules.plotter import plot_as_graph
+from modules.tools import update_database
 from modules.Updater import Updater
 
 logger = logging.getLogger(__name__)
 
 
-@st.cache_data
-def join_dfs(df1, df2):
-    """Join two dataframes.
-    
-    Args:
-        df1: First DataFrame to join
-        df2: Second DataFrame to join
-        
-    Returns:
-        DataFrame resulting from joining df1 and df2
-    """
-    df = df1.join(df2)
-    return df
-
-
 def update():
     """Update cryptocurrency prices in database.
-    
+
     Attempts to fetch latest prices and update the database.
     Shows success toast or error message on completion.
     """
@@ -58,7 +43,7 @@ def update():
 @st.dialog("Sync. Notion Database")
 def sync_notion_market():
     """Synchronize cryptocurrency data with Notion database.
-    
+
     Fetches current prices and updates configured Notion database.
     Shows progress bar during sync and handles various error cases.
     """
@@ -106,7 +91,11 @@ def sync_notion_market():
 
 st.title("Crypto Update")
 
-df_balance, df_sums, _ = load_db(st.session_state.settings["dbfile"])
+tokensdb = TokensDatabase(st.session_state.settings["dbfile"])
+with st.spinner("Loading balances..."):
+    df_balance = tokensdb.get_balances()
+with st.spinner("Loading sums..."):
+    df_sums = tokensdb.get_sum_over_time()
 
 # Update prices
 with st.sidebar:
@@ -122,7 +111,9 @@ with st.sidebar:
     if last_update:
         last_update = pd.Timestamp.fromtimestamp(float(last_update[0]), tz="UTC")
         last_update = pd.Timestamp.now(tz="UTC") - last_update
-        st.markdown(" - *Last update: " + str(last_update).split('.', maxsplit=1)[0] + "*")
+        st.markdown(
+            " - *Last update: " + str(last_update).split(".", maxsplit=1)[0] + "*"
+        )
     else:
         st.markdown(" - *No update yet*")
 
@@ -141,10 +132,11 @@ with st.container(border=True):
         st.metric("Invested", value=f"{total} €")
     with col2:
         # get last values
-        if df_balance is None or df_balance.empty:
-            balance = 0
-        else:
-            balance = df_balance.iloc[-1, 1:].sum()
+        balance = (
+            0
+            if df_balance is None or df_balance.empty
+            else df_balance.iloc[-1, 1:].sum()
+        )
         balance = round(balance, 2)
         st.metric("Total value", value=f"{balance} €")
     with col3:
@@ -155,7 +147,6 @@ with st.container(border=True):
         )
 
 with st.container(border=True):
-    # plot_as_graph(join_dfs(df_sums, df_balance))
     plot_as_graph(df_sums)
 
 # show last values"
@@ -164,5 +155,7 @@ if df_balance is None or df_balance.empty:
     st.info("No data available")
 else:
     last_V = df_balance.tail(5).copy()
+    last_V = last_V.loc[:, (last_V != 0).any(axis=0)]
+    last_V = round(last_V, 2)
     last_V = last_V.astype(str) + " €"
     st.dataframe(last_V)

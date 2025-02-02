@@ -1,13 +1,14 @@
-import streamlit as st
-import pandas as pd
 import logging
-import os
-from modules.database.portfolios import Portfolios
-from modules.database.market import Market
-from modules.plotter import plot_as_graph, plot_as_pie
-from modules.tools import create_portfolio_dataframe, interpolate_eurusd, load_db
-from modules.utils import get_file_hash, toTimestamp_A
 
+import pandas as pd
+import streamlit as st
+
+from modules.database.market import Market
+from modules.database.portfolios import Portfolios
+from modules.database.tokensdb import TokensDatabase
+from modules.plotter import plot_as_graph, plot_as_pie
+from modules.tools import create_portfolio_dataframe, interpolate_eurusd
+from modules.utils import toTimestamp_A
 
 logger = logging.getLogger(__name__)
 
@@ -125,10 +126,10 @@ def build_tabs(df: pd.DataFrame, columns: list = None):
         st.error("The end date must be after the start date")
 
 
-@st.cache_data(
-    show_spinner=False,
-    hash_funcs={str: lambda x: get_file_hash(x) if os.path.isfile(x) else hash(x)},
-)
+# @st.cache_data(
+#     show_spinner=False,
+#     hash_funcs={str: lambda x: get_file_hash(x) if os.path.isfile(x) else hash(x)},
+# )
 def load_market(dbfile: str) -> pd.DataFrame:
     """Load market data from database.
 
@@ -160,7 +161,11 @@ with st.sidebar:
             "End date", value=pd.to_datetime("today")
         )
 
-df_balance, df_sums, df_tokencount = load_db(st.session_state.settings["dbfile"])
+tokensdb = TokensDatabase(st.session_state.settings["dbfile"])
+with st.spinner("Loading balances..."):
+    df_balance = tokensdb.get_balances()
+with st.spinner("Loading token counts..."):
+    df_tokencount = tokensdb.get_token_counts()
 
 if "tokens" not in st.session_state:
     st.session_state.tokens = []

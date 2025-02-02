@@ -11,7 +11,7 @@ from modules.Updater import Updater
 from alive_progress import alive_bar
 from modules import tools
 from modules.database.tokensdb import TokensDatabase
-from modules.utils import debug_prefix, listfilesrecursive
+from modules.utils import debug_prefix, list_files_recursive
 
 # logging
 logging.basicConfig(
@@ -104,7 +104,7 @@ def saveToDB(inifile):
 
     conn = sqlite3.connect(dbfile)
 
-    archiveFiles = listfilesrecursive(archive_path)
+    archiveFiles = list_files_recursive(archive_path)
     count = len(archiveFiles)
     with alive_bar(
         count, title="Insert in database", force_tty=True, stats="(eta:{eta})"
@@ -119,7 +119,7 @@ def saveToDB(inifile):
     conn.close()
 
     histdb = TokensDatabase(dbfile)
-    histdb.dropDuplicate()
+    histdb.drop_duplicate()
 
 @app.command()
 def updateNotion(inifile: str):

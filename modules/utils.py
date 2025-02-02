@@ -71,7 +71,7 @@ def get_file_hash(filename):
     return md5_hash.hexdigest()
 
 
-def listfilesrecursive(directory, fileslist=None):
+def list_files_recursive(directory, fileslist=None):
     # list all files in directory recurcively
 
     if fileslist is None:
@@ -83,7 +83,7 @@ def listfilesrecursive(directory, fileslist=None):
         path = os.path.join(directory, item)
         if os.path.isdir(path):
             # logger.debug(f"{path} is a directory.")
-            listfilesrecursive(path, fileslist)
+            list_files_recursive(path, fileslist)
         else:
             # logger.debug(f"Add file {path}")
             fileslist.append(path)
@@ -101,6 +101,6 @@ def debug_prefix(input_str: str, flag=False) -> str:
 def dataframe_diff(df1, df2):
     """Find rows that are different between two DataFrames"""
     comparison_df = df1.merge(df2, indicator=True, how="outer")
-    logger.debug("comparison_df:\n%s", comparison_df.to_string())
+    logger.debug("comparison_df:\n%s", comparison_df)
     diff_df = comparison_df[comparison_df["_merge"] != "both"]
     return diff_df

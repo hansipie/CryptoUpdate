@@ -17,7 +17,7 @@ from modules.database.customdata import Customdata
 from modules.database.market import Market
 from modules.database.portfolios import Portfolios
 from modules.database.tokensdb import TokensDatabase
-from modules.utils import debug_prefix, get_file_hash, interpolate
+from modules.utils import debug_prefix, interpolate
 
 logger = logging.getLogger(__name__)
 
@@ -55,7 +55,7 @@ def update_database(dbfile, cmc_apikey):
             "price": tokens_prices.loc[token]["value"],
             "timestamp": tokens_prices.loc[token]["timestamp"],
         }
-    TokensDatabase(dbfile).addTokens(new_entries)
+    TokensDatabase(dbfile).add_tokens(new_entries)
 
     custom = Customdata(dbfile)
     custom.set("last_update", str(pd.Timestamp.now(tz="UTC").timestamp()), "float")
@@ -70,7 +70,7 @@ def create_portfolio_dataframe(data: dict) -> pd.DataFrame:
     df = pd.DataFrame.from_dict(data, columns=["amount"], orient="index")
     df["amount"] = df["amount"].astype(float)
     df.index.name = "token"
-    logger.debug("Create portfolio dataframe - Dataframe:\n%s", df.to_string())
+    logger.debug("Create portfolio dataframe - Dataframe:\n%s", df)
     market = Market(
         st.session_state.settings["dbfile"], st.session_state.settings["coinmarketcap_token"]
     )
@@ -126,22 +126,6 @@ def load_settings(settings: dict):
             settings["Local"]["sqlite_file"], st.session_state.settings["debug_flag"]
         ),
     )
-
-
-# load database
-@st.cache_data(
-    show_spinner=False,
-    hash_funcs={str: lambda x: get_file_hash(x) if os.path.isfile(x) else hash(x)},
-)
-def load_db(dbfile: str) -> pd.DataFrame:
-    """Load the database"""
-    with st.spinner("Loading database..."):
-        logger.debug("Load database")
-        tokensdb = TokensDatabase(dbfile)
-        df_balance = tokensdb.getBalances()
-        df_sums = tokensdb.get_sums()
-        df_tokencount = tokensdb.getTokenCounts()
-        return df_balance, df_sums, df_tokencount
 
 
 def interpolate_token(token: str, timestamp: int, dbfile: str) -> float:
