@@ -9,6 +9,7 @@ This module provides various utility functions for:
 
 import logging
 import os
+import traceback
 
 import pandas as pd
 import streamlit as st
@@ -186,3 +187,20 @@ def calculate_crypto_rate(token_a: str, token_b: str, timestamp: int, dbfile: st
     rate = value_a / value_b
     logger.debug("Calculate crypto rate - 1 %s = %f %s", token_a, rate, token_b)
     return rate
+
+def update():
+    """Update cryptocurrency prices in database.
+
+    Attempts to fetch latest prices and update the database.
+    Shows success toast or error message on completion.
+    """
+    try:
+        update_database(
+            st.session_state.settings["dbfile"],
+            st.session_state.settings["coinmarketcap_token"],
+        )
+        st.toast("Prices updated", icon=":material/check:")
+        st.rerun()
+    except (ConnectionError, ValueError) as e:
+        st.error(f"Update Error: {str(e)}")
+        traceback.print_exc()

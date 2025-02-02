@@ -190,7 +190,6 @@ if add_selectbox == "Market":
     st.title("Market")
     df_market = load_market(st.session_state.settings["dbfile"])
     build_tabs(df_market)
-    st.dataframe(df_market)
 
 if add_selectbox == "Currency (EURUSD)":
     logger.debug("Currency (EURUSD)")

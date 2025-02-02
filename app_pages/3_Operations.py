@@ -10,12 +10,13 @@ import os
 import streamlit as st
 import pandas as pd
 import tzlocal
+from modules.database.customdata import Customdata
 from modules.database.portfolios import Portfolios
 from modules.database.tokensdb import TokensDatabase
 from modules.database.operations import operations
 from modules.database.market import Market
 from modules.database.swaps import swaps
-from modules.tools import calculate_crypto_rate
+from modules.tools import calculate_crypto_rate, update
 from modules.utils import get_file_hash, toTimestamp_A
 
 logger = logging.getLogger(__name__)
@@ -610,6 +611,26 @@ g_tokens = TokensDatabase(st.session_state.settings["dbfile"]).get_tokens()
 
 g_operation = operations(st.session_state.settings["dbfile"])
 g_swaps = swaps(st.session_state.settings["dbfile"])
+
+# Update prices
+with st.sidebar:
+    if st.button(
+        "Update prices",
+        key="update_prices",
+        icon=":material/update:",
+        use_container_width=True,
+    ):
+        update()
+    # display time since last update
+    last_update = Customdata(st.session_state.settings["dbfile"]).get("last_update")
+    if last_update:
+        last_update = pd.Timestamp.fromtimestamp(float(last_update[0]), tz="UTC")
+        last_update = pd.Timestamp.now(tz="UTC") - last_update
+        st.markdown(
+            " - *Last update: " + str(last_update).split(".", maxsplit=1)[0] + "*"
+        )
+    else:
+        st.markdown(" - *No update yet*")
 
 buy_tab, swap_tab = st.tabs(["Buy", "Swap"])
 with buy_tab:

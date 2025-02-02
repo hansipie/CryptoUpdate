@@ -4,7 +4,7 @@ import pandas as pd
 import logging
 from modules.database.portfolios import Portfolios
 from modules.database.customdata import Customdata
-from modules.tools import update_database, create_portfolio_dataframe
+from modules.tools import update, update_database, create_portfolio_dataframe
 from modules.utils import dataframe_diff
 
 
@@ -180,22 +180,6 @@ def portfolioUI(tabs: list):
                     icon=":material/destruction:",
                 ):
                     danger_zone(tabs[i])
-
-
-def update():
-    """Update cryptocurrency prices in database.
-    
-    Attempts to fetch latest prices and update the database.
-    Shows success toast or error message on completion.
-    """
-    try:
-        update_database(
-            st.session_state.settings["dbfile"], st.session_state.settings["coinmarketcap_token"]
-        )
-        st.toast("Prices updated", icon=":material/check:")
-        st.rerun()
-    except Exception as e:
-        st.error(f"Update Error: {str(e)}")
 
 
 def load_portfolios(dbfile: str) -> Portfolios:

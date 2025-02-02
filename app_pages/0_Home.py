@@ -16,28 +16,10 @@ from modules.database.operations import operations
 from modules.Notion import Notion
 from modules.database.tokensdb import TokensDatabase
 from modules.plotter import plot_as_graph
-from modules.tools import update_database
 from modules.Updater import Updater
+from modules.tools import update
 
 logger = logging.getLogger(__name__)
-
-
-def update():
-    """Update cryptocurrency prices in database.
-
-    Attempts to fetch latest prices and update the database.
-    Shows success toast or error message on completion.
-    """
-    try:
-        update_database(
-            st.session_state.settings["dbfile"],
-            st.session_state.settings["coinmarketcap_token"],
-        )
-        st.toast("Prices updated", icon=":material/check:")
-        st.rerun()
-    except (ConnectionError, ValueError) as e:
-        st.error(f"Update Error: {str(e)}")
-        traceback.print_exc()
 
 
 @st.dialog("Sync. Notion Database")
