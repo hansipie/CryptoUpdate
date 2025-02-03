@@ -471,7 +471,7 @@ def swap_perf(token_a: str, token_b: str, timestamp: int, dbfile: str) -> float:
 
     if rate_swap is None or rate_now is None:
         return None
-    return (rate_now * 100) / rate_swap - 100
+    return (rate_swap * 100) / rate_now - 100
 
 def calc_perf(df: pd.DataFrame, col_token: str, col_rate: str) -> pd.DataFrame:
     """Calculate current performance metrics for operations.
@@ -547,7 +547,6 @@ def build_buy_avg_table():
             "Tokens Obtained",
         ],
     )
-
 
     if df.empty:
         return df
