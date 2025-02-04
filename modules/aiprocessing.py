@@ -1,9 +1,9 @@
 import base64
-import pandas as pd
 import io
-import traceback
 import logging
+import traceback
 
+import pandas as pd
 from openai import OpenAI
 from PIL import Image
 
@@ -72,7 +72,7 @@ def extract_from_img(bytes_data: bytes, api_key: str):
         logger.debug("Invalid image.")
         return None, None
     else:
-        logger.debug(f"Image type: {type_image}")
+        logger.debug("Image type: %s", type_image)
 
     base64_image = base64.b64encode(bytes_data).decode("utf-8")
 
@@ -143,7 +143,7 @@ def call_ai(messages: list, api_key: str):
 
     message = response.choices[0].message
     total_tokens = response.usage.total_tokens
-    logger.debug(f"Number of tokens used: {total_tokens}")
+    logger.debug("Number of tokens used: %d", total_tokens)
 
     if "NO_DATA" in message.content:
         logger.debug("Invalid image.")

@@ -148,10 +148,10 @@ class Market:
 
         timestamp = int(pd.Timestamp.now(tz=pytz.UTC).timestamp())
         cmc_prices = cmc(self.cmc_token)
-        tokens_prices = cmc_prices.getCryptoPrices(tokens, debug=debug)
+        tokens_prices = cmc_prices.get_crypto_prices(tokens, debug=debug)
         if not tokens_prices:
             logger.info("No data available")
-            return
+            raise ValueError("No data available")
 
         logger.debug("Adding %d tokens to database", len(tokens_prices))
 
@@ -311,7 +311,7 @@ class Market:
                         "Error updating currencies. Code: %d", response.status_code
                     )
                     time.sleep(1)
-                    return None
+                    raise ValueError("Error updating currencies")
                 resp = response.json()
 
                 logger.debug(
@@ -326,7 +326,7 @@ class Market:
 
         # add current rate to Currency from CMC
         cmc_prices = cmc(self.cmc_token)
-        price = cmc_prices.getCurrentFiatPrices(debug=debug)
+        price = cmc_prices.get_current_fiat_prices(debug=debug)
         logger.debug("Adding current rate to Currency: %s", price)
         for currency in price:
             self.add_currency(

@@ -23,7 +23,7 @@ from modules.utils import debug_prefix, interpolate
 logger = logging.getLogger(__name__)
 
 
-def update_database(dbfile, cmc_apikey):
+def update_database(dbfile, cmc_apikey, debug):
     """Update the database with the latest market data"""
     market = Market(dbfile, cmc_apikey)
     portfolio = Portfolios(dbfile)
@@ -41,13 +41,18 @@ def update_database(dbfile, cmc_apikey):
     tokens = [token for token in tokens if token not in not_tokens]
     logger.debug("Tokens after clean up: %s", str(tokens))
 
-    market.update_market(tokens, debug=st.session_state.settings["debug_flag"])
-    market.update_currencies(debug=st.session_state.settings["debug_flag"])
+    try:
+        market.update_market(tokens, debug=debug)
+        market.update_currencies(debug=debug)
+    except Exception as e:
+        logger.error("Error updating market data: %s", str(e))
+        traceback.print_exc()
+        raise ValueError("Error updating market data") from e
 
     tokens_prices = market.getLastMarket()
     if tokens_prices is None:
         logger.error("No Market data available")
-        return None
+        raise ValueError("No Market data available")
 
     new_entries = {}
     for token in tokens:
@@ -198,6 +203,7 @@ def update():
         update_database(
             st.session_state.settings["dbfile"],
             st.session_state.settings["coinmarketcap_token"],
+            st.session_state.settings["debug_flag"]
         )
         st.toast("Prices updated", icon=":material/check:")
         st.rerun()
