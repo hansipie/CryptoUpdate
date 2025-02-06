@@ -178,3 +178,4 @@ class TokensDatabase:
                 "SELECT DISTINCT token from TokensDatabase ORDER BY token", con
             )
             return df["token"].to_list()
+

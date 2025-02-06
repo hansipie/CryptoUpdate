@@ -129,14 +129,18 @@ with st.container(border=True):
         )
 
 with st.container(border=True):
-    plot_as_graph(df_sums)
+    if df_sums is None or df_sums.empty:
+        st.info("No data available")
+    else:
+        plot_as_graph(df_sums)
 
 # show last values"
 st.header("Last values")
 if df_balance is None or df_balance.empty:
     st.info("No data available")
 else:
-    last_V = df_balance.tail(5).copy()
+    last_V = df_balance.tail(10).copy()
+    #last_V = df_balance.copy()
     last_V = last_V.loc[:, (last_V != 0).any(axis=0)]
     last_V = round(last_V, 2)
     last_V = last_V.astype(str) + " €"

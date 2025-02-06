@@ -52,10 +52,10 @@ class cmc:
                 fiat_prices[fiat] = {"price": 0, "timestamp": 0}
                 try:
                     logger.debug(
-                        "Price for %s: %s", fiat, content["data"][symbol]["quote"][fiat]
+                        "Price for %s: %s", fiat, content["data"][0]["quote"][fiat]
                     )
-                    price_data = content["data"][symbol]["quote"][fiat]["price"]
-                    timestamp_data = content["data"][symbol]["quote"][fiat]["last_updated"]
+                    price_data = content["data"][0]["quote"][fiat]["price"]
+                    timestamp_data = content["data"][0]["quote"][fiat]["last_updated"]
 
                     if price_data is not None:
                         fiat_prices[fiat]["price"] = price_data

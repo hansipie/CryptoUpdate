@@ -25,7 +25,7 @@ class Market:
 
     def __init__(self, db_path: str, cmc_token: str):
         """Initialize Market instance.
-        
+
         Args:
             db_path: Path to SQLite database file
             cmc_token: CoinMarketCap API token
@@ -53,7 +53,7 @@ class Market:
 
     def getTokens(self) -> list:
         """Get list of all tokens in the database.
-        
+
         Returns:
             List of token symbols
         """
@@ -65,7 +65,7 @@ class Market:
 
     def getMarket(self) -> pd.DataFrame:
         """Get historical market data for all tokens.
-        
+
         Returns:
             DataFrame with token prices over time or None if empty
         """
@@ -88,13 +88,10 @@ class Market:
                     df_market = df_market.merge(df, on="timestamp", how="outer")
             if df_market.empty:
                 return None
-            # df_market = df_market.fillna(0) # c'est mal de remplir les NaN ici
+
             df_market["timestamp"] = pd.to_datetime(
                 df_market["timestamp"], unit="s", utc=True
-            )
-            df_market["timestamp"] = df_market["timestamp"].dt.tz_convert(
-                self.local_timezone
-            )
+            ).dt.tz_convert(self.local_timezone)
             df_market.rename(columns={"timestamp": "Date"}, inplace=True)
             df_market.set_index("Date", inplace=True)
             df_market.sort_index(inplace=True)
@@ -103,7 +100,7 @@ class Market:
 
     def getLastMarket(self) -> pd.DataFrame:
         """Get most recent market data for all tokens.
-        
+
         Returns:
             DataFrame with latest token prices or None if empty
         """
@@ -136,7 +133,7 @@ class Market:
 
     def update_market(self, tokens: list = None, debug: bool = False):
         """Update market data with current prices and add new tokens.
-        
+
         Args:
             tokens: Optional list of token symbols to add/update
         """
@@ -166,7 +163,7 @@ class Market:
 
     def get_last_timestamp(self) -> int:
         """Get timestamp of most recent market data.
-        
+
         Returns:
             Unix timestamp of latest market data
         """
@@ -178,11 +175,11 @@ class Market:
 
     def get_price(self, token: str, timestamp: int = None) -> float:
         """Get price of a token at given timestamp.
-        
+
         Args:
             token: Token symbol
             timestamp: Optional timestamp, latest if None
-            
+
         Returns:
             Token price or 0.0 if not found
         """
@@ -204,10 +201,10 @@ class Market:
 
     def get_prices(self, token: str) -> pd.DataFrame:
         """Get historical prices of a token.
-        
+
         Args:
             token: Token symbol
-            
+
         Returns:
             DataFrame with token prices over time
         """
@@ -220,7 +217,7 @@ class Market:
 
     def drop_duplicate(self, table: str):
         """Drop duplicate rows from a table.
-        
+
         Args:
             table: Table name
         """
@@ -236,7 +233,7 @@ class Market:
 
     def __find_missing_timestamps(self) -> pd.DataFrame:
         """Find missing timestamps in the Currency table.
-        
+
         Returns:
             DataFrame with missing timestamps
         """
@@ -338,7 +335,7 @@ class Market:
 
     def add_currency(self, timestamp: int, currency: str, price: float):
         """Add currency rate to the database.
-        
+
         Args:
             timestamp: Unix timestamp of the rate
             currency: Currency symbol
@@ -355,7 +352,7 @@ class Market:
 
     def get_currency(self) -> pd.DataFrame:
         """Get historical currency rates.
-        
+
         Returns:
             DataFrame with currency rates over time or None if empty
         """
@@ -373,11 +370,11 @@ class Market:
 
     def get_token_lowhigh(self, token: str, timestamp: int) -> pd.DataFrame:
         """Get the low and high values for a token at a given timestamp.
-        
+
         Args:
             token: Token symbol
             timestamp: Unix timestamp
-            
+
         Returns:
             DataFrame with low and high values
         """
@@ -394,10 +391,10 @@ class Market:
 
     def get_currency_lowhigh(self, timestamp: int) -> pd.DataFrame:
         """Get the low and high values for EURUSD at a given timestamp.
-        
+
         Args:
             timestamp: Unix timestamp
-            
+
         Returns:
             DataFrame with low and high values
         """

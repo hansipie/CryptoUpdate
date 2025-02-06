@@ -49,10 +49,10 @@ class operations:
             )
             conn.commit()
 
-    def delete(self, id):
+    def delete(self, item_id):
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
-            cursor.execute("DELETE FROM Operations WHERE id = ?", (id,))
+            cursor.execute("DELETE FROM Operations WHERE id = ?", (item_id,))
             conn.commit()
 
     def get_operations(self) -> list:
@@ -61,10 +61,10 @@ class operations:
             cursor.execute("SELECT * FROM Operations")
             return cursor.fetchall()
 
-    def get_operations_by_type(self, type: str) -> list:
+    def get_operations_by_type(self, op_type: str) -> list:
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT * FROM Operations WHERE type = ? ORDER BY timestamp DESC", (type,))
+            cursor.execute("SELECT * FROM Operations WHERE type = ? ORDER BY timestamp DESC", (op_type,))
             return cursor.fetchall()
         
     def sum_buyoperations(self) -> float:

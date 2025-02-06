@@ -7,8 +7,10 @@ This module provides various utility functions for:
 - Price calculations and interpolations
 """
 
+from datetime import datetime
 import logging
 import os
+import shutil
 import traceback
 
 import pandas as pd
@@ -23,8 +25,11 @@ from modules.utils import debug_prefix, interpolate
 logger = logging.getLogger(__name__)
 
 
-def update_database(dbfile, cmc_apikey, debug):
+def update_database(dbfile: str, cmc_apikey: str, debug: bool):
     """Update the database with the latest market data"""
+
+    backup_database(dbfile)
+
     market = Market(dbfile, cmc_apikey)
     portfolio = Portfolios(dbfile)
 
@@ -78,10 +83,12 @@ def create_portfolio_dataframe(data: dict) -> pd.DataFrame:
     df.index.name = "token"
     logger.debug("Create portfolio dataframe - Dataframe:\n%s", df)
     market = Market(
-        st.session_state.settings["dbfile"], st.session_state.settings["coinmarketcap_token"]
+        st.session_state.settings["dbfile"],
+        st.session_state.settings["coinmarketcap_token"],
     )
     df["value(€)"] = df.apply(
-        lambda row: row["amount"] * (market.get_price(row.name) if row.name != "EUR" else 1.0),
+        lambda row: row["amount"]
+        * (market.get_price(row.name) if row.name != "EUR" else 1.0),
         axis=1,
     )
     # sort df by token
@@ -136,7 +143,7 @@ def load_settings(settings: dict):
 
 def interpolate_token(token: str, timestamp: int, dbfile: str) -> float:
     """Interpolate the token value at a given timestamp"""
-    
+
     market = Market(dbfile, st.session_state.settings["coinmarketcap_token"])
     if token == "EUR":
         return 1.0
@@ -147,17 +154,17 @@ def interpolate_token(token: str, timestamp: int, dbfile: str) -> float:
 
     if len(df_low) == 0:
         logger.warning(
-            "Interpolate token - No data found for token: %s at timestamp: %d (%s)",
+            "No data found for token: %s at timestamp: %d (%s)",
             token,
             timestamp,
-            pd.Timestamp.fromtimestamp(int(timestamp), tz="UTC")
+            pd.Timestamp.fromtimestamp(int(timestamp), tz="UTC"),
         )
         return None
     if len(df_high) == 0:
         logger.debug(
-            "Interpolate token - No high data found for token: %s and timestamp: %d - using low data",
+            "No high data found for token: %s and timestamp: %d - using low data",
             token,
-            timestamp
+            timestamp,
         )
         df_high = df_low.copy()
 
@@ -166,17 +173,19 @@ def interpolate_token(token: str, timestamp: int, dbfile: str) -> float:
     price_high = df_high["price"][0]
     timestamp_low = df_low["timestamp"][0]
     timestamp_high = df_high["timestamp"][0]
-    price = interpolate(
-        timestamp_low, price_low, timestamp_high, price_high, timestamp
-    )
-    logger.debug("Interpolate token - Price: %f", price)
+    price = interpolate(timestamp_low, price_low, timestamp_high, price_high, timestamp)
+    logger.debug("Price: %f", price)
     return price
+
 
 def interpolate_eurusd(timestamp: int, dbfile: str) -> float:
     """Interpolate the EURUSD value at a given timestamp"""
     return interpolate_token("EURUSD", timestamp, dbfile)
 
-def calculate_crypto_rate(token_a: str, token_b: str, timestamp: int, dbfile: str) -> float:
+
+def calculate_crypto_rate(
+    token_a: str, token_b: str, timestamp: int, dbfile: str
+) -> float:
     """Calculate the rate between two cryptocurrencies at a given timestamp"""
     logger.debug(
         "Calculate crypto rate - Token A: %s - Token B: %s - Timestamp: %d",
@@ -193,6 +202,7 @@ def calculate_crypto_rate(token_a: str, token_b: str, timestamp: int, dbfile: st
     logger.debug("Calculate crypto rate - 1 %s = %f %s", token_a, rate, token_b)
     return rate
 
+
 def update():
     """Update cryptocurrency prices in database.
 
@@ -203,10 +213,33 @@ def update():
         update_database(
             st.session_state.settings["dbfile"],
             st.session_state.settings["coinmarketcap_token"],
-            st.session_state.settings["debug_flag"]
+            st.session_state.settings["debug_flag"],
         )
         st.toast("Prices updated", icon=":material/check:")
         st.rerun()
     except (ConnectionError, ValueError) as e:
         st.error(f"Update Error: {str(e)}")
         traceback.print_exc()
+
+
+def backup_database(dbfile: str) -> str:
+    """Crée une sauvegarde du fichier de base de données en ajoutant un timestamp dans le nom.
+
+    Args:
+        dbfile: Chemin vers le fichier de base de données
+
+    Returns:
+        Chemin vers le fichier de sauvegarde créé
+
+    Raises:
+        FileNotFoundError: Si le fichier source n'existe pas
+    """
+    if not os.path.exists(dbfile):
+        raise FileNotFoundError(f"Fichier de base de données introuvable : {dbfile}")
+
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    backup_file = f"{dbfile}_{timestamp}.bak"
+
+    shutil.copy2(dbfile, backup_file)
+    logger.info("Base de données sauvegardée dans : %s", backup_file)
+    return backup_file

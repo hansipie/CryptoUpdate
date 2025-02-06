@@ -25,9 +25,9 @@ class Updater:
             try:
                 text = v["properties"]["Token"]["title"][0]["text"]["content"]
             except KeyError:
-                logger.error("Invalid entry in Dashboard: ", v["id"])
+                logger.error("Invalid entry in Dashboard: %s", v["id"])
                 continue
-            logger.debug(f"Found entry: {text}")
+            logger.debug("Found entry: %s", text)
             if v["properties"]["Market Price"]["number"] is None:
                 price = 0
             else:
@@ -57,11 +57,11 @@ class Updater:
   
 
     def UpdateDBHandleError(self, response):
-        logger.error("Error updating Notion database. code: ", response.status_code)
+        logger.error("Error updating Notion database. code: %d", response.status_code)
         if response.status_code == 429:
             retry_after = int(response.headers["Retry-After"])
             logger.warning(
-                " - Rate limit exceeded. Retry after ", retry_after, " seconds"
+                " - Rate limit exceeded. Retry after %d seconds" , retry_after
             )
         elif response.status_code == 522:
             logger.warning(" - Connection timed out. Retry.")
