@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 
 class swaps:
-    def __init__(self, db_path: str = "./data/db.sqlite3"):
+    def __init__(self, db_path: str):
         logger.debug("Initializing swaps database")
         self.db_path = db_path
 

@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 
 class Portfolios:
-    def __init__(self, db_path: str = "./data/db.sqlite3"):
+    def __init__(self, db_path: str):
         self.db_path = db_path
 
         # Créer les tables si elles n'existent pas

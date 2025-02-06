@@ -10,7 +10,7 @@ class Notion:
         self.version = version
         self.base_url = "https://api.notion.com"
 
-    def getObjectId(self, name: str, type: str, parent: str = None) -> str | None:
+    def getObjectId(self, name: str, obj_type: str, parent: str = None) -> str | None:
         """
         Get the database/page ID of the Notion object
         """
@@ -19,8 +19,8 @@ class Notion:
             "Notion-Version": str(self.version),
             "Authorization": "Bearer " + str(self.apikey),
         }
-        body = {"query": name, "filter": {"value": type, "property": "object"}}
-        logging.info(f"Get {type} {name} id... {body}")
+        body = {"query": name, "filter": {"value": obj_type, "property": "object"}}
+        logging.info(f"Get {obj_type} {name} id... {body}")
 
         count = 0
         while True:
@@ -51,20 +51,20 @@ class Notion:
                         else:
                             result_id = result["id"]
                             break
-                    logging.debug(f"Returned {type} {name} id: {result_id}")
+                    logging.debug(f"Returned {obj_type} {name} id: {result_id}")
                     return result_id
                 except Exception as e:
                     traceback.print_exc()
-                    logging.error(f"Error getting {type} {name} id: {e}")
+                    logging.error(f"Error getting {obj_type} {name} id: {e}")
                     return None
             else:
-                logging.error(f"Error getting {type} {name} id. code: {response.status_code}")
+                logging.error(f"Error getting {obj_type} {name} id. code: {response.status_code}")
                 count += 1
                 if count > 5:
                     logging.warning("Max retry reached. Exit.")
                     return None
                 time.sleep(1)
-                logging.warning(f"Retry getting {type} id. code:{response.status_code}")
+                logging.warning(f"Retry getting {obj_type} id. code:{response.status_code}")
 
     def createDatabase(self, name, parent):
         """

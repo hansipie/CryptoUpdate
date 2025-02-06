@@ -50,7 +50,6 @@ with st.form(key="settings_form"):
         key="notion_parentpage",
         value=st.session_state.settings.get("notion_parentpage"),
     )
-    createDB = st.checkbox("Create Database", value=False)
 
     st.subheader("Coinmarketcap")
     coinmarketcap_token = st.text_input(
@@ -92,11 +91,4 @@ with st.form(key="settings_form"):
 
         conf = Configuration()
         conf.saveConfig(st.session_state.settings)
-
-        if (
-            createDB
-            and st.session_state.notion_database != ""
-            and st.session_state.notion_parentpage != ""
-        ):
-            createNotionDB()
 

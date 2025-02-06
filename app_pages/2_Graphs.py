@@ -109,7 +109,9 @@ def build_tabs(section: str = "Assets Balances"):
         available_tokens = markgetdb.getTokens()
     else:
         available_tokens = []
-
+    if not available_tokens:
+        st.info("No data available")
+        return
     temp_tokens = st.multiselect(
         "Select Tokens to display",
         available_tokens,

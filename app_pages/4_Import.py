@@ -201,7 +201,7 @@ if "output" not in st.session_state.import_page:
 if "type" not in st.session_state.import_page:
     st.session_state.import_page["type"] = None
 
-g_portfolio = pf.Portfolios()
+g_portfolio = pf.Portfolios(st.session_state.settings["dbfile"])
 
 st.title("Import")
 
