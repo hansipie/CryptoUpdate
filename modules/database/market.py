@@ -97,6 +97,47 @@ class Market:
             df_market.sort_index(inplace=True)
             df_market = df_market.reindex(sorted(df_market.columns), axis=1)
             return df_market
+        
+    def get_token_market(self, token: str, from_timestamp: int = None, to_timestamp: int = None) -> pd.DataFrame:
+        """Get historical market data for a token.
+
+        Args:
+            token: Token symbol
+            from_timestamp: Optional start timestamp
+            to_timestamp: Optional end timestamp
+
+        Returns:
+            DataFrame with token prices over time or None if empty
+        """
+        logger.debug("Get token market")
+        with sqlite3.connect(self.db_path) as con:
+            if from_timestamp and to_timestamp:
+                df = pd.read_sql_query(
+                    f"SELECT timestamp AS Date, price AS Price from Market WHERE token = '{token}' AND timestamp >= {from_timestamp} AND timestamp <= {to_timestamp} ORDER BY timestamp;",
+                    con,
+                )
+            elif from_timestamp:
+                df = pd.read_sql_query(
+                    f"SELECT timestamp AS Date, price AS Price from Market WHERE token = '{token}' AND timestamp >= {from_timestamp} ORDER BY timestamp;",
+                    con,
+                )
+            elif to_timestamp:
+                df = pd.read_sql_query(
+                    f"SELECT timestamp AS Date, price AS Price from Market WHERE token = '{token}' AND timestamp <= {to_timestamp} ORDER BY timestamp;",
+                    con,
+                )
+            else:
+                df = pd.read_sql_query(
+                    f"SELECT timestamp AS Date, price AS Price from Market WHERE token = '{token}' ORDER BY timestamp;",
+                    con,
+                )
+            if df.empty:
+                return None
+            df["Date"] = pd.to_datetime(df["Date"], unit="s", utc=True)
+            df["Date"] = df["Date"].dt.tz_convert(self.local_timezone)
+            df.set_index("Date", inplace=True)
+            df.sort_index(inplace=True)
+            return df
 
     def getLastMarket(self) -> pd.DataFrame:
         """Get most recent market data for all tokens.

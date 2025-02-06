@@ -25,13 +25,11 @@ class TokensDatabase:
         """Get the sum of all tokens through time"""
         logger.debug("Get sums")
         with sqlite3.connect(self.db_path) as con:
-            df_sql = pd.read_sql_query(
-                "SELECT * from TokensDatabase", con
-            )
+            df_sql = pd.read_sql_query("SELECT * from TokensDatabase", con)
             if df_sql.empty:
                 logger.warning("No data found in database")
                 return None
-            
+
             serie_sum = df_sql.groupby("timestamp").apply(
                 lambda x: sum(x["price"] * x["count"])
             )
@@ -83,39 +81,41 @@ class TokensDatabase:
             logger.debug("Balances:\n%s", df_balance)
             return df_balance
 
-    def get_token_counts(self) -> pd.DataFrame:
-        """Get the count of each token through time"""
-        logger.debug("Get token counts")
+    def get_token_balances(
+        self, token: str, from_timestamp: int = None, to_timestamp: int = None
+    ) -> pd.DataFrame:
+        """Get the balances of a token through time"""
+        logger.debug("Get balances for token %s", token)
         with sqlite3.connect(self.db_path) as con:
-            df_tokens = pd.read_sql_query(
-                "SELECT DISTINCT token from TokensDatabase", con
-            )
-            logger.debug("Tokens:\n%s", df_tokens)
-            if df_tokens.empty:
-                logger.warning("No token found in database")
-                return None
-            df_tokencount = pd.DataFrame()
-            for token in df_tokens["token"]:
+            if from_timestamp is not None and to_timestamp is not None:
                 df = pd.read_sql_query(
-                    f"SELECT timestamp, count AS '{token}' FROM TokensDatabase WHERE token = '{token}'",
+                    f"SELECT timestamp AS Date, price*count AS 'Value', count AS Count FROM TokensDatabase WHERE token = '{token}' AND timestamp >= {from_timestamp} AND timestamp <= {to_timestamp}",
                     con,
                 )
-                if df_tokencount.empty:
-                    df_tokencount = df
-                else:
-                    df_tokencount = df_tokencount.merge(df, on="timestamp", how="outer")
-            df_tokencount = df_tokencount.fillna(0)  # c'est OK de remplir les NaN ici
-            df_tokencount["timestamp"] = pd.to_datetime(
-                df_tokencount["timestamp"], unit="s", utc=True
-            )
-            df_tokencount["timestamp"] = df_tokencount["timestamp"].dt.tz_convert(
-                self.local_timezone
-            )
-            df_tokencount.rename(columns={"timestamp": "Date"}, inplace=True)
-            df_tokencount.set_index("Date", inplace=True)
-            df_tokencount.sort_index(inplace=True)
-            df_tokencount = df_tokencount.reindex(sorted(df_tokencount.columns), axis=1)
-            return df_tokencount
+            elif from_timestamp is not None:
+                df = pd.read_sql_query(
+                    f"SELECT timestamp AS Date, price*count AS 'Value', count AS Count FROM TokensDatabase WHERE token = '{token}' AND timestamp >= {from_timestamp}",
+                    con,
+                )
+            elif to_timestamp is not None:
+                df = pd.read_sql_query(
+                    f"SELECT timestamp AS Date, price*count AS 'value', count AS Count FROM TokensDatabase WHERE token = '{token}' AND timestamp <= {to_timestamp}",
+                    con,
+                )
+            else:
+                df = pd.read_sql_query(
+                    f"SELECT timestamp AS Date, price*count AS 'value', count AS Count FROM TokensDatabase WHERE token = '{token}'",
+                    con,
+                )
+            if df.empty:
+                logger.warning("No data found for token %s in database", token)
+                return None
+            df["Date"] = pd.to_datetime(df["Date"], unit="s", utc=True)
+            df["Date"] = df["Date"].dt.tz_convert(self.local_timezone)
+            df.set_index("Date", inplace=True)
+            df.sort_index(inplace=True)
+            logger.debug("Balances for token %s:\n%s", token, df)
+            return df
 
     def add_token(self, timestamp: int, token: str, price: float, count: float):
         with sqlite3.connect(self.db_path) as con:
@@ -178,4 +178,3 @@ class TokensDatabase:
                 "SELECT DISTINCT token from TokensDatabase ORDER BY token", con
             )
             return df["token"].to_list()
-

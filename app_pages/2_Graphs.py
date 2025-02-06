@@ -1,4 +1,5 @@
 import logging
+import os
 
 import pandas as pd
 import streamlit as st
@@ -8,7 +9,7 @@ from modules.database.portfolios import Portfolios
 from modules.database.tokensdb import TokensDatabase
 from modules.plotter import plot_as_graph, plot_as_pie
 from modules.tools import create_portfolio_dataframe, interpolate_eurusd
-from modules.utils import toTimestamp_A
+from modules.utils import get_file_hash, toTimestamp_A
 
 logger = logging.getLogger(__name__)
 
@@ -61,94 +62,122 @@ def aggregater_ui():
         else:
             st.info("No data available")
 
+def draw_tab_content(section:str, token: str, start_timestamp: int, end_timestamp: int):
+    logger.debug("Draw tab content for token %s", token)
+    if section == "Assets Balances":
+        with st.spinner("Loading assets balances..."):
+            df_view = tokensdb.get_token_balances(token, start_timestamp, end_timestamp)
+    elif section == "Market":
+        with st.spinner("Loading market..."):
+            df_view = markgetdb.get_token_market(token, start_timestamp, end_timestamp)
+    else:
+        df_view = None
+    if df_view is not None:
+        mcol1, mcol2 = st.columns(2)
+        with mcol1:
+            nbr_days = st.session_state.enddate - st.session_state.startdate
+            mcol1.metric("Days", value=nbr_days.days)
+        with mcol2:
+            first = df_view.iloc[0].values[0]
+            last = df_view.iloc[-1].values[0]
+            logger.debug("first: %s, last: %s", first, last)
+            mcol2.metric(
+                "Performance",
+                value=(
+                    f"{round(((last - first) / first) * 100, 2)} %"
+                    if first != 0
+                    else "0 %"
+                    if last == 0
+                    else "∞ %"
+                ),
+            )
+        col1, col2 = st.columns([3, 1])
+        with col1:
+            plot_as_graph(df_view)
+        with col2:
+            col2.dataframe(df_view, use_container_width=True)
+    else:
+        st.info("No data available")
 
-def build_tabs(df: pd.DataFrame, columns: list = None):
-    """Build tabs displaying performance graphs for selected tokens.
 
-    Args:
-        df: DataFrame containing token data
+def build_tabs(section: str = "Assets Balances"):
+    start_timestamp = toTimestamp_A(st.session_state.startdate, pd.to_datetime("00:00:00").time())
+    end_timestamp = toTimestamp_A(st.session_state.enddate, pd.to_datetime("23:59:59").time())
+    if section == "Assets Balances":
+        available_tokens = tokensdb.get_tokens()
+    elif section == "Market":
+        available_tokens = markgetdb.getTokens()
+    else:
+        available_tokens = []
 
-    Shows performance metrics and graphs for each selected token
-    within the specified date range.
-    """
+    temp_tokens = st.multiselect(
+        "Select Tokens to display",
+        available_tokens,
+        default=st.session_state.tokens,
+    )
+    if temp_tokens != st.session_state.tokens:
+        st.session_state.tokens = temp_tokens
+        logger.debug("Tokens list changed")
+        st.rerun()
+    else:
+        logger.debug("Tokens list not changed")
+
+    if st.session_state.tokens:
+        tabs = st.tabs(st.session_state.tokens)
+        idx_token = 0
+        for tab in tabs:
+            with tab:
+                draw_tab_content(section, st.session_state.tokens[idx_token], start_timestamp, end_timestamp)
+            idx_token += 1
+
+    
+def build_price_tab(df: pd.DataFrame):
     logger.debug("Build tabs")
     if df is None or df.empty:
         st.info("No data available")
         return
     if st.session_state.startdate < st.session_state.enddate:
-        if columns is None:
-            available_tokens = list(df.columns)
-            st.session_state.tokens = st.multiselect(
-                "Select Tokens to display",
-                available_tokens,
-                default=st.session_state.tokens,
-            )
-            tokens = st.session_state.tokens
-        else:
-            tokens = columns if all(x in df.columns for x in columns) else None
-        if tokens:
-            tabs = st.tabs(tokens)
-            idx_token = 0
-            for tab in tabs:
-                df_view = df.loc[df.index > str(st.session_state.startdate)]
-                df_view = df_view.loc[
-                    df_view.index
-                    < str(st.session_state.enddate + pd.to_timedelta(1, unit="d"))
-                ]
-                df_view = df_view.loc[:, [tokens[idx_token]]]
-                df_view = df_view.dropna()
 
-                mcol1, mcol2 = tab.columns(2)
-                with mcol1:
-                    nbr_days = st.session_state.enddate - st.session_state.startdate
-                    mcol1.metric("Days", value=nbr_days.days)
-                with mcol2:
-                    first = df_view.iloc[0].values[0]
-                    last = df_view.iloc[-1].values[0]
-                    logger.debug("first: %s, last: %s", first, last)
-                    mcol2.metric(
-                        "Performance",
-                        value=(
-                            f"{round(((last - first) / first) * 100, 2)} %"
-                            if first != 0
-                            else "0 %"
-                            if last == 0
-                            else "∞ %"
-                        ),
-                    )
-                col1, col2 = tab.columns([3, 1])
-                with col1:
-                    plot_as_graph(df_view, col1)
-                with col2:
-                    col2.dataframe(df_view, use_container_width=True)
-                idx_token += 1
+        df_view = df.loc[df.index > str(st.session_state.startdate)]
+        df_view = df_view.loc[
+            df_view.index
+            < str(st.session_state.enddate + pd.to_timedelta(1, unit="d"))
+        ]
+        df_view = df_view.loc[:, ["price"]]
+        df_view = df_view.dropna()
+
+        mcol1, mcol2 = st.columns(2)
+        with mcol1:
+            nbr_days = st.session_state.enddate - st.session_state.startdate
+            mcol1.metric("Days", value=nbr_days.days)
+        with mcol2:
+            first = df_view.iloc[0].values[0]
+            last = df_view.iloc[-1].values[0]
+            logger.debug("first: %s, last: %s", first, last)
+            mcol2.metric(
+                "Performance",
+                value=(
+                    f"{round(((last - first) / first) * 100, 2)} %"
+                    if first != 0
+                    else "0 %"
+                    if last == 0
+                    else "∞ %"
+                ),
+            )
+        col1, col2 = st.columns([3, 1])
+        with col1:
+            plot_as_graph(df_view)
+        with col2:
+            col2.dataframe(df_view, use_container_width=True)
+
     else:
         st.error("The end date must be after the start date")
-
-
-# @st.cache_data(
-#     show_spinner=False,
-#     hash_funcs={str: lambda x: get_file_hash(x) if os.path.isfile(x) else hash(x)},
-# )
-def load_market(dbfile: str) -> pd.DataFrame:
-    """Load market data from database.
-
-    Args:
-        dbfile: Path to database file
-
-    Returns:
-        DataFrame containing market price history
-    """
-    with st.spinner("Loading market..."):
-        logger.debug("Load market")
-        ret = Market(dbfile, st.session_state.settings["coinmarketcap_token"])
-        return ret.getMarket()
 
 
 with st.sidebar:
     add_selectbox = st.selectbox(
         "Assets View",
-        ("Global", "Assets Value", "Assets Count", "Market", "Currency (EURUSD)"),
+        ("Global", "Assets Balances", "Market", "Currency (EURUSD)"),
     )
 
     if add_selectbox != "Global":
@@ -162,10 +191,7 @@ with st.sidebar:
         )
 
 tokensdb = TokensDatabase(st.session_state.settings["dbfile"])
-with st.spinner("Loading balances..."):
-    df_balance = tokensdb.get_balances()
-with st.spinner("Loading token counts..."):
-    df_tokencount = tokensdb.get_token_counts()
+markgetdb = Market(st.session_state.settings["dbfile"], st.session_state.settings["coinmarketcap_token"])
 
 if "tokens" not in st.session_state:
     st.session_state.tokens = []
@@ -175,22 +201,15 @@ if add_selectbox == "Global":
     st.title("Global")
     aggregater_ui()
 
-if add_selectbox == "Assets Value":
-    logger.debug("Assets Value")
-    st.title("Assets Value")
-    build_tabs(df_balance)
-
-if add_selectbox == "Assets Count":
-    logger.debug("Assets Count")
-    st.title("Assets Count")
-    build_tabs(df_tokencount)
+if add_selectbox == "Assets Balances":
+    logger.debug("Assets Balances")
+    st.title("Assets Balances")
+    build_tabs()
 
 if add_selectbox == "Market":
     logger.debug("Market")
     st.title("Market")
-    df_market = load_market(st.session_state.settings["dbfile"])
-    build_tabs(df_market)
-    st.dataframe(df_market, use_container_width=True)
+    build_tabs("Market")
 
 if add_selectbox == "Currency (EURUSD)":
     logger.debug("Currency (EURUSD)")
@@ -200,9 +219,9 @@ if add_selectbox == "Currency (EURUSD)":
         st.session_state.settings["coinmarketcap_token"],
     )
     df_currency = market.get_currency()
-    build_tabs(df_currency, ["price"])
+    build_price_tab(df_currency)
 
-    interpolated = 0.0
+    interpolated: float = 0.0
     with st.form(key="interpolate"):
         col_date, col_time, col_btn = st.columns([3, 2, 1], vertical_alignment="bottom")
         with col_date:

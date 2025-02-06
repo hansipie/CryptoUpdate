@@ -495,9 +495,9 @@ def calc_perf(df: pd.DataFrame, col_token: str, col_rate: str) -> pd.DataFrame:
         df["Perf."] = ((df["Current Rate"] * 100) / df[col_rate]) - 100
     return df
 
-# @st.cache_data(
-#     hash_funcs={str: lambda x: get_file_hash(x) if os.path.isfile(x) else hash(x)},
-# )
+@st.cache_data(
+    hash_funcs={str: lambda x: get_file_hash(x) if os.path.isfile(x) else hash(x)},
+)
 def build_buy_dataframe() -> pd.DataFrame:
     # save buylist to a dataframe
     df = pd.DataFrame(
@@ -526,9 +526,9 @@ def build_buy_dataframe() -> pd.DataFrame:
     return df
 
 
-# @st.cache_data(
-#     hash_funcs={str: lambda x: get_file_hash(x) if os.path.isfile(x) else hash(x)},
-# )
+@st.cache_data(
+    hash_funcs={str: lambda x: get_file_hash(x) if os.path.isfile(x) else hash(x)},
+)
 def build_buy_avg_table():
     """Build a table showing average purchase metrics per token.
     
@@ -564,9 +564,9 @@ def build_buy_avg_table():
     return df
 
 
-# @st.cache_data(
-#     hash_funcs={str: lambda x: get_file_hash(x) if os.path.isfile(x) else hash(x)},
-# )
+@st.cache_data(
+    hash_funcs={str: lambda x: get_file_hash(x) if os.path.isfile(x) else hash(x)},
+)
 def build_swap_dataframe(dbfile: str) -> pd.DataFrame:
     # save swaps list to a dataframe
     df = pd.DataFrame(

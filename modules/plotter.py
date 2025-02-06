@@ -2,6 +2,7 @@ import logging
 import streamlit as st
 import pandas as pd
 import plotly.express as px
+import plotly.graph_objects as go
 
 logger = logging.getLogger(__name__)
 
@@ -11,7 +12,7 @@ def plot_as_pie(df: pd.DataFrame, column):
     if df.empty:
         st.info("No data available")
         return
-    
+
     total = df[column].sum()
     limit = (1 * total) / 100
     logger.debug(f"1% of {total} is {limit}")
@@ -25,7 +26,7 @@ def plot_as_pie(df: pd.DataFrame, column):
         logger.debug(f"Dataframe less than {limit}:\n{dfless}")
 
         dfless_sum = pd.DataFrame(dfless.sum()).T
-        dfless_sum.index = ['Others']
+        dfless_sum.index = ["Others"]
         logger.debug(f"Dataframe less than 1% sum:\n{dfless_sum}")
 
         dffinal = pd.concat([dffinal, dfless_sum])
@@ -34,14 +35,33 @@ def plot_as_pie(df: pd.DataFrame, column):
     fig = px.pie(dffinal, dffinal.index, column, width=700, height=700)
     st.plotly_chart(fig, use_container_width=True)
 
-def plot_as_graph(df: pd.DataFrame, st_object=None):
-    logger.debug(f"Plot with Plotly - StreamlitObject: {st_object}")
+
+def plot_as_graph(df: pd.DataFrame):
+    logger.debug("Plot with Plotly")
     if df.empty:
         st.info("No data available")
         return
-    # Create custom chart with linear time scale
-    fig = px.line(df, x=df.index, y=df.columns)
-    if st_object:
-        st_object.plotly_chart(fig)
-    else:
-        st.plotly_chart(fig)
+
+    fig = go.Figure()
+
+    # Ajouter la première trace en utilisant l'axe y par défaut (yaxis)
+    fig.add_trace(go.Scatter(x=df.index, y=df[df.columns[0]], name=df.columns[0]))
+
+    # Pour les colonnes suivantes, créer un nouvel axe y (yaxis2, yaxis3, etc.)
+    for i, col in enumerate(df.columns[1:], start=2):
+        fig.add_trace(go.Scatter(x=df.index, y=df[col], name=col, yaxis=f"y{i}"))
+        # Ajout ou mise à jour de l'axe y additionnel dans la configuration de la mise en page
+        fig.update_layout(
+            {
+                f"yaxis{i}": {
+                    "title": col,
+                    "overlaying": "y",  # Superpose cet axe sur le premier axe y
+                    "side": "right",  # Place l'axe à droite (vous pouvez ajuster la position)
+                }
+            }
+        )
+
+    # Définir le titre de l'axe y par défaut pour la première colonne
+    fig.update_layout(yaxis={"title": df.columns[0]})
+
+    st.plotly_chart(fig)
