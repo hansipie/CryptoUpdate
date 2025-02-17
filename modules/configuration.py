@@ -41,6 +41,9 @@ class configuration:
         """
         logger.debug("Saving configuration")
         config = {
+            "MarketRaccoon": {
+                "url": settings["marketraccoon_url"]
+            },
             "Notion": {
                 "token": settings["notion_token"],
                 "database": settings["notion_database"], 

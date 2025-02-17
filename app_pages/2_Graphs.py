@@ -1,5 +1,4 @@
 import logging
-import os
 
 import pandas as pd
 import streamlit as st
@@ -9,7 +8,7 @@ from modules.database.portfolios import Portfolios
 from modules.database.tokensdb import TokensDatabase
 from modules.plotter import plot_as_graph, plot_as_pie
 from modules.tools import create_portfolio_dataframe, interpolate_eurusd
-from modules.utils import get_file_hash, toTimestamp_A
+from modules.utils import toTimestamp_A
 
 logger = logging.getLogger(__name__)
 
@@ -62,7 +61,10 @@ def aggregater_ui():
         else:
             st.info("No data available")
 
-def draw_tab_content(section:str, token: str, start_timestamp: int, end_timestamp: int):
+
+def draw_tab_content(
+    section: str, token: str, start_timestamp: int, end_timestamp: int
+):
     logger.debug("Draw tab content for token %s", token)
     if section == "Assets Balances":
         with st.spinner("Loading assets balances..."):
@@ -73,17 +75,29 @@ def draw_tab_content(section:str, token: str, start_timestamp: int, end_timestam
     else:
         df_view = None
     if df_view is not None:
-        mcol1, mcol2 = st.columns(2)
+        if section == "Assets Balances":
+            column_value = "Value"
+            label = "Balance"
+        else:
+            column_value = "Price"
+            label = "Current Price"
+        mcol1, mcol2, mcol3, mcol4 = st.columns(4)
         with mcol1:
-            nbr_days = st.session_state.enddate - st.session_state.startdate
-            mcol1.metric("Days", value=nbr_days.days)
+            nbr_days = df_view.index[-1] - df_view.index[0]
+            st.metric(
+                "Days",
+                value=nbr_days.days,
+                help=f"From {df_view.index[0]} to {df_view.index[-1]}",
+            )
         with mcol2:
+
             first = df_view.iloc[0].values[0]
             last = df_view.iloc[-1].values[0]
-            logger.debug("first: %s, last: %s", first, last)
-            mcol2.metric(
-                "Performance",
-                value=(
+            current_price = df_view[column_value].iloc[-1]
+            st.metric(
+                label,
+                value=f"{round(current_price, 2)} €",
+                delta=(
                     f"{round(((last - first) / first) * 100, 2)} %"
                     if first != 0
                     else "0 %"
@@ -91,18 +105,42 @@ def draw_tab_content(section:str, token: str, start_timestamp: int, end_timestam
                     else "∞ %"
                 ),
             )
+        with mcol3:
+            min_price = df_view[column_value].min()
+            min_price_date = df_view.index[df_view[column_value] == df_view[column_value].min()]
+            st.metric(
+                "Timeframe Low",
+                value=f"{round(min_price, 2)} €",
+                help=f"Date: {min_price_date[0]}",
+                delta=f"{round(((current_price - min_price) / min_price) * 100, 2)} %",
+            )
+        with mcol4:
+            max_price = df_view[column_value].max()
+            max_price_date = df_view.index[df_view[column_value] == df_view[column_value].max()]
+            st.metric(
+                "Timeframe High",
+                value=f"{round(max_price, 2)} €",
+                help=f"Date: {max_price_date[0]}",
+                delta=f"{round(((current_price - max_price) / max_price) * 100, 2)} %",
+            )
+
         col1, col2 = st.columns([3, 1])
         with col1:
             plot_as_graph(df_view)
         with col2:
             col2.dataframe(df_view, use_container_width=True)
+
     else:
         st.info("No data available")
 
 
 def build_tabs(section: str = "Assets Balances"):
-    start_timestamp = toTimestamp_A(st.session_state.startdate, pd.to_datetime("00:00:00").time())
-    end_timestamp = toTimestamp_A(st.session_state.enddate, pd.to_datetime("23:59:59").time())
+    start_timestamp = toTimestamp_A(
+        st.session_state.startdate, pd.to_datetime("00:00:00").time()
+    )
+    end_timestamp = toTimestamp_A(
+        st.session_state.enddate, pd.to_datetime("23:59:59").time()
+    )
     if section == "Assets Balances":
         available_tokens = tokensdb.get_tokens()
     elif section == "Market":
@@ -129,21 +167,24 @@ def build_tabs(section: str = "Assets Balances"):
         idx_token = 0
         for tab in tabs:
             with tab:
-                draw_tab_content(section, st.session_state.tokens[idx_token], start_timestamp, end_timestamp)
+                draw_tab_content(
+                    section,
+                    st.session_state.tokens[idx_token],
+                    start_timestamp,
+                    end_timestamp,
+                )
             idx_token += 1
 
-    
+
 def build_price_tab(df: pd.DataFrame):
     logger.debug("Build tabs")
     if df is None or df.empty:
         st.info("No data available")
         return
     if st.session_state.startdate < st.session_state.enddate:
-
         df_view = df.loc[df.index > str(st.session_state.startdate)]
         df_view = df_view.loc[
-            df_view.index
-            < str(st.session_state.enddate + pd.to_timedelta(1, unit="d"))
+            df_view.index < str(st.session_state.enddate + pd.to_timedelta(1, unit="d"))
         ]
         df_view = df_view.loc[:, ["price"]]
         df_view = df_view.dropna()
@@ -184,16 +225,42 @@ with st.sidebar:
 
     if add_selectbox != "Global":
         st.divider()
-        st.session_state.startdate = st.date_input(
-            "Start date",
-            value=pd.to_datetime("today") - pd.to_timedelta(365, unit="d"),
+        st.session_state.enddate = pd.to_datetime("today")
+        selected_timeframe = st.selectbox(
+            "Timeframe", ["1D", "1W", "1M", "3M", "6M", "1Y", "All"], index=6
         )
-        st.session_state.enddate = st.date_input(
-            "End date", value=pd.to_datetime("today")
-        )
+        if "1D" == selected_timeframe:
+            st.session_state.startdate = st.session_state.enddate - pd.to_timedelta(
+                1, unit="d"
+            )
+        elif "1W" == selected_timeframe:
+            st.session_state.startdate = st.session_state.enddate - pd.to_timedelta(
+                7, unit="d"
+            )
+        elif "1M" == selected_timeframe:
+            st.session_state.startdate = st.session_state.enddate - pd.to_timedelta(
+                30, unit="d"
+            )
+        elif "3M" == selected_timeframe:
+            st.session_state.startdate = st.session_state.enddate - pd.to_timedelta(
+                90, unit="d"
+            )
+        elif "6M" == selected_timeframe:
+            st.session_state.startdate = st.session_state.enddate - pd.to_timedelta(
+                180, unit="d"
+            )
+        elif "1Y" == selected_timeframe:
+            st.session_state.startdate = st.session_state.enddate - pd.to_timedelta(
+                365, unit="d"
+            )
+        else:  # "All" == selected_timeframe:
+            st.session_state.startdate = pd.to_datetime("1900-01-01")
 
 tokensdb = TokensDatabase(st.session_state.settings["dbfile"])
-markgetdb = Market(st.session_state.settings["dbfile"], st.session_state.settings["coinmarketcap_token"])
+markgetdb = Market(
+    st.session_state.settings["dbfile"],
+    st.session_state.settings["coinmarketcap_token"],
+)
 
 if "tokens" not in st.session_state:
     st.session_state.tokens = []

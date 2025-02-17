@@ -1,0 +1,23 @@
+[project]
+name = "cryptoupdate"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "alive-progress>=3.2.0",
+    "dash>=2.18.2",
+    "matplotlib>=3.10.0",
+    "openai>=1.63.0",
+    "pandas>=2.2.3",
+    "plotly>=6.0.0",
+    "python-dotenv>=1.0.1",
+    "ruff>=0.9.6",
+    "st-pages>=1.0.1",
+    "streamlit>=1.42.0",
+    "typer>=0.15.1",
+    "tzlocal>=5.3",
+]
+
+[dependency-groups]
+dev = []

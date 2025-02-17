@@ -12,6 +12,7 @@ import logging
 import os
 import shutil
 import traceback
+from typing import Union
 
 import pandas as pd
 import streamlit as st
@@ -113,6 +114,7 @@ def load_settings(settings: dict):
     logger.debug("Loading settings")
     if "settings" not in st.session_state:
         st.session_state.settings = {}
+    st.session_state.settings["marketraccoon_url"] = settings["MarketRaccoon"]["url"]
     st.session_state.settings["notion_token"] = settings["Notion"]["token"]
     st.session_state.settings["notion_database"] = settings["Notion"]["database"]
     st.session_state.settings["notion_parentpage"] = settings["Notion"]["parentpage"]
@@ -141,17 +143,9 @@ def load_settings(settings: dict):
     )
 
 
-def interpolate_token(token: str, timestamp: int, dbfile: str) -> float:
-    """Interpolate the token value at a given timestamp"""
-
-    market = Market(dbfile, st.session_state.settings["coinmarketcap_token"])
-    if token == "EUR":
-        return 1.0
-    if token == "EURUSD" or token == "USD":
-        df_low, df_high = market.get_currency_lowhigh(timestamp)
-    else:
-        df_low, df_high = market.get_token_lowhigh(token, timestamp)
-
+def __interpolater(
+    df_low: pd.DataFrame, df_high: pd.DataFrame, timestamp: int, token: str = ""
+) -> float:
     if len(df_low) == 0:
         logger.warning(
             "No data found for token: %s at timestamp: %d (%s)",
@@ -169,18 +163,51 @@ def interpolate_token(token: str, timestamp: int, dbfile: str) -> float:
         df_high = df_low.copy()
 
     # Interpoler la valeur
-    price_low = df_low["price"][0]
-    price_high = df_high["price"][0]
-    timestamp_low = df_low["timestamp"][0]
-    timestamp_high = df_high["timestamp"][0]
+    idxlow = df_low.first_valid_index()
+    idxhigh = df_high.first_valid_index()
+    if idxlow is None or idxhigh is None:
+        raise ValueError("No valid index found")
+    price_low = df_low["price"].loc[idxlow]
+    price_high = df_high["price"].loc[idxhigh]
+    timestamp_low = df_low["timestamp"].loc[idxlow]
+    timestamp_high = df_high["timestamp"].loc[idxhigh]
     price = interpolate(timestamp_low, price_low, timestamp_high, price_high, timestamp)
     logger.debug("Price: %f", price)
     return price
 
 
-def interpolate_eurusd(timestamp: int, dbfile: str) -> float:
+def interpolate_token_b(token: str, timestamp: int, df: pd.DataFrame) -> float:
+    """Interpolate the token value at a given timestamp from a dataframe"""
+    logger.debug("Interpolate token - Token: %s - Timestamp: %d - from a dataframe", token, timestamp)
+    if token == "EUR":
+        return 1.0
+    df_low = df[df["timestamp"] <= timestamp].iloc[-1:]
+    df_high = df[df["timestamp"] >= timestamp].iloc[:1]
+
+    return __interpolater(df_low, df_high, timestamp, token)
+
+
+def interpolate_token(token: str, timestamp: int, dbfile: str) -> float:
+    """Interpolate the token value at a given timestamp from the database"""
+    logger.debug("Interpolate token - Token: %s - Timestamp: %d - from the database", token, timestamp)
+    market = Market(dbfile, st.session_state.settings["coinmarketcap_token"])
+    if token == "EUR":
+        return 1.0
+    if token == "EURUSD" or token == "USD":
+        df_low, df_high = market.get_currency_lowhigh(timestamp)
+    else:
+        df_low, df_high = market.get_token_lowhigh(token, timestamp)
+
+    return __interpolater(df_low, df_high, timestamp, token)
+
+
+def interpolate_eurusd(timestamp: int, input_data: Union[str, pd.DataFrame]) -> float:
     """Interpolate the EURUSD value at a given timestamp"""
-    return interpolate_token("EURUSD", timestamp, dbfile)
+    if isinstance(input_data, str):
+        return interpolate_token("EURUSD", timestamp, input_data)
+    if isinstance(input_data, pd.DataFrame):
+        return interpolate_token_b("EURUSD", timestamp, input_data)
+    raise ValueError("Invalid input type")
 
 
 def calculate_crypto_rate(

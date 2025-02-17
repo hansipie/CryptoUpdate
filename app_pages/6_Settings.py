@@ -1,30 +1,11 @@
-import streamlit as st
 import logging
 
-from modules.Notion import Notion
+import requests
+import streamlit as st
+
 from modules.configuration import configuration as Configuration
 
 logger = logging.getLogger(__name__)
-
-
-def createNotionDB():
-    """Create a new Notion database for cryptocurrency tracking.
-    
-    Attempts to create database using configured settings.
-    Shows success/failure status messages.
-    """
-    notion = Notion(st.session_state.notion_token)
-    with st.spinner("Creating database..."):
-        dbid = notion.createDatabase(
-            st.session_state.notion_database, st.session_state.notion_parentpage
-        )
-        if dbid is None:
-            st.error("Database not created. Please check your settings.")
-        elif dbid == "DB_EXISTS":
-            st.warning("Database already exists: " + st.session_state.notion_database)
-        else:
-            st.success("Database created: " + dbid)
-
 
 st.title("Settings")
 
@@ -33,23 +14,28 @@ if "settings" not in st.session_state:
 
 with st.form(key="settings_form"):
 
-    st.subheader("Notion")
-    notion_token = st.text_input(
-        "Notion API token",
-        key="notion_token",
-        type="password",
-        value=st.session_state.settings.get("notion_token"),
+    st.subheader("MarketRaccoon")
+    marketraccoon_url = st.text_input(
+        "MarketRaccoon URL",
+        key="marketraccoon_url",
+        value=st.session_state.settings.get("marketraccoon_url")
     )
-    notion_database = st.text_input(
-        "Database name",
-        key="notion_database",
-        value=st.session_state.settings.get("notion_database"),
-    )
-    notion_parentpage = st.text_input(
-        "Parent page",
-        key="notion_parentpage",
-        value=st.session_state.settings.get("notion_parentpage"),
-    )
+
+    try:
+        response = requests.get(
+            f"{marketraccoon_url}/api/healthcheck",
+            timeout=5,
+        )
+        if response.status_code == 200:
+            st.success("API is up and running.")
+        else:
+            st.error("API is down.")
+    except requests.ConnectionError:
+        st.error("Connection to MarketRaccoon failed.")
+        logger.error("Connection error during API healthcheck.")
+    except requests.Timeout:
+        st.error("API request timed out.")
+        logger.error("API request timed out.")
 
     st.subheader("Coinmarketcap")
     coinmarketcap_token = st.text_input(
@@ -82,13 +68,10 @@ with st.form(key="settings_form"):
 
     if submitted:
         logger.debug("Submitted")
-        st.session_state.settings["notion_token"] = notion_token
-        st.session_state.settings["notion_database"] = notion_database
-        st.session_state.settings["notion_parentpage"] = notion_parentpage
+        st.session_state.settings["marketraccoon_url"] = marketraccoon_url
         st.session_state.settings["coinmarketcap_token"] = coinmarketcap_token
         st.session_state.settings["openai_token"] = openai_token
         st.session_state.settings["debug_flag"] = debug_flag
 
         conf = Configuration()
         conf.saveConfig(st.session_state.settings)
-

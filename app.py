@@ -24,13 +24,14 @@ APP_PAGES = {
     "GRAPHS": "app_pages/2_Graphs.py",
     "OPERATIONS": "app_pages/3_Operations.py",
     "IMPORT": "app_pages/4_Import.py",
-    "SETTINGS": "app_pages/6_Settings.py"
+    "SETTINGS": "app_pages/6_Settings.py",
+    "TEST": "app_pages/X_Tests.py"
 }
 
 def setup_logging():
     """Configure application logging."""
     logging.basicConfig(
-        level=logging.INFO,
+        level=logging.DEBUG,
         format="%(asctime)s - %(levelname)s - %(name)s - %(pathname)s:%(lineno)d - %(message)s",
         handlers=[logging.StreamHandler(sys.stdout)]
     )
@@ -54,13 +55,15 @@ def setup_navigation():
         "graphs": st.Page(APP_PAGES["GRAPHS"], title="Graphs", icon="💰"),
         "operations": st.Page(APP_PAGES["OPERATIONS"], title="Operations", icon="💱"),
         "import": st.Page(APP_PAGES["IMPORT"], title="Import", icon="📥"),
-        "settings": st.Page(APP_PAGES["SETTINGS"], title="Settings", icon="⚙️")
+        "settings": st.Page(APP_PAGES["SETTINGS"], title="Settings", icon="⚙️"),
+        "tests": st.Page(APP_PAGES["TEST"], title="Tests", icon="🧪")
     }
     
     return st.navigation({
         "Main": [pages["home"], pages["portfolios"], pages["graphs"]],
-        "Inputs": [pages["operations"], pages["import"]],
-        "Settings": [pages["settings"]]
+        "Tools": [pages["operations"], pages["import"]],
+        "Settings": [pages["settings"]],
+        "Dev": [pages["tests"]]
     })
 
 def main():

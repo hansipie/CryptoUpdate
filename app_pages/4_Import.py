@@ -54,13 +54,13 @@ def data_ui(df: pd.DataFrame) -> pd.DataFrame:
 
 def extract(input_data: any) -> pd.DataFrame:
     """Extract structured data from input using AI processing.
-    
+
     Args:
         input: Image bytes or DataFrame to process
-        
+
     Returns:
         DataFrame containing extracted asset data
-        
+
     Raises:
         ValueError: If input type is not supported
     """
@@ -80,7 +80,7 @@ def extract(input_data: any) -> pd.DataFrame:
                 output = pd.DataFrame.from_dict(loads(message_json).get("assets"))
             else:
                 raise ValueError("Invalid input type")
-        except Exception as e:
+        except (ValueError, KeyError, TypeError) as e:
             st.error("Unexpected error: " + str(e))
             traceback.print_exc()
             st.stop()
@@ -91,7 +91,7 @@ def extract(input_data: any) -> pd.DataFrame:
 
 def save_data(df: pd.DataFrame, portfolio: str = None, action: str = "Set"):
     """Save imported data to selected portfolio.
-    
+
     Args:
         df: DataFrame containing token data
         portfolio: Name of target portfolio
@@ -118,10 +118,10 @@ def save_data(df: pd.DataFrame, portfolio: str = None, action: str = "Set"):
 
 def processImg(input_file) -> bytes:
     """Process uploaded image file.
-    
+
     Args:
         input_file: Uploaded image file object
-        
+
     Returns:
         Processed image bytes
     """
@@ -134,10 +134,10 @@ def processImg(input_file) -> bytes:
 @st.cache_data
 def processCSV(input_file) -> pd.DataFrame:
     """Process uploaded CSV file.
-    
+
     Args:
         input_file: Uploaded CSV file object
-        
+
     Returns:
         DataFrame containing file contents
     """
@@ -147,7 +147,7 @@ def processCSV(input_file) -> pd.DataFrame:
 
 def drawUI():
     """Draw the import interface UI components.
-    
+
     Shows input preview and extraction controls.
     """
     col_input, col_output = st.columns(2)
@@ -205,39 +205,33 @@ g_portfolio = pf.Portfolios(st.session_state.settings["dbfile"])
 
 st.title("Import")
 
-ai_tab, tests_tab = st.tabs(["AI", "Test"])
+file = st.file_uploader(
+    "Upload a file", type=["png", "jpg", "jpeg", "csv"], on_change=cleanSessionState
+)
 
-with ai_tab:
-    file = st.file_uploader(
-        "Upload a file", type=["png", "jpg", "jpeg", "csv"], on_change=cleanSessionState
-    )
-
-    if file is None:
-        if st.session_state.import_page["input"] is not None:
-            logger.debug("Data already imported")
-            if st.button(
-                "Clear Data", use_container_width=True, icon=":material/delete:"
-            ):
-                cleanSessionState()
-            else:
-                drawUI()
-        else:
-            logger.debug("No file uploaded")
+if file is None:
+    if st.session_state.import_page["input"] is not None:
+        logger.debug("Data already imported")
+        if st.button(
+            "Clear Data", use_container_width=True, icon=":material/delete:"
+        ):
             cleanSessionState()
-    else:
-        logger.debug("File: %s - file type: %s", file.name, file.type)
-
-        if file.type == "application/vnd.ms-excel":
-            logger.debug("CSV file detectimport_pageed")
-            input_file = processCSV(file)
         else:
-            logger.debug("Image file detected")
-            input_file = processImg(file)
-        st.session_state.import_page["type"] = file.type
-        st.session_state.import_page["input"] = input_file
-        drawUI()
+            drawUI()
+    else:
+        logger.debug("No file uploaded")
+        cleanSessionState()
+else:
+    logger.debug("File: %s - file type: %s", file.name, file.type)
 
-with tests_tab:
-    st.write("Test tab")
+    if file.type == "application/vnd.ms-excel":
+        logger.debug("CSV file detectimport_pageed")
+        input_file = processCSV(file)
+    else:
+        logger.debug("Image file detected")
+        input_file = processImg(file)
+    st.session_state.import_page["type"] = file.type
+    st.session_state.import_page["input"] = input_file
+    drawUI()
 
 logger.debug("## ended ##")
