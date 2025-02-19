@@ -86,17 +86,9 @@ with convert_tab:
 
 with raccoon_tab:
 
-    markgetdb = Market(
-        st.session_state.settings["dbfile"],
-        st.session_state.settings["coinmarketcap_token"],
-    )
-
-    available_tokens = markgetdb.getTokens()
-    
-    symbol = st.selectbox("Select a token", available_tokens)
     try:
         response = requests.get(
-            f"{st.session_state.settings['marketraccoon_url']}/api/v1/quotes/all/{symbol}",
+            f"{st.session_state.settings['marketraccoon_url']}/api/v1/fiat/all",
             timeout=5,
         )
         if response.status_code == 200:
@@ -111,7 +103,3 @@ with raccoon_tab:
     except requests.Timeout:
         st.error("API request timed out.")
         logger.error("API request timed out.")
-
-
-
-
