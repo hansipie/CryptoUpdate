@@ -17,7 +17,7 @@ st.title("Portfolios")
 @st.dialog("Add new portfolio")
 def add_new_portfolio():
     """Display dialog for creating a new portfolio.
-    
+
     Shows a form with name input and bundle flag checkbox.
     On submit, creates the new portfolio.
     """
@@ -33,10 +33,10 @@ def add_new_portfolio():
 @st.dialog("Danger Zone")
 def danger_zone(name: str):
     """Display confirmation dialog for deleting a portfolio.
-    
+
     Args:
         name: Name of portfolio to delete
-        
+
     Shows a confirmation prompt requiring typing 'delete'.
     """
     st.write(f"Delete portfolio {name}?")
@@ -49,10 +49,10 @@ def danger_zone(name: str):
 @st.dialog("Rename portfolio")
 def rename_portfolio(name: str):
     """Display dialog for renaming a portfolio.
-    
+
     Args:
         name: Current name of portfolio to rename
-        
+
     Shows input for new name and updates on submit.
     """
     new_name = st.text_input("New name")
@@ -64,10 +64,10 @@ def rename_portfolio(name: str):
 @st.dialog("Add Token")
 def add_token(name: str):
     """Display dialog for adding a token to a portfolio.
-    
+
     Args:
         name: Name of portfolio to add token to
-        
+
     Shows inputs for token symbol and amount.
     """
     st.write(f"Add token to {name}")
@@ -83,10 +83,10 @@ def add_token(name: str):
 @st.dialog("Delete Token")
 def delete_token(portfolio_name: str):
     """Display dialog for removing tokens from a portfolio.
-    
+
     Args:
         portfolio_name: Name of portfolio to remove tokens from
-        
+
     Shows multi-select for choosing tokens to delete.
     """
     st.write(f"Delete token from {portfolio_name}")
@@ -104,10 +104,10 @@ def delete_token(portfolio_name: str):
 
 def portfolioUI(tabs: list):
     """Display portfolio management interface.
-    
+
     Args:
         tabs: List of portfolio names to display
-        
+
     Shows editable tables of token holdings and management buttons
     for each portfolio.
     """
@@ -132,7 +132,9 @@ def portfolioUI(tabs: list):
                     column_config={
                         "token": st.column_config.TextColumn(disabled=True),
                         "amount": st.column_config.NumberColumn(format="%.8g"),
-                        "value(€)": st.column_config.NumberColumn(format="%.2f €", disabled=True),
+                        "value(€)": st.column_config.NumberColumn(
+                            format="%.2f €", disabled=True
+                        ),
                     },
                 )
                 df_diff = dataframe_diff(df, updated_data)
@@ -185,10 +187,10 @@ def portfolioUI(tabs: list):
 
 def load_portfolios(dbfile: str) -> Portfolios:
     """Load portfolios from database file.
-    
+
     Args:
         dbfile: Path to database file
-        
+
     Returns:
         Portfolios instance initialized with the database
     """
@@ -198,7 +200,7 @@ def load_portfolios(dbfile: str) -> Portfolios:
 @st.fragment
 def execute_search():
     """Execute token search and display results.
-    
+
     Shows a table of portfolios containing the searched token
     and their respective amounts.
     """
@@ -237,7 +239,9 @@ with st.sidebar:
     if last_update:
         last_update = pd.Timestamp.fromtimestamp(float(last_update[0]), tz="UTC")
         last_update = pd.Timestamp.now(tz="UTC") - last_update
-        st.markdown(" - *Last update: " + str(last_update).split('.', maxsplit=1)[0] + "*")
+        st.markdown(
+            " - *Last update: " + str(last_update).split(".", maxsplit=1)[0] + "*"
+        )
     else:
         st.markdown(" - *No update yet*")
 

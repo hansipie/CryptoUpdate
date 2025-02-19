@@ -3,12 +3,13 @@ import logging
 import pandas as pd
 import streamlit as st
 
+from modules.database.apimarket import ApiMarket
 from modules.database.market import Market
 from modules.database.portfolios import Portfolios
 from modules.database.tokensdb import TokensDatabase
 from modules.plotter import plot_as_graph, plot_as_pie
-from modules.tools import create_portfolio_dataframe, interpolate_eurusd
-from modules.utils import toTimestamp_A
+from modules.tools import create_portfolio_dataframe, interpolate_price
+from modules.utils import toTimestamp_A, toTimestamp_B
 
 logger = logging.getLogger(__name__)
 
@@ -90,7 +91,6 @@ def draw_tab_content(
                 help=f"From {df_view.index[0]} to {df_view.index[-1]}",
             )
         with mcol2:
-
             first = df_view.iloc[0].values[0]
             last = df_view.iloc[-1].values[0]
             current_price = df_view[column_value].iloc[-1]
@@ -107,7 +107,9 @@ def draw_tab_content(
             )
         with mcol3:
             min_price = df_view[column_value].min()
-            min_price_date = df_view.index[df_view[column_value] == df_view[column_value].min()]
+            min_price_date = df_view.index[
+                df_view[column_value] == df_view[column_value].min()
+            ]
             st.metric(
                 "Timeframe Low",
                 value=f"{round(min_price, 2)} €",
@@ -116,7 +118,9 @@ def draw_tab_content(
             )
         with mcol4:
             max_price = df_view[column_value].max()
-            max_price_date = df_view.index[df_view[column_value] == df_view[column_value].max()]
+            max_price_date = df_view.index[
+                df_view[column_value] == df_view[column_value].max()
+            ]
             st.metric(
                 "Timeframe High",
                 value=f"{round(max_price, 2)} €",
@@ -220,7 +224,7 @@ def build_price_tab(df: pd.DataFrame):
 with st.sidebar:
     add_selectbox = st.selectbox(
         "Assets View",
-        ("Global", "Assets Balances", "Market", "Currency (EURUSD)"),
+        ("Global", "Assets Balances", "Market", "Currency (USDEUR)"),
     )
 
     if add_selectbox != "Global":
@@ -280,13 +284,10 @@ if add_selectbox == "Market":
     st.title("Market")
     build_tabs("Market")
 
-if add_selectbox == "Currency (EURUSD)":
-    logger.debug("Currency (EURUSD)")
-    st.title("Currency (EURUSD)")
-    market = Market(
-        st.session_state.settings["dbfile"],
-        st.session_state.settings["coinmarketcap_token"],
-    )
+if add_selectbox == "Currency (USDEUR)":
+    logger.debug("Currency (USDEUR)")
+    st.title("Currency (USDEUR)")
+    market = ApiMarket(st.session_state.settings["marketraccoon_url"])
     df_currency = market.get_currency()
     build_price_tab(df_currency)
 
@@ -302,12 +303,12 @@ if add_selectbox == "Currency (EURUSD)":
                 "Submit",
                 use_container_width=True,
             ):
-                timestamp = toTimestamp_A(date, time)
-                interpolated = interpolate_eurusd(
-                    timestamp, st.session_state.settings["dbfile"]
-                )
+                timestamp = toTimestamp_B(date, time, utc=False)
+                df_low, df_high = market.get_currency_lowhigh(timestamp)
+                interpolated = interpolate_price(df_low, df_high, timestamp, "USDEUR")
+
         if interpolated is not None:
             if interpolated != 0.0:
-                st.info(f"Interpolated value: {interpolated} USD")
+                st.info(f"Interpolated value: {interpolated} EUR")
         else:
             st.info("No data available")

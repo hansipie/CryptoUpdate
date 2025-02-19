@@ -17,6 +17,7 @@ from typing import Union
 import pandas as pd
 import streamlit as st
 
+from modules.database.apimarket import ApiMarket
 from modules.database.customdata import Customdata
 from modules.database.market import Market
 from modules.database.portfolios import Portfolios
@@ -143,71 +144,55 @@ def load_settings(settings: dict):
     )
 
 
-def __interpolater(
+def interpolate_price(
     df_low: pd.DataFrame, df_high: pd.DataFrame, timestamp: int, token: str = ""
 ) -> float:
-    if len(df_low) == 0:
-        logger.warning(
-            "No data found for token: %s at timestamp: %d (%s)",
-            token,
-            timestamp,
-            pd.Timestamp.fromtimestamp(int(timestamp), tz="UTC"),
-        )
-        return None
-    if len(df_high) == 0:
+    """Interpolate the price at a given timestamp from two dataframes"""
+    if df_high.empty:
         logger.debug(
-            "No high data found for token: %s and timestamp: %d - using low data",
+            "No high data found for token: %s at timestamp: %d ... using low",
             token,
             timestamp,
         )
         df_high = df_low.copy()
 
+    if df_low.empty:
+        logger.warning("No data found for token: %s at timestamp: %d", token, timestamp)
+        return None
+
+    logger.debug(
+        "Interpolate price - Token: %s - Timestamp: %d\nLow:\n%s\nHigh:\n%s",
+        token,
+        timestamp,
+        df_low,
+        df_high,
+    )
+
     # Interpoler la valeur
-    idxlow = df_low.first_valid_index()
-    idxhigh = df_high.first_valid_index()
-    if idxlow is None or idxhigh is None:
-        raise ValueError("No valid index found")
-    price_low = df_low["price"].loc[idxlow]
-    price_high = df_high["price"].loc[idxhigh]
-    timestamp_low = df_low["timestamp"].loc[idxlow]
-    timestamp_high = df_high["timestamp"].loc[idxhigh]
+    try:
+        price_low = df_low["price"].iloc[-1]
+        price_high = df_high["price"].iloc[0]
+        timestamp_low = df_low["timestamp"].iloc[-1]
+        timestamp_high = df_high["timestamp"].iloc[0]
+    except Exception as e:
+        logger.error("Error interpolating price: %s", e)
+        return None
     price = interpolate(timestamp_low, price_low, timestamp_high, price_high, timestamp)
     logger.debug("Price: %f", price)
     return price
 
 
-def interpolate_token_b(token: str, timestamp: int, df: pd.DataFrame) -> float:
-    """Interpolate the token value at a given timestamp from a dataframe"""
-    logger.debug("Interpolate token - Token: %s - Timestamp: %d - from a dataframe", token, timestamp)
-    if token == "EUR":
-        return 1.0
-    df_low = df[df["timestamp"] <= timestamp].iloc[-1:]
-    df_high = df[df["timestamp"] >= timestamp].iloc[:1]
-
-    return __interpolater(df_low, df_high, timestamp, token)
-
-
-def interpolate_token(token: str, timestamp: int, dbfile: str) -> float:
+def __interpolate_token(token: str, timestamp: int, dbfile: str) -> float:
     """Interpolate the token value at a given timestamp from the database"""
-    logger.debug("Interpolate token - Token: %s - Timestamp: %d - from the database", token, timestamp)
+    logger.debug(
+        "Interpolate token - Token: %s - Timestamp: %d - from the database",
+        token,
+        timestamp,
+    )
     market = Market(dbfile, st.session_state.settings["coinmarketcap_token"])
-    if token == "EUR":
-        return 1.0
-    if token == "EURUSD" or token == "USD":
-        df_low, df_high = market.get_currency_lowhigh(timestamp)
-    else:
-        df_low, df_high = market.get_token_lowhigh(token, timestamp)
+    df_low, df_high = market.get_token_lowhigh(token, timestamp)
 
-    return __interpolater(df_low, df_high, timestamp, token)
-
-
-def interpolate_eurusd(timestamp: int, input_data: Union[str, pd.DataFrame]) -> float:
-    """Interpolate the EURUSD value at a given timestamp"""
-    if isinstance(input_data, str):
-        return interpolate_token("EURUSD", timestamp, input_data)
-    if isinstance(input_data, pd.DataFrame):
-        return interpolate_token_b("EURUSD", timestamp, input_data)
-    raise ValueError("Invalid input type")
+    return interpolate_price(df_low, df_high, timestamp, token)
 
 
 def calculate_crypto_rate(
@@ -221,8 +206,8 @@ def calculate_crypto_rate(
         timestamp,
     )
 
-    value_a = interpolate_token(token_a, timestamp, dbfile)
-    value_b = interpolate_token(token_b, timestamp, dbfile)
+    value_a = __interpolate_token(token_a, timestamp, dbfile)
+    value_b = __interpolate_token(token_b, timestamp, dbfile)
     if value_a is None or value_b is None:
         return None
     rate = value_a / value_b

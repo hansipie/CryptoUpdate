@@ -4,6 +4,7 @@ import os
 
 import pandas as pd
 import tzlocal
+from dateutil import parser
 
 
 logger = logging.getLogger(__name__)
@@ -32,33 +33,61 @@ def interpolate(x1, y1, x2, y2, x):
 def toTimestamp_A(date, time):
     # date if formated as yyyy-mm-dd, time as hh:mm:00
     # merge them to a datetime object, convert to UTC and then to epoch timestamp
-    logger.debug(f"toTimestamp: date={date}, time={time}")
+    logger.debug("toTimestamp: date=%s, time=%s", date, time)
     datetime_local = pd.to_datetime(f"{date} {time}")
     local_timezone = tzlocal.get_localzone()
-    logger.debug(f"Timezone locale: {local_timezone}")
+    logger.debug("Timezone locale: %s", local_timezone)
     datetime_utc = datetime_local.tz_localize(local_timezone).tz_convert("UTC")
     timestamp = datetime_utc.timestamp()
     logger.debug(
-        f"timestamp={timestamp} [local_time={datetime_local}, utc_time={datetime_utc}]"
+        "timestamp=%s [local_time=%s, utc_time=%s]",
+        timestamp,
+        datetime_local,
+        datetime_utc,
     )
     return timestamp
 
 
-def toTimestamp_B(date: str, time: str = "") -> float:
+def toTimestamp_B(date: str, time: str = "", utc=False) -> float:
     # date if formated as ISO 8601
     # convert to a datetime object, convert to UTC and then to epoch timestamp
     if time:
-        date = f"{date}T{time}"
-    logger.debug(f"toTimestamp: date={date}")
-    datetime_local = pd.to_datetime(date)
-    local_timezone = tzlocal.get_localzone()
-    logger.debug(f"Timezone locale: {local_timezone}")
-    datetime_utc = datetime_local.tz_localize(local_timezone).tz_convert("UTC")
+        datetime_in = f"{date} {time}"
+    else:
+        datetime_in = date
+
+    logger.debug("toTimestamp: date=%s", datetime_in)
+
+    try:
+        datetime_formated = parser.parse(datetime_in)
+        logger.debug("Parsed datetime: %s", datetime_formated)
+    except Exception as e:
+        logger.error("Error parsing date: %s", e)
+        raise
+
+    if utc:
+        datetime_utc = datetime_formated
+    else:
+        datetime_local = pd.to_datetime(datetime_formated)
+        logger.debug("Local datetime: %s", datetime_local)
+        local_timezone = tzlocal.get_localzone()
+        logger.debug("Timezone locale: %s", local_timezone)
+        datetime_utc = datetime_local.tz_localize(local_timezone).tz_convert("UTC")
+
     timestamp = datetime_utc.timestamp()
     logger.debug(
-        f"timestamp={timestamp} [local_time={datetime_local}, utc_time={datetime_utc}]"
+        "timestamp=%s [local_time=%s, utc_time=%s]",
+        timestamp,
+        datetime_formated,
+        datetime_utc,
     )
     return timestamp
+
+
+def fromTimestamp(timestamp: int) -> str:
+    # convert epoch timestamp to a datetime object in UTC
+    datetime_utc = pd.Timestamp.fromtimestamp(timestamp, tz="UTC")
+    return datetime_utc.strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def get_file_hash(filename):

@@ -25,17 +25,19 @@ APP_PAGES = {
     "OPERATIONS": "app_pages/3_Operations.py",
     "IMPORT": "app_pages/4_Import.py",
     "SETTINGS": "app_pages/6_Settings.py",
-    "TEST": "app_pages/X_Tests.py"
+    "TEST": "app_pages/X_Tests.py",
 }
+
 
 def setup_logging():
     """Configure application logging."""
     logging.basicConfig(
         level=logging.DEBUG,
         format="%(asctime)s - %(levelname)s - %(name)s - %(pathname)s:%(lineno)d - %(message)s",
-        handlers=[logging.StreamHandler(sys.stdout)]
+        handlers=[logging.StreamHandler(sys.stdout)],
     )
     return logging.getLogger(__name__)
+
 
 def init_config():
     """Initialize application configuration."""
@@ -43,9 +45,12 @@ def init_config():
     try:
         config.readConfig()
     except FileNotFoundError:
-        st.error("Settings file not found. Please verify your configuration file exists and is accessible.")
+        st.error(
+            "Settings file not found. Please verify your configuration file exists and is accessible."
+        )
         st.stop()
     return config
+
 
 def setup_navigation():
     """Configure application navigation structure."""
@@ -56,15 +61,18 @@ def setup_navigation():
         "operations": st.Page(APP_PAGES["OPERATIONS"], title="Operations", icon="💱"),
         "import": st.Page(APP_PAGES["IMPORT"], title="Import", icon="📥"),
         "settings": st.Page(APP_PAGES["SETTINGS"], title="Settings", icon="⚙️"),
-        "tests": st.Page(APP_PAGES["TEST"], title="Tests", icon="🧪")
+        "tests": st.Page(APP_PAGES["TEST"], title="Tests", icon="🧪"),
     }
-    
-    return st.navigation({
-        "Main": [pages["home"], pages["portfolios"], pages["graphs"]],
-        "Tools": [pages["operations"], pages["import"]],
-        "Settings": [pages["settings"]],
-        "Dev": [pages["tests"]]
-    })
+
+    return st.navigation(
+        {
+            "Main": [pages["home"], pages["portfolios"], pages["graphs"]],
+            "Tools": [pages["operations"], pages["import"]],
+            "Settings": [pages["settings"]],
+            "Dev": [pages["tests"]],
+        }
+    )
+
 
 def main():
     """Main application entry point."""
@@ -73,11 +81,7 @@ def main():
     logger.debug("### Start Render ###")
 
     # Configure Streamlit page
-    st.set_page_config(
-        layout="wide",
-        page_title="CryptoUpdate",
-        page_icon="📈"
-    )
+    st.set_page_config(layout="wide", page_title="CryptoUpdate", page_icon="📈")
 
     # Initialize configuration
     config = init_config()
@@ -93,6 +97,7 @@ def main():
         st.write(st.session_state)
 
     logger.debug("### End Render ###")
+
 
 if __name__ == "__main__":
     main()

@@ -23,7 +23,7 @@ class Customdata:
                 """
             )
             conn.commit()
-    
+
     def set(self, name: str, value: str, val_type: str):
         logger.debug("Setting %s to %s (%s)", name, value, val_type)
         with sqlite3.connect(self.db) as conn:
@@ -46,7 +46,7 @@ class Customdata:
             if row is None:
                 return None
             return row
-    
+
     def delete(self, name: str):
         logger.debug("Deleting %s", name)
         with sqlite3.connect(self.db) as conn:

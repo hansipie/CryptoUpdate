@@ -13,12 +13,11 @@ if "settings" not in st.session_state:
     st.session_state.settings = {}
 
 with st.form(key="settings_form"):
-
     st.subheader("MarketRaccoon")
     marketraccoon_url = st.text_input(
         "MarketRaccoon URL",
         key="marketraccoon_url",
-        value=st.session_state.settings.get("marketraccoon_url")
+        value=st.session_state.settings.get("marketraccoon_url"),
     )
 
     try:

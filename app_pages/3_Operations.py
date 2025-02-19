@@ -589,7 +589,6 @@ def build_swap_dataframe(dbfile: str) -> pd.DataFrame:
         axis=1,
     )
 
-
     # Calculate performance for each swap
     df["Perf."] = swap_perf(df["Swap Rate"], df["Current Rate"])
 
@@ -734,7 +733,7 @@ with swap_tab:
                     "To Amount",
                     "To Token",
                     "From Wallet",
-                    "To Wallet",                    
+                    "To Wallet",
                     "Swap Rate",
                     "Current Rate",
                     "Perf.",  # Ajout de la colonne Perf. dans l'ordre des colonnes

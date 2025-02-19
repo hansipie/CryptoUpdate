@@ -14,6 +14,7 @@ import pandas as pd
 import pytz
 import requests
 import tzlocal
+import streamlit as st
 
 from modules.cmc import cmc
 
@@ -97,8 +98,10 @@ class Market:
             df_market.sort_index(inplace=True)
             df_market = df_market.reindex(sorted(df_market.columns), axis=1)
             return df_market
-        
-    def get_token_market(self, token: str, from_timestamp: int = None, to_timestamp: int = None) -> pd.DataFrame:
+
+    def get_token_market(
+        self, token: str, from_timestamp: int = None, to_timestamp: int = None
+    ) -> pd.DataFrame:
         """Get historical market data for a token.
 
         Args:
@@ -391,24 +394,6 @@ class Market:
             )
             con.commit()
 
-    def get_currency(self) -> pd.DataFrame:
-        """Get historical currency rates.
-
-        Returns:
-            DataFrame with currency rates over time or None if empty
-        """
-        logger.debug("Get currency")
-        with sqlite3.connect(self.db_path) as con:
-            df = pd.read_sql_query("SELECT * from Currency", con)
-            if df.empty:
-                return None
-            df["timestamp"] = pd.to_datetime(df["timestamp"], unit="s", utc=True)
-            df["timestamp"] = df["timestamp"].dt.tz_convert(self.local_timezone)
-            df.rename(columns={"timestamp": "Date"}, inplace=True)
-            df.set_index("Date", inplace=True)
-            df.sort_index(inplace=True)
-            return df
-
     def get_token_lowhigh(self, token: str, timestamp: int) -> pd.DataFrame:
         """Get the low and high values for a token at a given timestamp.
 
@@ -426,26 +411,6 @@ class Market:
             )
             df_high = pd.read_sql_query(
                 f"SELECT timestamp, price from Market WHERE token = '{token}' AND timestamp >= {timestamp} ORDER BY timestamp ASC LIMIT 1;",
-                con,
-            )
-            return df_low, df_high
-
-    def get_currency_lowhigh(self, timestamp: int) -> pd.DataFrame:
-        """Get the low and high values for EURUSD at a given timestamp.
-
-        Args:
-            timestamp: Unix timestamp
-
-        Returns:
-            DataFrame with low and high values
-        """
-        with sqlite3.connect(self.db_path) as con:
-            df_low = pd.read_sql_query(
-                f"SELECT timestamp, price from Currency WHERE timestamp <= {timestamp} ORDER BY timestamp DESC LIMIT 1;",
-                con,
-            )
-            df_high = pd.read_sql_query(
-                f"SELECT timestamp, price from Currency WHERE timestamp >= {timestamp} ORDER BY timestamp ASC LIMIT 1;",
                 con,
             )
             return df_low, df_high

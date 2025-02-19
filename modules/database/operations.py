@@ -36,7 +36,14 @@ class operations:
             conn.commit()
 
     def insert(
-        self, type, source, destination, source_unit, destination_unit, timestamp, portfolio
+        self,
+        type,
+        source,
+        destination,
+        source_unit,
+        destination_unit,
+        timestamp,
+        portfolio,
     ):
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
@@ -45,7 +52,15 @@ class operations:
                 INSERT INTO Operations (type, source, destination, source_unit, destination_unit, timestamp, portfolio)
                 VALUES (?, ?, ?, ?, ?, ?, ?)
             """,
-                (type, source, destination, source_unit, destination_unit, timestamp, portfolio),
+                (
+                    type,
+                    source,
+                    destination,
+                    source_unit,
+                    destination_unit,
+                    timestamp,
+                    portfolio,
+                ),
             )
             conn.commit()
 
@@ -64,9 +79,12 @@ class operations:
     def get_operations_by_type(self, op_type: str) -> list:
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT * FROM Operations WHERE type = ? ORDER BY timestamp DESC", (op_type,))
+            cursor.execute(
+                "SELECT * FROM Operations WHERE type = ? ORDER BY timestamp DESC",
+                (op_type,),
+            )
             return cursor.fetchall()
-        
+
     def sum_buyoperations(self) -> float:
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
@@ -75,9 +93,11 @@ class operations:
             if ret is None:
                 return 0
             return ret
-    
+
     def get_averages(self) -> list:
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT destination_unit, SUM(source), source_unit, SUM(destination) FROM Operations WHERE type = 'buy' GROUP BY destination_unit, source_unit")
+            cursor.execute(
+                "SELECT destination_unit, SUM(source), source_unit, SUM(destination) FROM Operations WHERE type = 'buy' GROUP BY destination_unit, source_unit"
+            )
             return cursor.fetchall()

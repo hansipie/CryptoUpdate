@@ -17,7 +17,7 @@ class cmc:
         """
         Get the price of the fiat currencies from the Coinmarketcap API
         """
-        
+
         if converts is None:
             converts = ["USD"]
 
@@ -59,9 +59,13 @@ class cmc:
 
                     if price_data is not None:
                         fiat_prices[fiat]["price"] = price_data
-                        utc_time = datetime.strptime(timestamp_data, "%Y-%m-%dT%H:%M:%S.%fZ")
-                        fiat_prices[fiat]["timestamp"] = utc_time.replace(tzinfo=pytz.UTC).timestamp()
-                        
+                        utc_time = datetime.strptime(
+                            timestamp_data, "%Y-%m-%dT%H:%M:%S.%fZ"
+                        )
+                        fiat_prices[fiat]["timestamp"] = utc_time.replace(
+                            tzinfo=pytz.UTC
+                        ).timestamp()
+
                 except (KeyError, IndexError, TypeError) as e:
                     logger.error("Error getting price for %s : %s", fiat, str(e))
                     traceback.print_exc()
@@ -113,7 +117,7 @@ class cmc:
                     logger.debug("Price for %s: %s", name, price_data)
                 except (KeyError, IndexError, TypeError) as e:
                     logger.error("Error getting price for %s : %s", name, str(e))
-                    logger.debug("Data received: %s", content['data'][name])
+                    logger.debug("Data received: %s", content["data"][name])
             return crypto_prices
         else:
             logger.error("Error: %d", response.status_code)

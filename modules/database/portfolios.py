@@ -72,7 +72,9 @@ class Portfolios:
     def add_portfolio(self, name: str, bundle: int = 0):
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
-            cursor.execute("INSERT INTO Portfolios (name, bundle) VALUES (?, ?)", (name, bundle))
+            cursor.execute(
+                "INSERT INTO Portfolios (name, bundle) VALUES (?, ?)", (name, bundle)
+            )
             conn.commit()
 
     def delete_portfolio(self, name: str):
@@ -205,9 +207,10 @@ class Portfolios:
         logger.debug("Update portfolio - Data: %s", input_data.items())
         for portfolio_name, tokens in input_data.items():
             logger.debug(
-                "Update portfolio - Name: %s - Tokens: %s", portfolio_name, tokens.items()
+                "Update portfolio - Name: %s - Tokens: %s",
+                portfolio_name,
+                tokens.items(),
             )
             for token_name, token_details in tokens.items():
                 self.set_token(portfolio_name, token_name, token_details["amount"])
         return True
-

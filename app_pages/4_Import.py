@@ -212,9 +212,7 @@ file = st.file_uploader(
 if file is None:
     if st.session_state.import_page["input"] is not None:
         logger.debug("Data already imported")
-        if st.button(
-            "Clear Data", use_container_width=True, icon=":material/delete:"
-        ):
+        if st.button("Clear Data", use_container_width=True, icon=":material/delete:"):
             cleanSessionState()
         else:
             drawUI()

@@ -66,7 +66,6 @@ def extract_from_df(df: pd.DataFrame, api_key: str):
 
 
 def extract_from_img(bytes_data: bytes, api_key: str):
-
     type_image = get_image_type(bytes_data)
     if type_image is None:
         logger.debug("Invalid image.")
