@@ -105,33 +105,18 @@ def submit_swap(
     )
 
 
-def swap_row_selected():
+def rows_selected(selectable) -> list:
     """Get the selected row index in the swap table"""
-    logger.debug("Row selection: %s", st.session_state.swapselection)
+    logger.debug("Row selection: %s", selectable)
     if (
-        "selection" in st.session_state.swapselection
-        and "rows" in st.session_state.swapselection["selection"]
-        and len(st.session_state.swapselection["selection"]["rows"]) > 0
+        "selection" in selectable
+        and "rows" in selectable["selection"]
+        and len(selectable["selection"]["rows"]) > 0
     ):
-        selected_row = st.session_state.swapselection["selection"]["rows"][0]
+        selected_row = selectable["selection"]["rows"]
         return selected_row
     else:
         logger.debug("No swap row selected")
-        return None
-
-
-def buy_row_selected():
-    """Get the selected row index in the buy table"""
-    logger.debug("Row selection: %s", st.session_state.buyselection)
-    if (
-        "selection" in st.session_state.buyselection
-        and "rows" in st.session_state.buyselection["selection"]
-        and len(st.session_state.buyselection["selection"]["rows"]) > 0
-    ):
-        selected_row = st.session_state.buyselection["selection"]["rows"][0]
-        return selected_row
-    else:
-        logger.debug("No buy row selected")
         return None
 
 
@@ -374,7 +359,7 @@ def buy_delete_dialog(data: dict):
 
 
 @st.dialog("Delete Swap")
-def swap_delete_dialog(data: dict):
+def swap_delete_dialog(rows: list):
     """Display confirmation dialog for deleting a swap operation.
 
     Args:
@@ -383,12 +368,67 @@ def swap_delete_dialog(data: dict):
     Shows a confirmation prompt with operation details.
     On confirm, deletes the operation.
     """
-    logger.debug("Dialog Delete row: %s", data["id"])
-    st.dataframe(data, use_container_width=True)
-    st.write("Are you sure you want to delete this swap?")
+    todelete = []
+    for rowidx in rows:
+        data = df_swap.iloc[rowidx].to_dict()
+        todelete.append(data)
+
+    logger.debug("Dialog Delete row: %s", todelete)
+    st.write(f"{len(todelete)} swap(s) selected. Are you sure you want to delete?")
+
     if st.button("Confirm"):
-        logger.debug("Delete row: %s - %s", data, type(data["id"]))
-        g_swaps.delete(data["id"])
+        for data in todelete:
+            logger.debug("Delete row: %s - %s", data, type(data["id"]))
+            g_swaps.delete(data["id"])
+        st.rerun()
+
+
+@st.dialog("Archive Swap")
+def swap_archive_dialog(rows: list):
+    """Display confirmation dialog for archiving a swap operation.
+
+    Args:
+        data: Dictionary containing the swap operation data to archive
+
+    Shows a confirmation prompt with operation details.
+    On confirm, archives the operation.
+    """
+    toarchive = []
+    for rowidx in rows:
+        data = df_swap.iloc[rowidx].to_dict()
+        toarchive.append(data)
+
+    logger.debug("Dialog Archive row: %s", toarchive)
+    st.write(f"{len(toarchive)} swap(s) selected. Are you sure you want to archive?")
+
+    if st.button("Confirm"):
+        for data in toarchive:
+            logger.debug("Archive row: %s - %s", data, type(data["id"]))
+            g_swaps.update_tag(data["id"], "archived")
+        st.rerun()
+
+@st.dialog("Unarchive Swap")
+def swap_unarchive_dialog(rows: list):
+    """Display confirmation dialog for unarchiving a swap operation.
+
+    Args:
+        data: Dictionary containing the swap operation data to unarchive
+
+    Shows a confirmation prompt with operation details.
+    On confirm, unarchives the operation.
+    """
+    tounarchive = []
+    for rowidx in rows:
+        data = df_swap_arch.iloc[rowidx].to_dict()
+        tounarchive.append(data)
+
+    logger.debug("Dialog Unarchive row: %s", tounarchive)
+    st.write(f"{len(tounarchive)} swap(s) selected. Are you sure you want to unarchive?")
+
+    if st.button("Confirm"):
+        for data in tounarchive:
+            logger.debug("Unarchive row: %s - %s", data, type(data["id"]))
+            g_swaps.update_tag(data["id"], None)
         st.rerun()
 
 
@@ -398,24 +438,11 @@ def buy_edit():
     Shows edit dialog if a row is selected.
     Otherwise displays a warning toast.
     """
-    rowidx = buy_row_selected()
+    rowidx = rows_selected(st.session_state.buyselection)[0]
     if rowidx is None:
         st.toast("Please select a row", icon=":material/warning:")
     else:
         buy_edit_dialog(df_buy.iloc[rowidx].to_dict())
-
-
-def swap_edit():
-    """Handle editing of selected swap operation.
-
-    Shows edit dialog if a row is selected.
-    Otherwise displays a warning toast.
-    """
-    rowidx = swap_row_selected()
-    if rowidx is None:
-        st.toast("Please select a row", icon=":material/warning:")
-    else:
-        swap_edit_dialog(df_swap.iloc[rowidx].to_dict())
 
 
 def buy_delete():
@@ -425,12 +452,28 @@ def buy_delete():
     Otherwise displays a warning toast.
     """
     logger.debug("Delete row")
-    rowidx = buy_row_selected()
+    rowidx = rows_selected(st.session_state.buyselection)[0]
     if rowidx is None:
         st.toast("Please select a row", icon=":material/warning:")
     else:
         buy_delete_dialog(df_buy.iloc[rowidx].to_dict())
     pass
+
+
+def swap_edit():
+    """Handle editing of selected swap operation.
+
+    Shows edit dialog if a row is selected.
+    Otherwise displays a warning toast.
+    """
+    rowidx = rows_selected(st.session_state.swapselection)
+    if len(rowidx) > 1:
+        st.toast("Please select only one row", icon=":material/warning:")
+    else:
+        if rowidx[0] is None:
+            st.toast("Please select a row", icon=":material/warning:")
+        else:
+            swap_edit_dialog(df_swap.iloc[rowidx[0]].to_dict())
 
 
 def swap_delete():
@@ -440,11 +483,39 @@ def swap_delete():
     Otherwise displays a warning toast.
     """
     logger.debug("Delete row")
-    rowidx = swap_row_selected()
+    rowidx = rows_selected(st.session_state.swapselection)
     if rowidx is None:
         st.toast("Please select a row", icon=":material/warning:")
     else:
-        swap_delete_dialog(df_swap.iloc[rowidx].to_dict())
+        swap_delete_dialog(rowidx)
+
+
+def swap_archive():
+    """Handle archiving of selected swap operation.
+
+    Shows confirmation dialog if a row is selected.
+    Otherwise displays a warning toast.
+    """
+    logger.debug("Archive row")
+    rowidx = rows_selected(st.session_state.swapselection)
+    if rowidx is None:
+        st.toast("Please select a row", icon=":material/warning:")
+    else:
+        swap_archive_dialog(rowidx)
+
+def swap_unarchive():
+    """Handle unarchiving of selected swap operation.
+
+    Shows confirmation dialog if a row is selected.
+    Otherwise displays a warning toast.
+    """
+    logger.debug("Unarchive row")
+    rowidx = rows_selected(st.session_state.swapachselection)
+    if rowidx is None:
+        st.toast("Please select a row", icon=":material/warning:")
+    else:
+        swap_unarchive_dialog(rowidx)
+        
 
 
 def calc_perf(df: pd.DataFrame, col_token: str, col_rate: str) -> pd.DataFrame:
@@ -547,10 +618,9 @@ def build_buy_avg_table():
 @st.cache_data(
     hash_funcs={str: lambda x: get_file_hash(x) if os.path.isfile(x) else hash(x)},
 )
-def build_swap_dataframe(dbfile: str) -> pd.DataFrame:
-    # save swaps list to a dataframe
-    df = pd.DataFrame(
-        g_swaps.get(),
+def build_swap_dataframes(db_file: str) -> pd.DataFrame:
+    df1 = pd.DataFrame(
+        g_swaps.get_by_tag(""),
         columns=[
             "id",
             "timestamp",
@@ -563,10 +633,35 @@ def build_swap_dataframe(dbfile: str) -> pd.DataFrame:
             "tag",
         ],
     )
+    if not df1.empty:
+        df1 = build_swap_dataframe(df1)
+    else:
+        st.info("No swap operations")
 
-    if df.empty:
-        return df
+    df2 = pd.DataFrame(
+        g_swaps.get_by_tag("archived"),
+        columns=[
+            "id",
+            "timestamp",
+            "From Token",
+            "From Amount",
+            "From Wallet",
+            "To Token",
+            "To Amount",
+            "To Wallet",
+            "tag",
+        ],
+    )
+    if not df2.empty:
+        df2 = build_swap_dataframe(df2)
+    else:
+        st.info("No archived swaps")
 
+    return df1, df2
+
+
+@st.cache_data()
+def build_swap_dataframe(df: pd.DataFrame) -> pd.DataFrame:
     # convert timestamp to datetime
     df["Date"] = pd.to_datetime(df["timestamp"], unit="s", utc=True)
     local_timezone = tzlocal.get_localzone()
@@ -582,7 +677,7 @@ def build_swap_dataframe(dbfile: str) -> pd.DataFrame:
             row["From Token"],
             row["To Token"],
             int(pd.Timestamp.now(tz="UTC").timestamp()),
-            dbfile,
+            st.session_state.settings["dbfile"],
         )
         if row["From Token"] != row["To Token"]
         else 1.0,
@@ -593,6 +688,76 @@ def build_swap_dataframe(dbfile: str) -> pd.DataFrame:
     df["Perf."] = swap_perf(df["Swap Rate"], df["Current Rate"])
 
     return df
+
+
+def draw_swap(df: pd.DataFrame):
+    if df.empty:
+        st.info("No swap operations")
+    else:
+        st.dataframe(
+            df,
+            use_container_width=True,
+            hide_index=True,
+            column_order=(
+                "Date",
+                "From Amount",
+                "From Token",
+                "To Amount",
+                "To Token",
+                "From Wallet",
+                "To Wallet",
+                "Swap Rate",
+                "Current Rate",
+                "Perf.",  # Ajout de la colonne Perf. dans l'ordre des colonnes
+            ),
+            column_config={
+                "From Amount": st.column_config.NumberColumn(format="%.8g"),
+                "To Amount": st.column_config.NumberColumn(format="%.8g"),
+                "Swap Rate": st.column_config.NumberColumn(format="%.8g"),
+                "Current Rate": st.column_config.NumberColumn(format="%.8g"),
+                "Perf.": st.column_config.NumberColumn(
+                    format="%.2f%%"
+                ),  # Configuration du format pour Perf.
+            },
+            on_select="rerun",
+            selection_mode="multi-row",
+            key="swapselection",
+        )
+
+
+def draw_swap_arch(df: pd.DataFrame):
+    if df.empty:
+        st.info("No archived swaps")
+    else:
+        st.dataframe(
+            df,
+            use_container_width=True,
+            hide_index=True,
+            column_order=(
+                "Date",
+                "From Amount",
+                "From Token",
+                "To Amount",
+                "To Token",
+                "From Wallet",
+                "To Wallet",
+                "Swap Rate",
+                "Current Rate",
+                "Perf.",  # Ajout de la colonne Perf. dans l'ordre des colonnes
+            ),
+            column_config={
+                "From Amount": st.column_config.NumberColumn(format="%.8g"),
+                "To Amount": st.column_config.NumberColumn(format="%.8g"),
+                "Swap Rate": st.column_config.NumberColumn(format="%.8g"),
+                "Current Rate": st.column_config.NumberColumn(format="%.8g"),
+                "Perf.": st.column_config.NumberColumn(
+                    format="%.2f%%"
+                ),  # Configuration du format pour Perf.
+            },
+            on_select="rerun",
+            selection_mode="multi-row",
+            key="swapachselection",
+        )
 
 
 g_wallets = Portfolios(st.session_state.settings["dbfile"]).get_portfolio_names()
@@ -714,43 +879,11 @@ with buy_tab:
 
 with swap_tab:
     # build swap table with performance metrics
-    df_swap = build_swap_dataframe(st.session_state.settings["dbfile"])
+    df_swap, df_swap_arch = build_swap_dataframes(st.session_state.settings["dbfile"])
 
     col_swaplist, col_swapbtns = st.columns([8, 1])
     with col_swaplist:
-        if df_swap.empty:
-            st.info("No swap operations")
-        else:
-            st.dataframe(
-                df_swap,
-                use_container_width=True,
-                height=700,
-                hide_index=True,
-                column_order=(
-                    "Date",
-                    "From Amount",
-                    "From Token",
-                    "To Amount",
-                    "To Token",
-                    "From Wallet",
-                    "To Wallet",
-                    "Swap Rate",
-                    "Current Rate",
-                    "Perf.",  # Ajout de la colonne Perf. dans l'ordre des colonnes
-                ),
-                column_config={
-                    "From Amount": st.column_config.NumberColumn(format="%.8g"),
-                    "To Amount": st.column_config.NumberColumn(format="%.8g"),
-                    "Swap Rate": st.column_config.NumberColumn(format="%.8g"),
-                    "Current Rate": st.column_config.NumberColumn(format="%.8g"),
-                    "Perf.": st.column_config.NumberColumn(
-                        format="%.2f%%"
-                    ),  # Configuration du format pour Perf.
-                },
-                on_select="rerun",
-                selection_mode="single-row",
-                key="swapselection",
-            )
+        draw_swap(df_swap)
     with col_swapbtns:
         st.button(
             "New",
@@ -767,9 +900,29 @@ with swap_tab:
             key="swap_edit",
         )
         st.button(
+            "Archive",
+            on_click=swap_archive,
+            use_container_width=True,
+            icon=":material/archive:",
+            key="swap_archive",
+        )
+        st.button(
             "Delete",
             on_click=swap_delete,
             use_container_width=True,
             icon=":material/delete:",
             key="swap_delete",
+        )
+
+    st.title("Archived Swaps")
+    col_archlist, col_archbtns = st.columns([8, 1])
+    with col_archlist:
+        draw_swap_arch(df_swap_arch)
+    with col_archbtns:
+        st.button(
+            "Unarchive",
+            on_click=swap_unarchive,
+            use_container_width=True,
+            icon=":material/unarchive:",
+            key="swap_unarchive",
         )

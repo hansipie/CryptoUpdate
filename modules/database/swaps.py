@@ -49,6 +49,24 @@ class swaps:
             )
             return cursor.fetchall()
 
+    def get_by_tag(self, tag: str) -> list:
+        logger.debug("Getting swaps by tag")
+
+        tag_filter = f"WHERE tag = '{tag}'"
+
+        if not tag:
+            tag_filter = f"WHERE tag IS NULL"
+
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                f"""
+                SELECT id, timestamp, token_from, amount_from, wallet_from, token_to, amount_to, wallet_to, tag
+                FROM Swaps {tag_filter} ORDER BY timestamp DESC
+            """
+            )
+            return cursor.fetchall()
+
     def insert(
         self,
         timestamp,
@@ -91,4 +109,19 @@ class swaps:
                 logger.debug(f"Entry with id {entry_id} deleted successfully.")
         except Exception as e:
             logger.error(f"Error deleting swap: {e}")
+            traceback.print_exc()
+
+    def update_tag(self, entry_id: int, tag: str):
+        logger.debug("Updating swap tag")
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                if not tag:
+                    cursor.execute(f"UPDATE Swaps SET tag = NULL WHERE id = {entry_id}")
+                else:    
+                    cursor.execute(f"UPDATE Swaps SET tag = '{tag}' WHERE id = {entry_id}")
+                conn.commit()
+                logger.debug(f"Tag updated for entry with id {entry_id}")
+        except Exception as e:
+            logger.error(f"Error updating tag: {e}")
             traceback.print_exc()
