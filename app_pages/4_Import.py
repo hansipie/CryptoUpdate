@@ -66,7 +66,7 @@ def extract(input_data: any) -> pd.DataFrame:
     """
     logger.debug("Extracting data")
     output = None
-    with st.spinner("Extracting data..."):
+    with st.spinner("Extracting data...", show_time=True):
         try:
             if isinstance(input_data, bytes):
                 message_json, _ = aiprocessing.extract_from_img(

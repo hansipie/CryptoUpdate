@@ -21,9 +21,9 @@ logger = logging.getLogger(__name__)
 st.title("Crypto Update")
 
 tokensdb = TokensDatabase(st.session_state.settings["dbfile"])
-with st.spinner("Loading balances..."):
+with st.spinner("Loading balances...", show_time=True):
     df_balance = tokensdb.get_balances()
-with st.spinner("Loading sums..."):
+with st.spinner("Loading sums...", show_time=True):
     df_sums = tokensdb.get_sum_over_time()
 
 # Update prices

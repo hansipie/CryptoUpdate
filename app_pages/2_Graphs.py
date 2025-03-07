@@ -68,10 +68,10 @@ def draw_tab_content(
 ):
     logger.debug("Draw tab content for token %s", token)
     if section == "Assets Balances":
-        with st.spinner("Loading assets balances..."):
+        with st.spinner("Loading assets balances...", show_time=True):
             df_view = tokensdb.get_token_balances(token, start_timestamp, end_timestamp)
     elif section == "Market":
-        with st.spinner("Loading market..."):
+        with st.spinner("Loading market...", show_time=True):
             df_view = markgetdb.get_token_market(token, start_timestamp, end_timestamp)
     else:
         df_view = None
