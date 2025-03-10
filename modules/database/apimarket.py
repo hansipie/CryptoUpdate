@@ -22,12 +22,19 @@ class ApiMarket:
         """
         logger.debug("Get currency")
         request = requests.get(
-            self.url + "/api/v1/fiat/all",
+            self.url + "/api/v1/fiat/listing/historical?limit=0",
             timeout=10,
         )
         if request.status_code == 200:
             data = request.json()
-            df = pd.DataFrame(data)
+            items = data.get("items", [])
+
+            if not items:
+                logger.debug("No items found in the response")
+                return None
+            
+            df = pd.DataFrame(items)
+
             df["date"] = pd.to_datetime(df["date"], utc=True)
             df["date"] = df["date"].dt.tz_convert(self.local_timezone)
             df.rename(columns={"date": "Date", "eur": "price"}, inplace=True)
@@ -54,7 +61,7 @@ class ApiMarket:
         date = fromTimestamp(timestamp)
 
         request = requests.get(
-            self.url + f"/api/v1/fiat?date={date}",
+            self.url + f"/api/v1/fiat/quotes?date={date}",
             timeout=10,
         )
         if request.status_code == 200:
