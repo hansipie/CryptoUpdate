@@ -118,8 +118,10 @@ class swaps:
                 cursor = conn.cursor()
                 if not tag:
                     cursor.execute(f"UPDATE Swaps SET tag = NULL WHERE id = {entry_id}")
-                else:    
-                    cursor.execute(f"UPDATE Swaps SET tag = '{tag}' WHERE id = {entry_id}")
+                else:
+                    cursor.execute(
+                        f"UPDATE Swaps SET tag = '{tag}' WHERE id = {entry_id}"
+                    )
                 conn.commit()
                 logger.debug(f"Tag updated for entry with id {entry_id}")
         except Exception as e:

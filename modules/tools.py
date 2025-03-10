@@ -12,7 +12,6 @@ import logging
 import os
 import shutil
 import traceback
-from typing import Union
 
 import pandas as pd
 import streamlit as st
@@ -74,6 +73,22 @@ def update_database(dbfile: str, cmc_apikey: str, debug: bool):
     custom.set("last_update", str(pd.Timestamp.now(tz="UTC").timestamp()), "float")
 
 
+def rate_usd_to_x(to: str, timestamp: int) -> float:
+    """Convert USD value to another cryptocurrency based on historical rates."""
+
+    to = to.lower()
+    if to == "usd":
+        return 1.0
+
+    market = ApiMarket(st.session_state.settings["marketraccoon_url"])
+    df_low, df_high = market.get_currency_lowhigh(timestamp)
+    if df_low is None or df_high is None:
+        logger.error("No currency data available")
+        return None
+
+    return interpolate_price(df_low, df_high, timestamp, to)
+
+
 def create_portfolio_dataframe(data: dict) -> pd.DataFrame:
     """Create a dataframe from the portfolio data"""
     logger.debug("Create portfolio dataframe - Data: %s", str(data))
@@ -90,7 +105,15 @@ def create_portfolio_dataframe(data: dict) -> pd.DataFrame:
     )
     df["value(€)"] = df.apply(
         lambda row: row["amount"]
-        * (market.get_price(row.name) if row.name != "EUR" else 1.0),
+        * (
+            1.0
+            if row.name == "EUR"
+            else (
+                rate_usd_to_x("EUR", pd.Timestamp.now(tz="UTC").timestamp())
+                if row.name == "USD"
+                else market.get_price(row.name)
+            )
+        ),
         axis=1,
     )
     # sort df by token

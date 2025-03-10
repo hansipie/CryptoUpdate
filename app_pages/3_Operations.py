@@ -407,6 +407,7 @@ def swap_archive_dialog(rows: list):
             g_swaps.update_tag(data["id"], "archived")
         st.rerun()
 
+
 @st.dialog("Unarchive Swap")
 def swap_unarchive_dialog(rows: list):
     """Display confirmation dialog for unarchiving a swap operation.
@@ -423,7 +424,9 @@ def swap_unarchive_dialog(rows: list):
         tounarchive.append(data)
 
     logger.debug("Dialog Unarchive row: %s", tounarchive)
-    st.write(f"{len(tounarchive)} swap(s) selected. Are you sure you want to unarchive?")
+    st.write(
+        f"{len(tounarchive)} swap(s) selected. Are you sure you want to unarchive?"
+    )
 
     if st.button("Confirm"):
         for data in tounarchive:
@@ -503,6 +506,7 @@ def swap_archive():
     else:
         swap_archive_dialog(rowidx)
 
+
 def swap_unarchive():
     """Handle unarchiving of selected swap operation.
 
@@ -515,7 +519,6 @@ def swap_unarchive():
         st.toast("Please select a row", icon=":material/warning:")
     else:
         swap_unarchive_dialog(rowidx)
-        
 
 
 def calc_perf(df: pd.DataFrame, col_token: str, col_rate: str) -> pd.DataFrame:

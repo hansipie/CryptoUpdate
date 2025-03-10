@@ -32,7 +32,7 @@ class ApiMarket:
             if not items:
                 logger.debug("No items found in the response")
                 return None
-            
+
             df = pd.DataFrame(items)
 
             df["date"] = pd.to_datetime(df["date"], utc=True)
