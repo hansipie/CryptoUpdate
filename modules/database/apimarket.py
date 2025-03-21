@@ -14,6 +14,17 @@ class ApiMarket:
         self.url = url
         self.local_timezone = tzlocal.get_localzone()
 
+    def __get_currency(self, url: str):
+        logger.debug("Get currency from private method")
+        logger.debug("URL: %s", url)
+        request = requests.get(url, timeout=10, )
+        if request.status_code == 200:
+            data = request.json()
+            results = data.get("results", [])
+            next_url = data.get("next", None)
+            return results, next_url
+        return None, None
+
     def get_currency(self) -> pd.DataFrame:
         """Get historical currency rates.
 
@@ -21,33 +32,45 @@ class ApiMarket:
             DataFrame with currency rates over time or None if empty
         """
         logger.debug("Get currency")
-        request = requests.get(
-            self.url + "/api/v1/fiat/listing/historical?limit=0",
-            timeout=10,
+        url = self.url + "/api/v1/fiat"
+        df = pd.DataFrame()
+        while True:
+            results, next_url = self.__get_currency(url)
+            if not results:
+                logger.debug("No data found in the response")
+                continue
+            df_tmp = pd.DataFrame(results)
+            df = pd.concat([df, df_tmp], ignore_index=True)
+            if next_url:
+                url = next_url
+            else:
+                break
+
+        if len(df) == 0:
+            return None
+        
+        df["date"] = pd.to_datetime(df["date"], utc=True)
+        df["date"] = df["date"].dt.tz_convert(self.local_timezone)
+        df.rename(columns={"date": "Date", "eur": "price"}, inplace=True)
+        df.set_index("Date", inplace=True)
+        df.sort_index(inplace=True)
+        
+        return df
+
+    def __extend_df(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Extend the DataFrame."""
+        logger.debug("Extend DataFrame")
+        if df is None or len(df) == 0:
+            return None
+        df["timestamp"] = df.apply(
+            lambda x: int(toTimestamp_B(x["date"], utc=True)), axis=1
         )
-        if request.status_code == 200:
-            data = request.json()
-            items = data.get("items", [])
+        df.rename(columns={"eur": "price"}, inplace=True)
 
-            if not items:
-                logger.debug("No items found in the response")
-                return None
+        logger.debug("extended df:\n%s", df)
+        return df
 
-            df = pd.DataFrame(items)
-
-            df["date"] = pd.to_datetime(df["date"], utc=True)
-            df["date"] = df["date"].dt.tz_convert(self.local_timezone)
-            df.rename(columns={"date": "Date", "eur": "price"}, inplace=True)
-            df.set_index("Date", inplace=True)
-            df.sort_index(inplace=True)
-
-            # convert prices from EUR to USD
-            # df["price"] = 1/df["price"]
-
-            return df
-        return None
-
-    def get_currency_lowhigh(self, timestamp: int) -> pd.DataFrame:
+    def get_currency_lowhigh(self, timestamp: int):
         """Get the low and high currency rates for a given timestamp.
 
         Args:
@@ -59,33 +82,31 @@ class ApiMarket:
         logger.debug("Get currency low and high")
 
         date = fromTimestamp(timestamp)
+        logger.debug("timestamp: %i -> Date: %s", timestamp, date)
 
         request = requests.get(
-            self.url + f"/api/v1/fiat/quotes?date={date}",
+            self.url + f"/api/v1/fiat?date={date}",
             timeout=10,
         )
         if request.status_code == 200:
             data = request.json()
-            df = pd.DataFrame(data)
-            df["timestamp"] = df.apply(
+            if "results" not in data:
+                logger.error("No results found in the response")
+                return None, None
+            df_data = pd.DataFrame(data.get("results", []))
+            
+            # reformating the dataframe
+            df_data["timestamp"] = df_data.apply(
                 lambda x: int(toTimestamp_B(x["date"], utc=True)), axis=1
             )
-            df.sort_values("timestamp", inplace=True)
+            df_data.rename(columns={"eur": "price"}, inplace=True)
+            logger.debug("fiat data:\n%s", df_data)
 
-            df.rename(columns={"eur": "price"}, inplace=True)
-            # convert prices from EUR to USD
-            # df["price"] = 1/df["price"]
+            df_low = df_data[df_data['timestamp'] == df_data['timestamp'].min()]
+            df_high = df_data[df_data['timestamp'] == df_data['timestamp'].max()]
+            logger.debug("Low Data:\n%s", df_low)
+            logger.debug("High Data:\n%s", df_high)
 
-            logger.debug("Currency data:\n%s", df)
-
-            if len(df) == 0:
-                return None, None
-            low_df = df[df["timestamp"] <= timestamp].iloc[-1:]
-            high_df = df[df["timestamp"] >= timestamp].iloc[:1]
-
-            logger.debug("Low Data:\n%s", low_df)
-            logger.debug("High Data:\n%s", high_df)
-
-            return low_df, high_df
+            return df_low, df_high
         logger.error("Failed to get data, status code: %s", request.status_code)
         return None, None

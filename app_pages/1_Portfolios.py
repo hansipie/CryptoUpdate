@@ -258,7 +258,7 @@ with st.sidebar:
 
 # Display portfolios
 tabs = g_portfolios.get_portfolio_names()
-logger.debug(f"Portfolios: {tabs}")
+logger.debug("Portfolios: %s", tabs)
 if not tabs:
     st.info("No portfolios found")
     st.stop()
