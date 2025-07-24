@@ -547,7 +547,7 @@ def calc_perf(df: pd.DataFrame, col_token: str, col_rate: str) -> pd.DataFrame:
 def swap_perf(rate_swap, rate_now) -> float:
     if rate_swap is None or rate_now is None:
         return None
-    return ((rate_now * 100) / rate_swap) - 100
+    return ((rate_swap * 100) / rate_now) - 100
 
 
 def build_buy_dataframe() -> pd.DataFrame:
@@ -600,15 +600,8 @@ def build_buy_avg_table():
     if df.empty:
         return df
 
-    green_icon = "🟩"
-    yellow_icon = "🟨"
-    red_icon = "🟥"
-
     df["Avg. Rate"] = df["Total Bought"] / df["Tokens Obtained"]
     df = calc_perf(df, "Token", "Avg. Rate")
-    df["icon"] = df["Perf."].apply(
-        lambda x: green_icon if x > 0 else (red_icon if x < -50 else yellow_icon)
-    )
     logger.debug("Average table:\n%s", df)
     # order by Perf.
     df = df.sort_values(by=["Perf."], ascending=False)
@@ -694,8 +687,27 @@ def draw_swap(df: pd.DataFrame):
     if df.empty:
         st.info("No swap operations")
     else:
+        # Apply styling based on Perf. column values using configurable thresholds
+        green_threshold = st.session_state.settings.get("operations_green_threshold", 100)
+        orange_threshold = st.session_state.settings.get("operations_orange_threshold", 50)
+        red_threshold = st.session_state.settings.get("operations_red_threshold", 0)
+        
+        def color_rows(row):
+            if pd.isna(row['Perf.']):
+                return [''] * len(row)
+            elif row['Perf.'] >= green_threshold:
+                return ['background-color: #90EE90'] * len(row)  # Light green
+            elif row['Perf.'] >= orange_threshold:
+                return ['background-color: #FFA500'] * len(row)  # Orange
+            elif row['Perf.'] < red_threshold:
+                return ['background-color: #FFB6C1'] * len(row)  # Light red
+            else:
+                return [''] * len(row)
+        
+        styled_df = df.style.apply(color_rows, axis=1)
+        
         st.dataframe(
-            df,
+            styled_df,
             use_container_width=True,
             hide_index=True,
             column_order=(
@@ -729,8 +741,27 @@ def draw_swap_arch(df: pd.DataFrame):
     if df.empty:
         st.info("No archived swaps")
     else:
+        # Apply styling based on Perf. column values using configurable thresholds
+        green_threshold = st.session_state.settings.get("operations_green_threshold", 100)
+        orange_threshold = st.session_state.settings.get("operations_orange_threshold", 50)
+        red_threshold = st.session_state.settings.get("operations_red_threshold", 0)
+        
+        def color_rows(row):
+            if pd.isna(row['Perf.']):
+                return [''] * len(row)
+            elif row['Perf.'] >= green_threshold:
+                return ['background-color: #90EE90'] * len(row)  # Light green
+            elif row['Perf.'] >= orange_threshold:
+                return ['background-color: #FFA500'] * len(row)  # Orange
+            elif row['Perf.'] < red_threshold:
+                return ['background-color: #FFB6C1'] * len(row)  # Light red
+            else:
+                return [''] * len(row)
+        
+        styled_df = df.style.apply(color_rows, axis=1)
+        
         st.dataframe(
-            df,
+            styled_df,
             use_container_width=True,
             hide_index=True,
             column_order=(
@@ -852,14 +883,26 @@ with buy_tab:
     if df_avg.empty:
         st.info("No data available")
     else:
+        # Apply styling based on Perf. column values (same logic as icons)
+        def color_avg_rows(row):
+            if pd.isna(row['Perf.']):
+                return [''] * len(row)
+            elif row['Perf.'] > 0:
+                return ['background-color: #90EE90'] * len(row)  # Light green
+            elif row['Perf.'] < -50:
+                return ['background-color: #FFB6C1'] * len(row)  # Light red
+            else:
+                return ['background-color: #FFFF99'] * len(row)  # Light yellow
+        
+        styled_df_avg = df_avg.style.apply(color_avg_rows, axis=1)
+        
         height = (len(df_avg) * 35) + 38
         st.dataframe(
-            df_avg,
+            styled_df_avg,
             use_container_width=True,
             hide_index=True,
             height=height,
             column_order=(
-                "icon",
                 "Token",
                 "Total Bought",
                 "Currency",
@@ -869,7 +912,6 @@ with buy_tab:
                 "Perf.",
             ),
             column_config={
-                "icon": st.column_config.TextColumn(label=""),
                 "Avg. Rate": st.column_config.NumberColumn(format="%.8f"),
                 "Current Rate": st.column_config.NumberColumn(format="%.8f"),
                 "Perf.": st.column_config.NumberColumn(format="%.2f%%"),

@@ -60,6 +60,11 @@ class configuration:
                     "debug_", ""
                 ),
             },
+            "OperationsColors": {
+                "green_threshold": settings.get("operations_green_threshold", 100),
+                "orange_threshold": settings.get("operations_orange_threshold", 50),
+                "red_threshold": settings.get("operations_red_threshold", 0),
+            },
         }
 
         try:

@@ -59,6 +59,41 @@ with st.form(key="settings_form"):
         value=st.session_state.settings.get("debug_flag"),
     )
 
+    st.subheader("Operations Colors")
+    st.write("Configure color thresholds for performance indicators in Operations tab:")
+    
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        operations_green_threshold = st.number_input(
+            "Green threshold (%)",
+            key="operations_green_threshold",
+            value=st.session_state.settings.get("operations_green_threshold", 100),
+            min_value=0,
+            max_value=1000,
+            step=1,
+            help="Performance >= this value will be colored green"
+        )
+    with col2:
+        operations_orange_threshold = st.number_input(
+            "Orange threshold (%)",
+            key="operations_orange_threshold", 
+            value=st.session_state.settings.get("operations_orange_threshold", 50),
+            min_value=0,
+            max_value=1000,
+            step=1,
+            help="Performance >= this value will be colored orange"
+        )
+    with col3:
+        operations_red_threshold = st.number_input(
+            "Red threshold (%)",
+            key="operations_red_threshold",
+            value=st.session_state.settings.get("operations_red_threshold", 0),
+            min_value=-1000,
+            max_value=1000,
+            step=1,
+            help="Performance < this value will be colored red"
+        )
+
     submitted = st.form_submit_button(
         label="Save",
         help="Save settings.",
@@ -71,6 +106,9 @@ with st.form(key="settings_form"):
         st.session_state.settings["coinmarketcap_token"] = coinmarketcap_token
         st.session_state.settings["openai_token"] = openai_token
         st.session_state.settings["debug_flag"] = debug_flag
+        st.session_state.settings["operations_green_threshold"] = operations_green_threshold
+        st.session_state.settings["operations_orange_threshold"] = operations_orange_threshold
+        st.session_state.settings["operations_red_threshold"] = operations_red_threshold
 
         conf = Configuration()
         conf.saveConfig(st.session_state.settings)
