@@ -29,7 +29,6 @@ COPY requirements.in .
 
 # Installez les dépendances Python nécessaires
 RUN pip install --upgrade pip
-RUN pip install pip-tools && pip-compile --output-file requirements.txt requirements.in
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copiez le reste des fichiers du projet dans le répertoire de travail
