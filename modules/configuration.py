@@ -65,6 +65,9 @@ class configuration:
                 "orange_threshold": settings.get("operations_orange_threshold", 50),
                 "red_threshold": settings.get("operations_red_threshold", 0),
             },
+            "FiatCurrency": {
+                "currency": settings.get("fiat_currency", "EUR"),
+            },
         }
 
         try:

@@ -20,4 +20,6 @@ dependencies = [
 ]
 
 [dependency-groups]
-dev = []
+dev = [
+    "pylint>=3.3.8",
+]

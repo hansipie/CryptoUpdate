@@ -12,19 +12,85 @@ import logging
 import os
 import shutil
 import traceback
-from typing import Union
 
 import pandas as pd
+import requests
 import streamlit as st
 
-from modules.database.apimarket import ApiMarket
 from modules.database.customdata import Customdata
 from modules.database.market import Market
 from modules.database.portfolios import Portfolios
 from modules.database.tokensdb import TokensDatabase
+from modules.database.apimarket import ApiMarket
 from modules.utils import debug_prefix, interpolate
 
 logger = logging.getLogger(__name__)
+
+
+# Conversion d'une valeur fiat vers la devise cible définie dans les settings
+def convert_fiat_to_settings_currency(
+    value: float, input_currency: str = "EUR"
+) -> float:
+    """
+    Convertit une valeur fiat (ex: EUR, USD) vers la devise cible définie dans les settings.
+
+    Args:
+        value: Montant à convertir
+        input_currency: Devise d'entrée (ex: "EUR", "USD")
+
+    Returns:
+        Montant converti dans la devise cible
+    """
+    settings = st.session_state.settings
+    target_currency = settings.get("fiat_currency", "EUR")
+
+    # Si les devises sont identiques, pas de conversion nécessaire
+    if input_currency == target_currency:
+        return value
+
+    # Utiliser ApiMarket pour obtenir les taux de change
+    api_market = ApiMarket(settings["marketraccoon_url"])
+
+    try:
+        # Récupérer les derniers taux de change
+        rates_df = api_market.get_fiat_latest_rate()
+
+        if rates_df is None or rates_df.empty:
+            logger.warning(
+                "Aucun taux de change disponible, retour de la valeur originale"
+            )
+            return value
+
+        # Prendre le taux le plus récent
+        latest_rate = rates_df.iloc[-1]["price"]
+
+        # Conversion selon les devises
+        if input_currency == "EUR" and target_currency == "USD":
+            # EUR vers USD
+            converted_value = value * latest_rate
+        elif input_currency == "USD" and target_currency == "EUR":
+            # USD vers EUR
+            converted_value = value / latest_rate
+        else:
+            # Autres conversions non supportées pour le moment
+            logger.warning(
+                "Conversion %s -> %s non supportée", input_currency, target_currency
+            )
+            return value
+
+        logger.debug(
+            "Conversion %s %s -> %s %s (taux: %s)",
+            value,
+            input_currency,
+            converted_value,
+            target_currency,
+            latest_rate,
+        )
+        return converted_value
+
+    except (requests.RequestException, KeyError, ValueError) as e:
+        logger.error("Erreur conversion %s -> %s: %s", input_currency, target_currency, e)
+        return value
 
 
 def update_database(dbfile: str, cmc_apikey: str, debug: bool):
@@ -74,6 +140,11 @@ def update_database(dbfile: str, cmc_apikey: str, debug: bool):
     custom.set("last_update", str(pd.Timestamp.now(tz="UTC").timestamp()), "float")
 
 
+def is_fiat(token: str) -> bool:
+    """Check if the token is a fiat currency"""
+    return token in ["USD", "EUR"]
+
+
 def create_portfolio_dataframe(data: dict) -> pd.DataFrame:
     """Create a dataframe from the portfolio data"""
     logger.debug("Create portfolio dataframe - Data: %s", str(data))
@@ -90,7 +161,7 @@ def create_portfolio_dataframe(data: dict) -> pd.DataFrame:
     )
     df["value(€)"] = df.apply(
         lambda row: row["amount"]
-        * (market.get_price(row.name) if row.name != "EUR" else 1.0),
+        * (market.get_price(row.name) if not is_fiat(row.name) else 1.0),
         axis=1,
     )
     # sort df by token
@@ -123,9 +194,7 @@ def load_settings(settings: dict):
         "token"
     ]
     st.session_state.settings["openai_token"] = settings["OpenAI"]["token"]
-    st.session_state.settings["debug_flag"] = (
-        True if settings["Debug"]["flag"] == "True" else False
-    )
+    st.session_state.settings["debug_flag"] = settings["Debug"]["flag"] == "True"
 
     st.session_state.settings["archive_path"] = os.path.join(
         os.getcwd(),
@@ -142,6 +211,11 @@ def load_settings(settings: dict):
             settings["Local"]["sqlite_file"], st.session_state.settings["debug_flag"]
         ),
     )
+
+    # Load fiat currency setting
+    st.session_state.settings["fiat_currency"] = settings.get(
+        "FiatCurrency", {}
+    ).get("currency", "EUR")
 
 
 def interpolate_price(
@@ -174,7 +248,7 @@ def interpolate_price(
         price_high = df_high["price"].iloc[0]
         timestamp_low = df_low["timestamp"].iloc[-1]
         timestamp_high = df_high["timestamp"].iloc[0]
-    except Exception as e:
+    except (IndexError, KeyError) as e:
         logger.error("Error interpolating price: %s", e)
         return None
     price = interpolate(timestamp_low, price_low, timestamp_high, price_high, timestamp)

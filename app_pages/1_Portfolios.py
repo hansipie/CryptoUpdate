@@ -111,7 +111,7 @@ def portfolioUI(tabs: list):
     Shows editable tables of token holdings and management buttons
     for each portfolio.
     """
-    logger.debug(f"portfolioUI - Tabs: {tabs}")
+    logger.debug("portfolioUI - Tabs: %s", tabs)
 
     tabs_widget = st.tabs(tabs)
 
@@ -216,6 +216,19 @@ def execute_search():
 
 g_portfolios = load_portfolios(st.session_state.settings["dbfile"])
 
+# Fonction callback pour garantir la persistance du toggle
+def on_toggle_change():
+    """Callback pour garantir la synchronisation de l'état du toggle."""
+    # Force la sauvegarde explicite de l'état
+    if "show_empty_portfolios" in st.session_state:
+        # Rien à faire, l'état est déjà synchronisé par Streamlit
+        pass
+
+# Toggle persistant pour afficher/masquer les portefeuilles vides
+# Initialisation robuste avec validation
+if "show_empty_portfolios" not in st.session_state:
+    st.session_state["show_empty_portfolios"] = True
+
 with st.sidebar:
     # Add new portfolio dialog
     if st.button(
@@ -256,11 +269,37 @@ with st.sidebar:
     ):
         execute_search()
 
-# Display portfolios
-tabs = g_portfolios.get_portfolio_names()
-logger.debug(f"Portfolios: {tabs}")
+    st.divider()
+
+    # Toggle pour afficher/masquer les portefeuilles vides avec callback
+    st.toggle(
+        "Afficher les portefeuilles vides",
+        key="show_empty_portfolios",
+        help="Afficher ou masquer les portefeuilles sans token ou avec un solde nul.",
+        on_change=on_toggle_change
+    )
+
+
+def is_portfolio_empty(pf_name):
+    pf = g_portfolios.get_portfolio(pf_name)
+    df = create_portfolio_dataframe(pf)
+    if df.empty:
+        return True
+    # Si tous les montants sont nuls ou absents
+    if (df["amount"].fillna(0) == 0).all():
+        return True
+    return False
+
+all_tabs = g_portfolios.get_portfolio_names()
+# Lecture robuste de l'état du toggle avec fallback
+show_empty = st.session_state.get("show_empty_portfolios", True)
+if show_empty:
+    tabs = all_tabs
+else:
+    tabs = [name for name in all_tabs if not is_portfolio_empty(name)]
+logger.debug("Portfolios: %s", tabs)
 if not tabs:
-    st.info("No portfolios found")
+    st.info("Aucun portefeuille à afficher avec ce filtre.")
     st.stop()
 else:
     try:

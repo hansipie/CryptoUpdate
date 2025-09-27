@@ -12,6 +12,10 @@ st.title("Settings")
 if "settings" not in st.session_state:
     st.session_state.settings = {}
 
+# Initialize fiat currency in session state if not already set
+if "fiat_currency" not in st.session_state:
+    st.session_state.fiat_currency = st.session_state.settings.get("fiat_currency", "EUR")
+
 with st.form(key="settings_form"):
     st.subheader("MarketRaccoon")
     marketraccoon_url = st.text_input(
@@ -57,6 +61,19 @@ with st.form(key="settings_form"):
         "Debug",
         key="debug_flag",
         value=st.session_state.settings.get("debug_flag"),
+    )
+
+    st.subheader("Currency")
+    fiat_currencies = [
+        "USD", "EUR", "GBP", "CHF", "CAD", "AUD", "JPY", 
+        "CNY", "KRW", "BRL", "MXN", "INR", "RUB", "TRY"
+    ]
+    fiat_currency = st.selectbox(
+        "Reference fiat currency",
+        key="fiat_currency_select",
+        options=fiat_currencies,
+        index=fiat_currencies.index(st.session_state.settings.get("fiat_currency", "EUR")),
+        help="Select the reference currency for price display and conversions"
     )
 
     st.subheader("Operations Colors")
@@ -109,6 +126,9 @@ with st.form(key="settings_form"):
         st.session_state.settings["operations_green_threshold"] = operations_green_threshold
         st.session_state.settings["operations_orange_threshold"] = operations_orange_threshold
         st.session_state.settings["operations_red_threshold"] = operations_red_threshold
+        st.session_state.settings["fiat_currency"] = fiat_currency
+        st.session_state.fiat_currency = fiat_currency
 
         conf = Configuration()
         conf.saveConfig(st.session_state.settings)
+        st.success("Settings saved successfully!")
