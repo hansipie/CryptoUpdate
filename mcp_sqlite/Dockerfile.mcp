@@ -1,0 +1,36 @@
+# MCP SQLite Server Dockerfile
+FROM python:3.12-slim
+
+# Set working directory
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    sqlite3 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy requirements and install Python dependencies
+COPY pyproject.toml uv.lock ./
+RUN pip install uv
+RUN uv sync --frozen
+
+# Copy application code
+COPY . .
+
+# Create data directory and ensure proper permissions
+RUN mkdir -p /app/data && \
+    chmod 755 /app/data
+
+# Expose MCP server port (typically 3000)
+EXPOSE 3000
+
+# Set environment variables
+ENV PYTHONPATH=/app
+ENV MCP_SQLITE_DB_PATH=/app/data/db.sqlite3
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD python -c "import sqlite3; sqlite3.connect('${MCP_SQLITE_DB_PATH}').execute('SELECT 1')" || exit 1
+
+# Default command - adjust based on your MCP server implementation
+CMD ["uv", "run", "python", "-m", "mcp_sqlite_server"]
