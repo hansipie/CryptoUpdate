@@ -29,7 +29,9 @@ class cmc:
                 "Debug mode: use sandbox-api.coinmarketcap.com instead of pro-api.coinmarketcap.com"
             )
             url = "https://sandbox-api.coinmarketcap.com/v2/tools/price-conversion"
-            headers = {"X-CMC_PRO_API_KEY": "b54bcf4d-1bca-4e8e-9a24-22ff2c3d462c"}
+            # In debug mode, use the sandbox API with the provided token
+            # Sandbox API keys should be configured in settings
+            headers = {"X-CMC_PRO_API_KEY": str(self.coinmarketcap_token)}
         else:
             url = "https://pro-api.coinmarketcap.com/v2/tools/price-conversion"
             headers = {"X-CMC_PRO_API_KEY": str(self.coinmarketcap_token)}
@@ -44,9 +46,8 @@ class cmc:
         if response.status_code == 200:
             fiat_prices = {}
             content = response.json()
-            logger.info(
-                "Get current market prices from Coinmarketcap successfully\n%s", content
-            )
+            logger.info("Get current market prices from Coinmarketcap successfully")
+            logger.debug("API response data: %s", content)
             for fiat in converts:
                 # Initialiser l'entrée pour chaque token
                 fiat_prices[fiat] = {"price": 0, "timestamp": 0}
@@ -69,12 +70,12 @@ class cmc:
                 except (KeyError, IndexError, TypeError) as e:
                     logger.error("Error getting price for %s : %s", fiat, str(e))
                     traceback.print_exc()
-                    logger.error("Data received: %s", content["data"])
+                    logger.debug("Data received: %s", content["data"])
                     return None
             return fiat_prices
         else:
-            logger.error("Error: %d", response.status_code)
-            logger.error(response.text)
+            logger.error("API request failed with status code: %d", response.status_code)
+            logger.debug("Error response: %s", response.text)
             return None
 
     def get_crypto_prices(self, tokens: list, unit="EUR", debug=False):
@@ -92,7 +93,9 @@ class cmc:
             url = (
                 "https://sandbox-api.coinmarketcap.com/v2/cryptocurrency/quotes/latest"
             )
-            headers = {"X-CMC_PRO_API_KEY": "b54bcf4d-1bca-4e8e-9a24-22ff2c3d462c"}
+            # In debug mode, use the sandbox API with the provided token
+            # Sandbox API keys should be configured in settings
+            headers = {"X-CMC_PRO_API_KEY": str(self.coinmarketcap_token)}
         else:
             url = "https://pro-api.coinmarketcap.com/v2/cryptocurrency/quotes/latest"
             headers = {"X-CMC_PRO_API_KEY": str(self.coinmarketcap_token)}
@@ -120,6 +123,6 @@ class cmc:
                     logger.debug("Data received: %s", content["data"][name])
             return crypto_prices
         else:
-            logger.error("Error: %d", response.status_code)
-            logger.error(response.text)
+            logger.error("API request failed with status code: %d", response.status_code)
+            logger.debug("Error response: %s", response.text)
             return None
