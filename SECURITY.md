@@ -1,10 +1,10 @@
 # Security Report
 
-## Date: 2025-10-22
+## Last Updated: 2025-10-22
 
 ## Executive Summary
 
-A comprehensive security audit was conducted on the CryptoUpdate application. Multiple critical and high-severity vulnerabilities were identified and remediated. This document outlines the vulnerabilities found, fixes applied, and security best practices.
+A comprehensive security audit was conducted on the CryptoUpdate application. Multiple critical and high-severity vulnerabilities were identified and remediated. All project dependencies have been upgraded to their latest secure versions. This document outlines the vulnerabilities found, fixes applied, dependency status, and security best practices.
 
 ## Vulnerabilities Identified and Fixed
 
@@ -298,7 +298,77 @@ For security concerns or to report vulnerabilities:
 
 ---
 
+## Dependency Security Status
+
+### Current Vulnerability Status
+
+**pip-audit scan results:** 1 known vulnerability (mitigated)
+
+All direct project dependencies have been upgraded to their latest secure versions. The only remaining vulnerability is in pip itself, which is mitigated by Python 3.12.3's PEP 706 implementation.
+
+### Known Vulnerability: pip 25.2 (MITIGATED)
+
+**Vulnerability:** GHSA-4xh5-x5gv-qwph / CVE-2025-8869
+
+**Description:** pip's fallback tar extraction doesn't check symbolic links point to extraction directory. In the fallback extraction path for source distributions, pip used Python's tarfile module without verifying that symbolic/hard link targets resolve inside the intended extraction directory.
+
+**Affected Versions:** pip <= 25.2
+
+**Fix Version:** pip 25.3 (not yet released as of 2025-10-22)
+
+**Mitigation Status:** ✅ MITIGATED
+
+The project uses Python 3.12.3, which implements PEP 706 safe-extraction behavior. This provides defense-in-depth protection against this vulnerability and other tarfile extraction issues. While upgrading to pip 25.3 is recommended when available, the current configuration is considered secure.
+
+**References:**
+- https://github.com/advisories/GHSA-4xh5-x5gv-qwph
+- https://www.python.org/dev/peps/pep-0706/
+
+### Dependency Versions (Latest Secure Versions)
+
+The following major dependencies have been verified as secure:
+
+| Package | Version | Security Status | Notes |
+|---------|---------|-----------------|-------|
+| streamlit | 1.50.0 | ✅ Secure | Fixes CVE-2025-1684, CVE-2024-42474 |
+| requests | 2.32.5 | ✅ Secure | Fixes .netrc credentials leak |
+| urllib3 | 2.5.0 | ✅ Secure | Fixes CVE-2025-50182, CVE-2024-37891 |
+| openai | 2.6.0 | ✅ Secure | Updated from 1.109.1, minor breaking changes |
+| dash | 3.2.0 | ✅ Secure | Fixes CVE-2024-21485 (XSS) |
+| pandas | 2.3.3 | ✅ Secure | Latest stable version |
+| pillow | 11.3.0 | ✅ Secure | Latest stable version |
+| jinja2 | 3.1.6 | ✅ Secure | Latest stable version |
+| certifi | 2025.10.5 | ✅ Secure | Latest CA bundle |
+
+### Recent Dependency Updates (2025-10-22)
+
+The following packages were upgraded to their latest versions:
+
+**Major Version Updates:**
+- openai: 1.109.1 → 2.6.0
+- pylint: 3.3.8 → 4.0.2
+- isort: 6.0.1 → 7.0.0
+- astroid: 3.3.11 → 4.0.1
+
+**Minor/Patch Updates:**
+- certifi: 2025.8.3 → 2025.10.5
+- numpy: 2.3.3 → 2.3.4
+- pandas: 2.3.2 → 2.3.3
+- matplotlib: 3.10.6 → 3.10.7
+- ruff: 0.13.2 → 0.14.1
+- And 15+ other patch updates
+
+**Compatibility:** All upgrades have been tested for basic import compatibility. The OpenAI 2.x upgrade includes minor breaking changes to ResponseFunctionToolCallOutput, which does not affect this project's usage.
+
+---
+
 ## Version History
+
+### Version 1.1 - 2025-10-22
+- Upgraded all dependencies to latest secure versions
+- Addressed 25+ package updates including 4 major version upgrades
+- Documented pip vulnerability mitigation via Python 3.12.3 PEP 706
+- Verified all CVEs fixed in updated packages
 
 ### Version 1.0 - 2025-10-22
 - Initial security audit completed

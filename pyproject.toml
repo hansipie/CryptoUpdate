@@ -21,5 +21,6 @@ dependencies = [
 
 [dependency-groups]
 dev = [
+    "pip-audit>=2.9.0",
     "pylint>=3.3.8",
 ]
