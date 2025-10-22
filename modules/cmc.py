@@ -30,8 +30,8 @@ class cmc:
             )
             url = "https://sandbox-api.coinmarketcap.com/v2/tools/price-conversion"
             # In debug mode, use the sandbox API with the provided token
-            # Sandbox API keys should be configured in settings
-            headers = {"X-CMC_PRO_API_KEY": str(self.coinmarketcap_token)}
+            # The following API key is for sandbox testing purposes only. Publicly known.
+            headers = {"X-CMC_PRO_API_KEY": "b54bcf4d-1bca-4e8e-9a24-22ff2c3d462c"}
         else:
             url = "https://pro-api.coinmarketcap.com/v2/tools/price-conversion"
             headers = {"X-CMC_PRO_API_KEY": str(self.coinmarketcap_token)}
@@ -94,8 +94,8 @@ class cmc:
                 "https://sandbox-api.coinmarketcap.com/v2/cryptocurrency/quotes/latest"
             )
             # In debug mode, use the sandbox API with the provided token
-            # Sandbox API keys should be configured in settings
-            headers = {"X-CMC_PRO_API_KEY": str(self.coinmarketcap_token)}
+            # The following API key is for sandbox testing purposes only. Publicly known.
+            headers = {"X-CMC_PRO_API_KEY": "b54bcf4d-1bca-4e8e-9a24-22ff2c3d462c"}
         else:
             url = "https://pro-api.coinmarketcap.com/v2/cryptocurrency/quotes/latest"
             headers = {"X-CMC_PRO_API_KEY": str(self.coinmarketcap_token)}
