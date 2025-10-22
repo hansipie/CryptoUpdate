@@ -25,14 +25,15 @@ WORKDIR /home/docker/app
 EXPOSE 8080
 
 # Copiez les fichiers de configuration et d'installation du projet dans le répertoire de travail
-COPY requirements.in .
+COPY pyproject.toml uv.lock ./
 
-# Installez les dépendances Python nécessaires
+# Installez les dépendances Python nécessaires avec uv
 RUN pip install --upgrade pip
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir uv
+RUN uv sync --frozen --no-dev
 
 # Copiez le reste des fichiers du projet dans le répertoire de travail
 COPY . .
 
 # Définissez la commande pour exécuter votre application
-CMD streamlit run app.py --server.port 8080
+CMD uv run streamlit run app.py --server.port 8080
