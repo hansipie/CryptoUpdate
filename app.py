@@ -94,7 +94,18 @@ def main():
     # Debug information
     if st.session_state.settings["debug_flag"]:
         st.write("Debug mode is ON")
-        st.write(st.session_state)
+        # Filter out sensitive data from session state before displaying
+        safe_session_state = {
+            k: v for k, v in st.session_state.items()
+            if k not in ["settings"] and not k.endswith("_token")
+        }
+        # Add non-sensitive settings
+        if "settings" in st.session_state:
+            safe_session_state["settings"] = {
+                k: ("***REDACTED***" if "token" in k.lower() or "password" in k.lower() else v)
+                for k, v in st.session_state.settings.items()
+            }
+        st.write(safe_session_state)
 
     logger.debug("### End Render ###")
 

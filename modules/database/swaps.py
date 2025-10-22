@@ -52,19 +52,23 @@ class swaps:
     def get_by_tag(self, tag: str) -> list:
         logger.debug("Getting swaps by tag")
 
-        tag_filter = f"WHERE tag = '{tag}'"
-
-        if not tag:
-            tag_filter = f"WHERE tag IS NULL"
-
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
-            cursor.execute(
-                f"""
-                SELECT id, timestamp, token_from, amount_from, wallet_from, token_to, amount_to, wallet_to, tag
-                FROM Swaps {tag_filter} ORDER BY timestamp DESC
-            """
-            )
+            if not tag:
+                cursor.execute(
+                    """
+                    SELECT id, timestamp, token_from, amount_from, wallet_from, token_to, amount_to, wallet_to, tag
+                    FROM Swaps WHERE tag IS NULL ORDER BY timestamp DESC
+                    """
+                )
+            else:
+                cursor.execute(
+                    """
+                    SELECT id, timestamp, token_from, amount_from, wallet_from, token_to, amount_to, wallet_to, tag
+                    FROM Swaps WHERE tag = ? ORDER BY timestamp DESC
+                    """,
+                    (tag,)
+                )
             return cursor.fetchall()
 
     def insert(
@@ -104,7 +108,7 @@ class swaps:
         try:
             with sqlite3.connect(self.db_path) as conn:
                 cursor = conn.cursor()
-                cursor.execute(f"DELETE FROM Swaps WHERE id = {entry_id}")
+                cursor.execute("DELETE FROM Swaps WHERE id = ?", (entry_id,))
                 conn.commit()
                 logger.debug(f"Entry with id {entry_id} deleted successfully.")
         except Exception as e:
@@ -117,9 +121,9 @@ class swaps:
             with sqlite3.connect(self.db_path) as conn:
                 cursor = conn.cursor()
                 if not tag:
-                    cursor.execute(f"UPDATE Swaps SET tag = NULL WHERE id = {entry_id}")
-                else:    
-                    cursor.execute(f"UPDATE Swaps SET tag = '{tag}' WHERE id = {entry_id}")
+                    cursor.execute("UPDATE Swaps SET tag = NULL WHERE id = ?", (entry_id,))
+                else:
+                    cursor.execute("UPDATE Swaps SET tag = ? WHERE id = ?", (tag, entry_id))
                 conn.commit()
                 logger.debug(f"Tag updated for entry with id {entry_id}")
         except Exception as e:
