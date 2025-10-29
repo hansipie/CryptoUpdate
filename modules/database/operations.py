@@ -2,8 +2,13 @@
 
 This module handles cryptocurrency operations including:
 - Buy and sell transactions
+- Airdrop operations (buy with source = 0)
 - Operation history tracking
 - Performance calculations
+
+IMPORTANT: Operations with source = 0 are VALID and represent token airdrops.
+These are legitimate operations where tokens are received without monetary cost.
+Do NOT delete or flag these as invalid.
 """
 
 import logging
@@ -28,7 +33,7 @@ class operations:
                     destination FLOAT NOT NULL, 
                     source_unit TEXT NOT NULL, 
                     destination_unit TEXT NOT NULL,
-                    timestamp INTEGERT NOT NULL,
+                    timestamp INTEGER NOT NULL,
                     portfolio TEXT
                 )
             """

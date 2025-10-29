@@ -47,27 +47,37 @@ class TokensDatabase:
             return df_sum
 
     def get_balances(self) -> pd.DataFrame:
-        """Get the balances of each token through time"""
+        """Get the balances of each token through time
+
+        Uses pivot_table instead of multiple merges to avoid memory explosion.
+        """
         logger.debug("Get balances")
         with sqlite3.connect(self.db_path) as con:
-            df_tokens = pd.read_sql_query(
-                "SELECT DISTINCT token from TokensDatabase", con
+            # Load all data at once and use pivot instead of multiple merges
+            df_all = pd.read_sql_query(
+                """SELECT timestamp, token,
+                   price * (CASE WHEN count IS NOT NULL THEN count ELSE 0 END) AS value
+                   FROM TokensDatabase""",
+                con,
             )
-            logger.debug("Tokens:\n%s", df_tokens)
-            if df_tokens.empty:
+
+            if df_all.empty:
                 logger.warning("No token found in database")
                 return None
-            df_balance = pd.DataFrame()
-            for token in df_tokens["token"]:
-                df = pd.read_sql_query(
-                    f"SELECT timestamp, price*(CASE WHEN count IS NOT NULL THEN count ELSE 0 END) AS '{token}' FROM TokensDatabase WHERE token = '{token}'",
-                    con,
-                )
-                if df_balance.empty:
-                    df_balance = df
-                else:
-                    df_balance = df_balance.merge(df, on="timestamp", how="outer")
-            df_balance = df_balance.fillna(0)  # c'est OK de remplir les NaN ici
+
+            # Use pivot_table instead of multiple merges (much more memory efficient)
+            df_balance = df_all.pivot_table(
+                index='timestamp',
+                columns='token',
+                values='value',
+                aggfunc='first',  # In case of duplicates, take first value
+                fill_value=0
+            )
+
+            # Reset index to make timestamp a column again
+            df_balance = df_balance.reset_index()
+
+            # Convert timestamp to datetime
             df_balance["timestamp"] = pd.to_datetime(
                 df_balance["timestamp"], unit="s", utc=True
             )
@@ -77,8 +87,11 @@ class TokensDatabase:
             df_balance.rename(columns={"timestamp": "Date"}, inplace=True)
             df_balance.set_index("Date", inplace=True)
             df_balance.sort_index(inplace=True)
+
+            # Sort columns alphabetically
             df_balance = df_balance.reindex(sorted(df_balance.columns), axis=1)
-            logger.debug("Balances:\n%s", df_balance)
+            logger.debug("Balances shape: %s", df_balance.shape)
+            logger.debug("Balances:\n%s", df_balance.head())
             return df_balance
 
     def get_token_balances(

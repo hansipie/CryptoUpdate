@@ -24,6 +24,7 @@ APP_PAGES = {
     "GRAPHS": "app_pages/2_Graphs.py",
     "OPERATIONS": "app_pages/3_Operations.py",
     "IMPORT": "app_pages/4_Import.py",
+    "TOKEN_METADATA": "app_pages/5_TokenMetadata.py",
     "SETTINGS": "app_pages/6_Settings.py",
     "TEST": "app_pages/X_Tests.py",
 }
@@ -60,6 +61,7 @@ def setup_navigation():
         "graphs": st.Page(APP_PAGES["GRAPHS"], title="Graphs", icon="💰"),
         "operations": st.Page(APP_PAGES["OPERATIONS"], title="Operations", icon="💱"),
         "import": st.Page(APP_PAGES["IMPORT"], title="Import", icon="📥"),
+        "token_metadata": st.Page(APP_PAGES["TOKEN_METADATA"], title="Token Metadata", icon="🏷️"),
         "settings": st.Page(APP_PAGES["SETTINGS"], title="Settings", icon="⚙️"),
         "tests": st.Page(APP_PAGES["TEST"], title="Tests", icon="🧪"),
     }
@@ -67,7 +69,7 @@ def setup_navigation():
     return st.navigation(
         {
             "Main": [pages["home"], pages["portfolios"], pages["graphs"]],
-            "Tools": [pages["operations"], pages["import"]],
+            "Tools": [pages["operations"], pages["import"], pages["token_metadata"]],
             "Settings": [pages["settings"]],
             "Dev": [pages["tests"]],
         }
