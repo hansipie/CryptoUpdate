@@ -32,7 +32,7 @@ with st.sidebar:
         "Update prices",
         key="update_prices",
         icon=":material/update:",
-        use_container_width=True,
+        width='stretch',
     ):
         update()
     # display time since last update

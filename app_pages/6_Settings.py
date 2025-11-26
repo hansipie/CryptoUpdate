@@ -48,12 +48,12 @@ with st.form(key="settings_form"):
         value=st.session_state.settings.get("coinmarketcap_token"),
     )
 
-    st.subheader("OpenAI")
-    openai_token = st.text_input(
-        "OpenAI API token",
-        key="openai_token",
+    st.subheader("AI")
+    ai_apitoken = st.text_input(
+        "AI API token (Anthropic)",
+        key="ai_apitoken",
         type="password",
-        value=st.session_state.settings.get("openai_token"),
+        value=st.session_state.settings.get("ai_apitoken"),
     )
 
     st.subheader("Debug")
@@ -114,14 +114,14 @@ with st.form(key="settings_form"):
     submitted = st.form_submit_button(
         label="Save",
         help="Save settings.",
-        use_container_width=True,
+        width='stretch',
     )
 
     if submitted:
         logger.debug("Submitted")
         st.session_state.settings["marketraccoon_url"] = marketraccoon_url
         st.session_state.settings["coinmarketcap_token"] = coinmarketcap_token
-        st.session_state.settings["openai_token"] = openai_token
+        st.session_state.settings["ai_apitoken"] = ai_apitoken
         st.session_state.settings["debug_flag"] = debug_flag
         st.session_state.settings["operations_green_threshold"] = operations_green_threshold
         st.session_state.settings["operations_orange_threshold"] = operations_orange_threshold

@@ -127,7 +127,7 @@ def portfolioUI(tabs: list):
                 logger.debug("Dataframe:\n%s", df)
                 updated_data = st.data_editor(
                     df,
-                    use_container_width=True,
+                    width='stretch',
                     height=height,
                     column_config={
                         "token": st.column_config.TextColumn(disabled=True),
@@ -154,7 +154,7 @@ def portfolioUI(tabs: list):
                 if st.button(
                     "Add Token",
                     key=f"addT_{i}",
-                    use_container_width=True,
+                    width='stretch',
                     icon=":material/add:",
                 ):
                     add_token(tabs[i])
@@ -162,7 +162,7 @@ def portfolioUI(tabs: list):
                 if st.button(
                     "Delete Token",
                     key=f"deleteT_{i}",
-                    use_container_width=True,
+                    width='stretch',
                     icon=":material/remove:",
                 ):
                     delete_token(tabs[i])
@@ -170,7 +170,7 @@ def portfolioUI(tabs: list):
                 if st.button(
                     "Rename Portfolio",
                     key=f"rename_{i}",
-                    use_container_width=True,
+                    width='stretch',
                     icon=":material/edit:",
                 ):
                     rename_portfolio(tabs[i])
@@ -178,7 +178,7 @@ def portfolioUI(tabs: list):
                 if st.button(
                     "Danger Zone",
                     key=f"dangerZ_{i}",
-                    use_container_width=True,
+                    width='stretch',
                     type="primary",
                     icon=":material/destruction:",
                 ):
@@ -211,7 +211,7 @@ def execute_search():
     )
     df_search.sort_index(inplace=True)
     logger.debug("Search result:\n%s", df_search)
-    st.dataframe(df_search, use_container_width=True)
+    st.dataframe(df_search, width='stretch')
 
 
 g_portfolios = load_portfolios(st.session_state.settings["dbfile"])
@@ -235,7 +235,7 @@ with st.sidebar:
         "Add new portfolio",
         key="add_new_portfolio",
         icon=":material/note_add:",
-        use_container_width=True,
+        width='stretch',
     ):
         add_new_portfolio()
 
@@ -244,7 +244,7 @@ with st.sidebar:
         "Update prices",
         key="update_prices",
         icon=":material/update:",
-        use_container_width=True,
+        width='stretch',
     ):
         update()
     # display time since last update

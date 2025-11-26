@@ -153,7 +153,7 @@ def buy_add() -> None:
             label_visibility="hidden",
         )
     to_wallet = st.selectbox("Portfolio", g_wallets, key="to_wallet", index=None)
-    if st.button("Submit", use_container_width=True):
+    if st.button("Submit", width='stretch'):
         timestamp = toTimestamp_A(date, time)
         submit_buy(
             timestamp, from_amount, form_currency, to_amount, to_token, to_wallet
@@ -193,7 +193,7 @@ def swap_add() -> None:
         swap_wallet_to = st.selectbox(
             "To Wallet", g_wallets, index=None, key="swap_wallet_to"
         )
-    if st.button("Submit", use_container_width=True):
+    if st.button("Submit", width='stretch'):
         timestamp = toTimestamp_A(date, time)
         submit_swap(
             timestamp,
@@ -259,7 +259,7 @@ def buy_edit_dialog(data: dict) -> None:
     else:
         idx_wallet = None
     to_wallet = st.selectbox("Portfolio", g_wallets, key="to_wallet", index=idx_wallet)
-    if st.button("Submit", use_container_width=True):
+    if st.button("Submit", width='stretch'):
         timestamp = toTimestamp_A(date, time)
         g_operation.delete(data["id"])
         submit_buy(
@@ -324,7 +324,7 @@ def swap_edit_dialog(data: dict):
         swap_wallet_to = st.selectbox(
             "To Wallet", g_wallets, index=idx_to, key="swap_wallet_to"
         )
-    if st.button("Submit", use_container_width=True):
+    if st.button("Submit", width='stretch'):
         timestamp = toTimestamp_A(date, time)
         g_swaps.delete(data["id"])
         submit_swap(
@@ -350,7 +350,7 @@ def buy_delete_dialog(data: dict):
     On confirm, deletes the operation.
     """
     logger.debug("Dialog Delete row: %s", data["id"])
-    st.dataframe(data, use_container_width=True)
+    st.dataframe(data, width='stretch')
     st.write("Are you sure you want to delete this buy operation?")
     if st.button("Confirm"):
         logger.debug("Delete row: %s - %s", data, type(data["id"]))
@@ -708,7 +708,7 @@ def draw_swap(df: pd.DataFrame):
         
         st.dataframe(
             styled_df,
-            use_container_width=True,
+            width='stretch',
             hide_index=True,
             column_order=(
                 "Date",
@@ -762,7 +762,7 @@ def draw_swap_arch(df: pd.DataFrame):
         
         st.dataframe(
             styled_df,
-            use_container_width=True,
+            width='stretch',
             hide_index=True,
             column_order=(
                 "Date",
@@ -803,7 +803,7 @@ with st.sidebar:
         "Update prices",
         key="update_prices",
         icon=":material/update:",
-        use_container_width=True,
+        width='stretch',
     ):
         update()
     # display time since last update
@@ -829,7 +829,7 @@ with buy_tab:
         else:
             st.dataframe(
                 df_buy,
-                use_container_width=True,
+                width='stretch',
                 height=600,
                 hide_index=True,
                 column_order=(
@@ -858,21 +858,21 @@ with buy_tab:
         st.button(
             "New",
             on_click=buy_add,
-            use_container_width=True,
+            width='stretch',
             icon=":material/add:",
             key="buy_new",
         )
         st.button(
             "Edit",
             on_click=buy_edit,
-            use_container_width=True,
+            width='stretch',
             icon=":material/edit:",
             key="buy_edit",
         )
         st.button(
             "Delete",
             on_click=buy_delete,
-            use_container_width=True,
+            width='stretch',
             icon=":material/delete:",
             key="buy_delete",
         )
@@ -899,7 +899,7 @@ with buy_tab:
         height = (len(df_avg) * 35) + 38
         st.dataframe(
             styled_df_avg,
-            use_container_width=True,
+            width='stretch',
             hide_index=True,
             height=height,
             column_order=(
@@ -930,28 +930,28 @@ with swap_tab:
         st.button(
             "New",
             on_click=swap_add,
-            use_container_width=True,
+            width='stretch',
             icon=":material/add:",
             key="swap_new",
         )
         st.button(
             "Edit",
             on_click=swap_edit,
-            use_container_width=True,
+            width='stretch',
             icon=":material/edit:",
             key="swap_edit",
         )
         st.button(
             "Archive",
             on_click=swap_archive,
-            use_container_width=True,
+            width='stretch',
             icon=":material/archive:",
             key="swap_archive",
         )
         st.button(
             "Delete",
             on_click=swap_delete,
-            use_container_width=True,
+            width='stretch',
             icon=":material/delete:",
             key="swap_delete",
         )
@@ -964,7 +964,7 @@ with swap_tab:
         st.button(
             "Unarchive",
             on_click=swap_unarchive,
-            use_container_width=True,
+            width='stretch',
             icon=":material/unarchive:",
             key="swap_unarchive",
         )

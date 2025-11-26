@@ -193,7 +193,7 @@ def load_settings(settings: dict):
     st.session_state.settings["coinmarketcap_token"] = settings["Coinmarketcap"][
         "token"
     ]
-    st.session_state.settings["openai_token"] = settings["OpenAI"]["token"]
+    st.session_state.settings["ai_apitoken"] = settings["AI"]["token"]
     st.session_state.settings["debug_flag"] = settings["Debug"]["flag"] == "True"
 
     st.session_state.settings["archive_path"] = os.path.join(

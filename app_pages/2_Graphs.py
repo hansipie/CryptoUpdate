@@ -48,7 +48,7 @@ def aggregater_ui():
             df["Repartition(%)"] = (df["value(€)"] / df["value(€)"].sum()) * 100
             df = df.rename(columns={"amount": "Amount", "value(€)": "Value(€)"})
             df = df.sort_values(by="Repartition(%)", ascending=False)
-            st.dataframe(df, use_container_width=True, height=height)
+            st.dataframe(df, width='stretch', height=height)
             st.write("Total value: €" + str(round(df["Value(€)"].sum(), 2)))
         else:
             st.info("No data available")
@@ -132,7 +132,7 @@ def draw_tab_content(
         with col1:
             plot_as_graph(df_view)
         with col2:
-            col2.dataframe(df_view, use_container_width=True)
+            col2.dataframe(df_view, width='stretch')
 
     else:
         st.info("No data available")
@@ -215,7 +215,7 @@ def build_price_tab(df: pd.DataFrame):
         with col1:
             plot_as_graph(df_view)
         with col2:
-            col2.dataframe(df_view, use_container_width=True)
+            col2.dataframe(df_view, width='stretch')
 
     else:
         st.error("The end date must be after the start date")
@@ -301,7 +301,7 @@ if add_selectbox == "Currency (USDEUR)":
         with col_btn:
             if st.form_submit_button(
                 "Submit",
-                use_container_width=True,
+                width='stretch',
             ):
                 timestamp = toTimestamp_B(date, time, utc=False)
                 df_low, df_high = market.get_currency_lowhigh(timestamp)

@@ -184,7 +184,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 COINMARKETCAP_TOKEN = os.getenv("COINMARKETCAP_TOKEN")
-OPENAI_TOKEN = os.getenv("OPENAI_TOKEN")
+AI_APITOKEN = os.getenv("AI_APITOKEN")
 NOTION_TOKEN = os.getenv("NOTION_TOKEN")
 ```
 

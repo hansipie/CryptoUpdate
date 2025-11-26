@@ -33,7 +33,7 @@ def data_ui(df: pd.DataFrame) -> pd.DataFrame:
     logger.debug("Displaying data")
     st.session_state.import_page["output"] = st.data_editor(
         df,
-        use_container_width=True,
+        width='stretch',
     )
 
     col_pfolios, col_action = st.columns([0.8, 0.2], vertical_alignment="center")
@@ -70,12 +70,12 @@ def extract(input_data: any) -> pd.DataFrame:
         try:
             if isinstance(input_data, bytes):
                 message_json, _ = aiprocessing.extract_from_img(
-                    input_data, st.session_state.settings["openai_token"]
+                    input_data, st.session_state.settings["ai_apitoken"]
                 )
                 output = pd.DataFrame.from_dict(loads(message_json).get("assets"))
             elif isinstance(input_data, pd.DataFrame):
                 message_json, _ = aiprocessing.extract_from_df(
-                    input_data, st.session_state.settings["openai_token"]
+                    input_data, st.session_state.settings["ai_apitoken"]
                 )
                 output = pd.DataFrame.from_dict(loads(message_json).get("assets"))
             else:
@@ -158,7 +158,7 @@ def drawUI():
                 column_config={
                     "amount": st.column_config.NumberColumn(format="%.8g"),
                 },
-                use_container_width=True,
+                width='stretch',
             )
         else:
             st.image(st.session_state.import_page["input"])
@@ -166,7 +166,7 @@ def drawUI():
         if st.session_state.import_page["output"] is None:
             logger.debug("Data not extracted yet")
             if st.button(
-                "Extract Data", use_container_width=True, icon=":material/table:"
+                "Extract Data", width='stretch', icon=":material/table:"
             ):
                 output = extract(st.session_state.import_page["input"])
                 data_ui(output)
@@ -174,7 +174,7 @@ def drawUI():
             logger.debug("Data already extracted")
             st.button(
                 "Extract Data",
-                use_container_width=True,
+                width='stretch',
                 disabled=True,
                 icon=":material/table:",
             )
@@ -212,7 +212,7 @@ file = st.file_uploader(
 if file is None:
     if st.session_state.import_page["input"] is not None:
         logger.debug("Data already imported")
-        if st.button("Clear Data", use_container_width=True, icon=":material/delete:"):
+        if st.button("Clear Data", width='stretch', icon=":material/delete:"):
             cleanSessionState()
         else:
             drawUI()

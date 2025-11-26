@@ -49,7 +49,7 @@ class configuration:
                 "parentpage": settings["notion_parentpage"],
             },
             "Coinmarketcap": {"token": settings["coinmarketcap_token"]},
-            "OpenAI": {"token": settings["openai_token"]},
+            "AI": {"token": settings["ai_apitoken"]},
             "Debug": {"flag": str(settings["debug_flag"])},
             "Local": {
                 "archive_path": os.path.basename(settings["archive_path"]).replace(

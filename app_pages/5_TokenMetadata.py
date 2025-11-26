@@ -60,7 +60,7 @@ with st.sidebar:
             help="Notes about the token status"
         )
 
-        submitted = st.form_submit_button("Save Token Metadata", use_container_width=True)
+        submitted = st.form_submit_button("Save Token Metadata", width='stretch')
 
         if submitted:
             if not token_symbol:
@@ -142,7 +142,7 @@ with tab1:
 
         st.dataframe(
             df_recent,
-            use_container_width=True,
+            width='stretch',
             hide_index=True,
             column_config={
                 "token": st.column_config.TextColumn("Token", width="small"),
@@ -168,7 +168,7 @@ with tab2:
 
         st.dataframe(
             df_active,
-            use_container_width=True,
+            width='stretch',
             hide_index=True,
             column_config={
                 "token": st.column_config.TextColumn("Token", width="small"),
@@ -218,7 +218,7 @@ with tab3:
 
         st.dataframe(
             df_delisted,
-            use_container_width=True,
+            width='stretch',
             hide_index=True,
             column_config={
                 "token": st.column_config.TextColumn("Token", width="small"),
@@ -285,7 +285,7 @@ with tab4:
 
             st.dataframe(
                 df_display,
-                use_container_width=True,
+                width='stretch',
                 hide_index=True,
                 column_config={
                     "token": st.column_config.TextColumn("Token", width="small"),
@@ -302,7 +302,7 @@ with tab4:
         # Export functionality
         st.divider()
 
-        if st.button("📥 Export to CSV", use_container_width=True):
+        if st.button("📥 Export to CSV", width='stretch'):
             df_export = pd.DataFrame(all_metadata)
             csv = df_export.to_csv(index=False)
             st.download_button(
@@ -310,7 +310,7 @@ with tab4:
                 data=csv,
                 file_name=f"token_metadata_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
                 mime="text/csv",
-                use_container_width=True
+                width='stretch'
             )
 
 # Footer with help

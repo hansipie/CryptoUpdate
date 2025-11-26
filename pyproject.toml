@@ -6,9 +6,9 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "alive-progress>=3.2.0",
+    "anthropic>=0.42.0",
     "dash>=2.18.2",
     "matplotlib>=3.10.0",
-    "openai>=1.63.0",
     "pandas>=2.2.3",
     "plotly>=6.0.0",
     "python-dotenv>=1.0.1",

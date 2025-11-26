@@ -775,7 +775,7 @@ Streamlit multi-page app with sections:
 - `tools.py` - Utility functions and price updates
 - `plotter.py` - Chart generation with Plotly
 - `configuration.py` - Settings file management
-- `aiprocessing.py` - OpenAI integration for data processing
+- `aiprocessing.py` - Anthropic Claude API integration for data processing
 
 ### State Management
 
@@ -792,7 +792,7 @@ Streamlit session state stores:
 {
     "Notion": {"token": "...", "database": "...", "parentpage": "..."},
     "Coinmarketcap": {"token": "..."},
-    "OpenAI": {"token": "..."},
+    "AI": {"token": "..."},
     "Debug": {"flag": "False"},
     "Local": {
         "archive_path": "archive",
