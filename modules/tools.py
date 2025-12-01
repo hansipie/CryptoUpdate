@@ -137,7 +137,32 @@ def update_database(dbfile: str, cmc_apikey: str, debug: bool):
     TokensDatabase(dbfile).add_tokens(new_entries)
 
     custom = Customdata(dbfile)
-    custom.set("last_update", str(pd.Timestamp.now(tz="UTC").timestamp()), "float")
+    custom.set("last_update", str(int(pd.Timestamp.now(tz="UTC").timestamp())), "integer")
+
+
+def parse_last_update(last_update_data: tuple) -> pd.Timestamp:
+    """Parse last_update from Customdata based on its stored type.
+
+    Args:
+        last_update_data: Tuple (value, type) from Customdata.get()
+
+    Returns:
+        pd.Timestamp with timezone UTC
+    """
+    value, value_type = last_update_data
+
+    if value_type == "integer":
+        timestamp = int(value)
+    elif value_type == "float":
+        timestamp = int(float(value))
+    else:
+        # Fallback: try float first, then int
+        try:
+            timestamp = int(float(value))
+        except ValueError:
+            timestamp = int(value)
+
+    return pd.Timestamp.fromtimestamp(timestamp, tz="UTC")
 
 
 def is_fiat(token: str) -> bool:

@@ -16,7 +16,7 @@ from modules.database.tokensdb import TokensDatabase
 from modules.database.operations import operations
 from modules.database.market import Market
 from modules.database.swaps import swaps
-from modules.tools import calculate_crypto_rate, update
+from modules.tools import calculate_crypto_rate, update, parse_last_update
 from modules.utils import get_file_hash, toTimestamp_A
 
 logger = logging.getLogger(__name__)
@@ -809,8 +809,8 @@ with st.sidebar:
     # display time since last update
     last_update = Customdata(st.session_state.settings["dbfile"]).get("last_update")
     if last_update:
-        last_update = pd.Timestamp.fromtimestamp(float(last_update[0]), tz="UTC")
-        last_update = pd.Timestamp.now(tz="UTC") - last_update
+        last_update_ts = parse_last_update(last_update)
+        last_update = pd.Timestamp.now(tz="UTC") - last_update_ts
         st.markdown(
             " - *Last update: " + str(last_update).split(".", maxsplit=1)[0] + "*"
         )

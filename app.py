@@ -57,8 +57,8 @@ def setup_navigation():
     """Configure application navigation structure."""
     pages = {
         "home": st.Page(APP_PAGES["HOME"], title="Home", icon="🏠", default=True),
-        "portfolios": st.Page(APP_PAGES["PORTFOLIOS"], title="Portfolios", icon="📊"),
-        "graphs": st.Page(APP_PAGES["GRAPHS"], title="Graphs", icon="💰"),
+        "portfolios": st.Page(APP_PAGES["PORTFOLIOS"], title="Portfolios", icon="💰"),
+        "graphs": st.Page(APP_PAGES["GRAPHS"], title="Graphs", icon="📊"),
         "operations": st.Page(APP_PAGES["OPERATIONS"], title="Operations", icon="💱"),
         "import": st.Page(APP_PAGES["IMPORT"], title="Import", icon="📥"),
         "token_metadata": st.Page(APP_PAGES["TOKEN_METADATA"], title="Token Metadata", icon="🏷️"),

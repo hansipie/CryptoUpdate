@@ -6,7 +6,7 @@ import streamlit as st
 
 from modules.database.customdata import Customdata
 from modules.database.portfolios import Portfolios
-from modules.tools import create_portfolio_dataframe, update
+from modules.tools import create_portfolio_dataframe, update, parse_last_update
 from modules.utils import dataframe_diff
 
 logger = logging.getLogger(__name__)
@@ -250,8 +250,8 @@ with st.sidebar:
     # display time since last update
     last_update = Customdata(st.session_state.settings["dbfile"]).get("last_update")
     if last_update:
-        last_update = pd.Timestamp.fromtimestamp(float(last_update[0]), tz="UTC")
-        last_update = pd.Timestamp.now(tz="UTC") - last_update
+        last_update_ts = parse_last_update(last_update)
+        last_update = pd.Timestamp.now(tz="UTC") - last_update_ts
         st.markdown(
             " - *Last update: " + str(last_update).split(".", maxsplit=1)[0] + "*"
         )
