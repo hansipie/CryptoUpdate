@@ -6,27 +6,39 @@ formatting, and timezone conversions for financial data.
 """
 
 import logging
+from typing import Optional
 
 import pandas as pd
 import requests
 import tzlocal
+
+from modules.database.fiat_cache import FiatCacheManager
 
 logger = logging.getLogger(__name__)
 
 
 class ApiMarket:
     """Client for MarketRaccoon API to fetch fiat currency exchange rates.
-    
+
     This class provides methods to interact with the MarketRaccoon API
     for retrieving real-time currency exchange rates.
+
     Attributes:
         url (str): Base URL of the MarketRaccoon API
         local_timezone: Local timezone for date conversion
+        cache (FiatCacheManager): Optional cache manager for API responses
     """
 
-    def __init__(self, url: str):
+    def __init__(self, url: str, cache_file: Optional[str] = None):
+        """Initialize ApiMarket client.
+
+        Args:
+            url: Base URL of the MarketRaccoon API
+            cache_file: Optional path to cache file. If provided, enables caching.
+        """
         self.url = url
         self.local_timezone = tzlocal.get_localzone()
+        self.cache = FiatCacheManager(cache_file) if cache_file else None
 
     def get_fiat_latest_rate(self) -> pd.DataFrame:
         """Get latest currency rates.
@@ -61,6 +73,66 @@ class ApiMarket:
 
         logger.error("Error fetching fiat rates: %s", request.status_code)
         return None
+
+    def get_fiat_latest_rate_cached(self) -> Optional[pd.DataFrame]:
+        """Get latest currency rates with caching support.
+
+        This is the cached version of get_fiat_latest_rate(). If cache is disabled
+        (cache_file=None), falls back to direct API call.
+
+        Returns:
+            DataFrame with currency rates or None if empty
+        """
+        if not self.cache:
+            # Cache disabled, use direct API call
+            return self.get_fiat_latest_rate()
+
+        # Use cache with fallback strategy
+        cached_data = self.cache.get_or_fetch(
+            "fiat_latest",
+            self._fetch_and_serialize_latest_rate
+        )
+
+        if cached_data is None:
+            return None
+
+        return self._deserialize_latest_rate(cached_data)
+
+    def _fetch_and_serialize_latest_rate(self) -> Optional[dict]:
+        """Fetch latest rate from API and serialize for caching.
+
+        Returns:
+            Serialized rate data dict or None if fetch failed
+        """
+        df = self.get_fiat_latest_rate()
+
+        if df is None or df.empty:
+            return None
+
+        # Serialize DataFrame to cacheable dict
+        return {
+            "date": df.index[0].isoformat(),
+            "price": float(df.iloc[0]["price"]),
+            "interpolated": False
+        }
+
+    def _deserialize_latest_rate(self, cached_data: dict) -> pd.DataFrame:
+        """Deserialize cached data back to DataFrame.
+
+        Args:
+            cached_data: Serialized rate data from cache
+
+        Returns:
+            DataFrame with same structure as get_fiat_latest_rate()
+        """
+        # Reconstruct DataFrame from cached dict
+        df = pd.DataFrame([{
+            "Date": pd.to_datetime(cached_data["date"], utc=True).tz_convert(self.local_timezone),
+            "price": cached_data["price"]
+        }])
+
+        df.set_index("Date", inplace=True)
+        return df
 
     def get_currency(self, timestamp: int = None) -> pd.DataFrame:
         """Get fiat currency exchange rates from the API.

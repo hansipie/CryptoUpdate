@@ -1,4 +1,5 @@
 import logging
+import os
 
 import pandas as pd
 import streamlit as st
@@ -300,13 +301,18 @@ if add_selectbox == "Market":
 if add_selectbox == "Currency (USDEUR)":
     logger.debug("Currency (USDEUR)")
     st.title("Currency (USDEUR)")
-    market = ApiMarket(st.session_state.settings["marketraccoon_url"])
 
-    # Cache currency data to avoid re-fetching on form submission
-    if "currency_data" not in st.session_state:
-        st.session_state.currency_data = market.get_currency()
+    # Initialize ApiMarket with caching support
+    cache_file = os.path.join(st.session_state.settings["data_path"], "api_cache.json")
+    market = ApiMarket(
+        st.session_state.settings["marketraccoon_url"],
+        cache_file=cache_file
+    )
 
-    build_price_tab(st.session_state.currency_data)
+    # Fetch currency data (will use cache internally)
+    currency_data = market.get_currency()
+
+    build_price_tab(currency_data)
 
     # Initialize session state for interpolation results
     if "interpolation_result" not in st.session_state:

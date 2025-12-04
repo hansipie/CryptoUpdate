@@ -27,6 +27,28 @@ from modules.utils import debug_prefix, interpolate
 logger = logging.getLogger(__name__)
 
 
+def _get_cached_api_market() -> ApiMarket:
+    """Get or create cached ApiMarket instance in session state.
+
+    This singleton pattern prevents creating multiple ApiMarket instances
+    per session and enables caching of API responses.
+
+    Returns:
+        ApiMarket instance with caching enabled
+    """
+    if "api_market_instance" not in st.session_state:
+        settings = st.session_state.settings
+        cache_file = os.path.join(settings["data_path"], "api_cache.json")
+
+        st.session_state.api_market_instance = ApiMarket(
+            settings["marketraccoon_url"],
+            cache_file=cache_file
+        )
+        logger.debug("Created cached ApiMarket instance with cache file: %s", cache_file)
+
+    return st.session_state.api_market_instance
+
+
 # Conversion d'une valeur fiat vers la devise cible définie dans les settings
 def convert_fiat_to_settings_currency(
     value: float, input_currency: str = "EUR"
@@ -60,12 +82,12 @@ def convert_fiat_to_settings_currency(
         )
         return value
 
-    # Utiliser ApiMarket pour obtenir les taux de change EUR/USD
-    api_market = ApiMarket(settings["marketraccoon_url"])
+    # Utiliser ApiMarket pour obtenir les taux de change EUR/USD avec cache
+    api_market = _get_cached_api_market()
 
     try:
-        # Récupérer les derniers taux de change
-        rates_df = api_market.get_fiat_latest_rate()
+        # Récupérer les derniers taux de change (avec cache)
+        rates_df = api_market.get_fiat_latest_rate_cached()
 
         if rates_df is None or rates_df.empty:
             logger.warning(
