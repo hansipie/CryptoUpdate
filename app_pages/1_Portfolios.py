@@ -120,9 +120,23 @@ def portfolioUI(tabs: list):
             pf = g_portfolios.get_portfolio(tabs[i])
             df = create_portfolio_dataframe(pf)
             if not df.empty:  # Only create DataFrame if data exists
-                balance = df["value(€)"].sum()
-                df.sort_values(by=["value(€)"], ascending=False, inplace=True)
-                st.write(f"Total value: €{round(balance, 2)}")
+                # Get target currency from settings
+                target_currency = st.session_state.settings.get("fiat_currency", "EUR")
+                value_column = f"value({target_currency})"
+
+                balance = df[value_column].sum()
+                df.sort_values(by=[value_column], ascending=False, inplace=True)
+
+                # Display total with appropriate currency symbol
+                currency_symbols = {
+                    "EUR": "€", "USD": "$", "GBP": "£", "CHF": "CHF",
+                    "CAD": "CA$", "AUD": "A$", "JPY": "¥", "CNY": "¥",
+                    "KRW": "₩", "BRL": "R$", "MXN": "MX$", "INR": "₹",
+                    "RUB": "₽", "TRY": "₺"
+                }
+                currency_symbol = currency_symbols.get(target_currency, target_currency)
+                st.write(f"Total value: {currency_symbol}{round(balance, 2)}")
+
                 height = (len(df) * 35) + 38
                 logger.debug("Dataframe:\n%s", df)
                 updated_data = st.data_editor(
@@ -132,8 +146,8 @@ def portfolioUI(tabs: list):
                     column_config={
                         "token": st.column_config.TextColumn(disabled=True),
                         "amount": st.column_config.NumberColumn(format="%.8g"),
-                        "value(€)": st.column_config.NumberColumn(
-                            format="%.2f €", disabled=True
+                        value_column: st.column_config.NumberColumn(
+                            format=f"%.2f {currency_symbol}", disabled=True
                         ),
                     },
                 )

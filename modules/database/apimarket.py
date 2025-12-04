@@ -45,7 +45,8 @@ class ApiMarket:
             if not data:  # Si la liste est vide
                 return None
 
-            df = pd.DataFrame(data)
+            # L'API retourne un objet unique, créer une liste pour DataFrame
+            df = pd.DataFrame([data])
             df["date"] = pd.to_datetime(df["date"], utc=True)
             df["date"] = df["date"].dt.tz_convert(self.local_timezone)
             df.rename(columns={"date": "Date", "eur": "price"}, inplace=True)
@@ -60,3 +61,101 @@ class ApiMarket:
 
         logger.error("Error fetching fiat rates: %s", request.status_code)
         return None
+
+    def get_currency(self, timestamp: int = None) -> pd.DataFrame:
+        """Get fiat currency exchange rates from the API.
+
+        If timestamp is provided, fetches the interpolated rate for that specific
+        date. Otherwise, fetches all historical fiat exchange rate data with
+        pagination.
+
+        Args:
+            timestamp: Optional Unix timestamp. If provided, returns interpolated
+                      rate for that specific date. If None, returns all data.
+
+        Returns:
+            DataFrame with columns: Date (index), price, interpolated
+            Returns None if no data is available or an error occurs
+        """
+        # If timestamp provided, fetch interpolated value for that date
+        if timestamp is not None:
+            logger.debug("Get fiat currency data for timestamp: %d", timestamp)
+
+            # Convert Unix timestamp to ISO 8601 format
+            from datetime import datetime
+            dt = datetime.fromtimestamp(timestamp, tz=self.local_timezone)
+            date_str = dt.astimezone(pd.Timestamp.now(tz='UTC').tz).isoformat()
+
+            request = requests.get(
+                self.url + "/api/v1/fiat",
+                params={"date": date_str},
+                timeout=10,
+            )
+
+            if request.status_code == 200:
+                data = request.json()
+                results = data.get("results", [])
+
+                if not results:
+                    logger.info("No fiat data available for timestamp %d", timestamp)
+                    return None
+
+                df = pd.DataFrame(results)
+                df["date"] = pd.to_datetime(df["date"], utc=True)
+                df["date"] = df["date"].dt.tz_convert(self.local_timezone)
+                df.rename(columns={"date": "Date", "eur": "price"}, inplace=True)
+                df.set_index("Date", inplace=True)
+
+                logger.info("Retrieved interpolated fiat rate for timestamp %d", timestamp)
+                return df
+            elif request.status_code == 204:
+                logger.info("No fiat data available (204)")
+                return None
+            else:
+                logger.error("Error fetching fiat data: %s", request.status_code)
+                return None
+
+        # Otherwise, fetch all data with pagination
+        logger.debug("Get all fiat currency data")
+        all_results = []
+        next_url = self.url + "/api/v1/fiat"
+
+        # Fetch all pages
+        while next_url:
+            logger.debug("Fetching page: %s", next_url)
+            request = requests.get(next_url, timeout=10)
+
+            if request.status_code == 200:
+                data = request.json()
+                results = data.get("results", [])
+                all_results.extend(results)
+
+                # Get next page URL
+                next_url = data.get("next")
+
+                logger.debug(
+                    "Retrieved %d records, total so far: %d",
+                    len(results),
+                    len(all_results),
+                )
+            elif request.status_code == 204:
+                logger.info("No fiat data available (204)")
+                return None
+            else:
+                logger.error("Error fetching fiat data: %s", request.status_code)
+                return None
+
+        # Convert to DataFrame
+        if not all_results:
+            logger.info("No fiat data retrieved")
+            return None
+
+        df = pd.DataFrame(all_results)
+        df["date"] = pd.to_datetime(df["date"], utc=True)
+        df["date"] = df["date"].dt.tz_convert(self.local_timezone)
+        df.rename(columns={"date": "Date", "eur": "price"}, inplace=True)
+        df.set_index("Date", inplace=True)
+        df.sort_index(inplace=True)
+
+        logger.info("Retrieved %d total fiat records", len(df))
+        return df

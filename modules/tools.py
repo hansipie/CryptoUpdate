@@ -34,12 +34,15 @@ def convert_fiat_to_settings_currency(
     """
     Convertit une valeur fiat (ex: EUR, USD) vers la devise cible définie dans les settings.
 
+    LIMITATION ACTUELLE: Seules les conversions EUR<->USD sont supportées.
+    Pour les autres devises, la valeur originale est retournée sans conversion.
+
     Args:
         value: Montant à convertir
         input_currency: Devise d'entrée (ex: "EUR", "USD")
 
     Returns:
-        Montant converti dans la devise cible
+        Montant converti dans la devise cible (ou valeur originale si conversion non supportée)
     """
     settings = st.session_state.settings
     target_currency = settings.get("fiat_currency", "EUR")
@@ -48,7 +51,16 @@ def convert_fiat_to_settings_currency(
     if input_currency == target_currency:
         return value
 
-    # Utiliser ApiMarket pour obtenir les taux de change
+    # Si ni EUR ni USD n'est impliqué, pas de conversion possible pour le moment
+    if input_currency not in ["EUR", "USD"] or target_currency not in ["EUR", "USD"]:
+        logger.warning(
+            "Conversion %s -> %s non supportée. Seules les conversions EUR<->USD sont disponibles.",
+            input_currency,
+            target_currency
+        )
+        return value
+
+    # Utiliser ApiMarket pour obtenir les taux de change EUR/USD
     api_market = ApiMarket(settings["marketraccoon_url"])
 
     try:
@@ -62,17 +74,21 @@ def convert_fiat_to_settings_currency(
             return value
 
         # Prendre le taux le plus récent
+        # L'API MarketRaccoon retourne le champ "eur" qui représente le taux USD->EUR
+        # Exemple: si eur=0.8563, cela signifie 1 USD = 0.8563 EUR
         latest_rate = rates_df.iloc[-1]["price"]
 
         # Conversion selon les devises
         if input_currency == "EUR" and target_currency == "USD":
-            # EUR vers USD
-            converted_value = value * latest_rate
-        elif input_currency == "USD" and target_currency == "EUR":
-            # USD vers EUR
+            # EUR vers USD: diviser par le taux USD->EUR
+            # Exemple: 100 EUR / 0.8563 = 116.78 USD
             converted_value = value / latest_rate
+        elif input_currency == "USD" and target_currency == "EUR":
+            # USD vers EUR: multiplier par le taux USD->EUR
+            # Exemple: 100 USD * 0.8563 = 85.63 EUR
+            converted_value = value * latest_rate
         else:
-            # Autres conversions non supportées pour le moment
+            # Ne devrait pas arriver vu la vérification ci-dessus
             logger.warning(
                 "Conversion %s -> %s non supportée", input_currency, target_currency
             )
@@ -90,7 +106,7 @@ def convert_fiat_to_settings_currency(
 
     except (requests.RequestException, KeyError, ValueError) as e:
         logger.error("Erreur conversion %s -> %s: %s", input_currency, target_currency, e)
-        return value
+        return None
 
 
 def update_database(dbfile: str, cmc_apikey: str, debug: bool):
@@ -180,15 +196,33 @@ def create_portfolio_dataframe(data: dict) -> pd.DataFrame:
     df["amount"] = df["amount"].astype(float)
     df.index.name = "token"
     logger.debug("Create portfolio dataframe - Dataframe:\n%s", df)
+
+    # Get target currency from settings
+    target_currency = st.session_state.settings.get("fiat_currency", "EUR")
+
     market = Market(
         st.session_state.settings["dbfile"],
         st.session_state.settings["coinmarketcap_token"],
     )
-    df["value(€)"] = df.apply(
-        lambda row: row["amount"]
-        * (market.get_price(row.name) if not is_fiat(row.name) else 1.0),
-        axis=1,
-    )
+
+    def calculate_value(row):
+        token = row.name
+        amount = row["amount"]
+
+        if is_fiat(token):
+            # For fiat currencies, the amount is in the token's native currency
+            # Example: if token is "USD", amount is in USD
+            # Convert from token currency to target currency
+            return convert_fiat_to_settings_currency(amount, input_currency=token)
+        else:
+            # For crypto, get price in EUR and convert to target currency
+            price_eur = market.get_price(token)
+            value_in_eur = amount * price_eur
+            return convert_fiat_to_settings_currency(value_in_eur, input_currency="EUR")
+
+    # Create column with dynamic currency symbol
+    df[f"value({target_currency})"] = df.apply(calculate_value, axis=1)
+
     # sort df by token
     df = df.sort_index()
     return df

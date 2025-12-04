@@ -37,6 +37,10 @@ def aggregater_ui():
     logger.debug("Aggregated: %s", agg)
     df = create_portfolio_dataframe(agg)
 
+    # Get target currency from settings
+    target_currency = st.session_state.settings.get("fiat_currency", "EUR")
+    value_column = f"value({target_currency})"
+
     col_tbl, col_pie = st.columns(2)
     with col_tbl:
         st.header("Tokens")
@@ -44,19 +48,28 @@ def aggregater_ui():
             height = (len(df) * 35) + 38
             height = min(height, 650)
 
-            df = df.groupby("token").agg({"amount": "sum", "value(€)": "sum"})
-            df["Repartition(%)"] = (df["value(€)"] / df["value(€)"].sum()) * 100
-            df = df.rename(columns={"amount": "Amount", "value(€)": "Value(€)"})
+            df = df.groupby("token").agg({"amount": "sum", value_column: "sum"})
+            df["Repartition(%)"] = (df[value_column] / df[value_column].sum()) * 100
+            df = df.rename(columns={"amount": "Amount", value_column: f"Value({target_currency})"})
             df = df.sort_values(by="Repartition(%)", ascending=False)
             st.dataframe(df, width='stretch', height=height)
-            st.write("Total value: €" + str(round(df["Value(€)"].sum(), 2)))
+
+            # Display total with appropriate currency symbol
+            currency_symbols = {
+                "EUR": "€", "USD": "$", "GBP": "£", "CHF": "CHF",
+                "CAD": "CA$", "AUD": "A$", "JPY": "¥", "CNY": "¥",
+                "KRW": "₩", "BRL": "R$", "MXN": "MX$", "INR": "₹",
+                "RUB": "₽", "TRY": "₺"
+            }
+            currency_symbol = currency_symbols.get(target_currency, target_currency)
+            st.write(f"Total value: {currency_symbol}" + str(round(df[f"Value({target_currency})"].sum(), 2)))
         else:
             st.info("No data available")
     with col_pie:
         st.header("Tokens repartition")
         if not df.empty:
             try:
-                plot_as_pie(df, column="Value(€)")
+                plot_as_pie(df, column=f"Value({target_currency})")
             except Exception as e:
                 st.error(f"Error: {str(e)}")
         else:
@@ -288,10 +301,17 @@ if add_selectbox == "Currency (USDEUR)":
     logger.debug("Currency (USDEUR)")
     st.title("Currency (USDEUR)")
     market = ApiMarket(st.session_state.settings["marketraccoon_url"])
-    df_currency = market.get_currency()
-    build_price_tab(df_currency)
 
-    interpolated: float = 0.0
+    # Cache currency data to avoid re-fetching on form submission
+    if "currency_data" not in st.session_state:
+        st.session_state.currency_data = market.get_currency()
+
+    build_price_tab(st.session_state.currency_data)
+
+    # Initialize session state for interpolation results
+    if "interpolation_result" not in st.session_state:
+        st.session_state.interpolation_result = None
+
     with st.form(key="interpolate"):
         col_date, col_time, col_btn = st.columns([3, 2, 1], vertical_alignment="bottom")
         with col_date:
@@ -299,16 +319,34 @@ if add_selectbox == "Currency (USDEUR)":
         with col_time:
             time = st.time_input("Time", key="intertime")
         with col_btn:
-            if st.form_submit_button(
-                "Submit",
-                width='stretch',
-            ):
-                timestamp = toTimestamp_B(date, time, utc=False)
-                df_low, df_high = market.get_currency_lowhigh(timestamp)
-                interpolated = interpolate_price(df_low, df_high, timestamp, "USDEUR")
+            submitted = st.form_submit_button("Submit", width='stretch')
 
-        if interpolated is not None:
-            if interpolated != 0.0:
-                st.info(f"Interpolated value: {interpolated} EUR")
+        if submitted:
+            timestamp = toTimestamp_B(date, time, utc=False)
+            df_result = market.get_currency(timestamp=timestamp)
+
+            if df_result is not None and not df_result.empty:
+                value = df_result["price"].iloc[0]
+                is_interpolated = df_result.get("interpolated", pd.Series([False])).iloc[0]
+                st.session_state.interpolation_result = {
+                    "value": value,
+                    "is_interpolated": is_interpolated
+                }
+            else:
+                st.session_state.interpolation_result = None
+
+    # Display interpolation results
+    if st.session_state.interpolation_result is not None:
+        result = st.session_state.interpolation_result
+        value = result["value"]
+        is_interpolated = result["is_interpolated"]
+
+        if value != 0.0:
+            if is_interpolated:
+                st.info(f"Interpolated value: {value:.6f} EUR")
+            else:
+                st.info(f"Exact value: {value:.6f} EUR")
         else:
-            st.info("No data available")
+            st.warning("Value is 0.0")
+    elif st.session_state.interpolation_result is None and "interpolation_result" in st.session_state:
+        st.info("No data available")
