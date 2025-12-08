@@ -298,6 +298,14 @@ def load_settings(settings: dict):
         "FiatCurrency", {}
     ).get("currency", "EUR")
 
+    # Load UI preferences
+    st.session_state.settings["show_empty_portfolios"] = settings.get(
+        "UIPreferences", {}
+    ).get("show_empty_portfolios", True)
+    st.session_state.settings["graphs_selected_tokens"] = settings.get(
+        "UIPreferences", {}
+    ).get("graphs_selected_tokens", [])
+
 
 def interpolate_price(
     df_low: pd.DataFrame, df_high: pd.DataFrame, timestamp: int, token: str = ""

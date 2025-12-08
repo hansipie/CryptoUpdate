@@ -3,11 +3,14 @@ import traceback
 
 import pandas as pd
 import streamlit as st
+import plotly.graph_objects as go
 
 from modules.database.customdata import Customdata
 from modules.database.portfolios import Portfolios
+from modules.database.tokensdb import TokensDatabase
 from modules.tools import create_portfolio_dataframe, update, parse_last_update
 from modules.utils import dataframe_diff
+from modules.configuration import configuration
 
 logger = logging.getLogger(__name__)
 
@@ -117,6 +120,10 @@ def portfolioUI(tabs: list):
 
     for i, tab in enumerate(tabs_widget):
         with tab:
+            # Display historical chart above the table
+            plot_portfolio_history(tabs[i], st.session_state.settings["dbfile"])
+            st.divider()
+
             pf = g_portfolios.get_portfolio(tabs[i])
             df = create_portfolio_dataframe(pf)
             if not df.empty:  # Only create DataFrame if data exists
@@ -211,6 +218,111 @@ def load_portfolios(dbfile: str) -> Portfolios:
     return Portfolios(dbfile)
 
 
+def get_portfolio_history(portfolio_name: str, dbfile: str) -> pd.DataFrame:
+    """Get historical value of a portfolio over time.
+
+    Args:
+        portfolio_name: Name of the portfolio
+        dbfile: Path to database file
+
+    Returns:
+        DataFrame with timestamp index and portfolio value
+    """
+    logger.debug("Getting history for portfolio %s", portfolio_name)
+
+    # Get current portfolio tokens and amounts
+    portfolio = Portfolios(dbfile)
+    tokens_dict = portfolio.get_tokens(portfolio_name)
+
+    if not tokens_dict:
+        logger.warning("Portfolio %s is empty", portfolio_name)
+        return pd.DataFrame()
+
+    # Get historical prices from TokensDatabase
+    tokensdb = TokensDatabase(dbfile)
+
+    # Query all historical data for tokens in this portfolio
+    import sqlite3
+    with sqlite3.connect(dbfile) as con:
+        # Get tokens list
+        tokens_list = list(tokens_dict.keys())
+        tokens_placeholder = ','.join(['?' for _ in tokens_list])
+
+        query = f"""
+            SELECT timestamp, token, price
+            FROM TokensDatabase
+            WHERE token IN ({tokens_placeholder})
+            ORDER BY timestamp
+        """
+        df = pd.read_sql_query(query, con, params=tokens_list)
+
+    if df.empty:
+        logger.warning("No historical data found for portfolio %s", portfolio_name)
+        return pd.DataFrame()
+
+    # Convert timestamp to datetime
+    df['timestamp'] = pd.to_datetime(df['timestamp'], unit='s', utc=True)
+    df['timestamp'] = df['timestamp'].dt.tz_convert(tokensdb.local_timezone)
+
+    # Calculate value for each token at each timestamp
+    df['amount'] = df['token'].map(lambda t: float(tokens_dict.get(t, 0)))
+    df['value'] = df['price'] * df['amount']
+
+    # Group by timestamp and sum values
+    portfolio_value = df.groupby('timestamp')['value'].sum().reset_index()
+    portfolio_value.columns = ['Date', 'Value']
+    portfolio_value.set_index('Date', inplace=True)
+    portfolio_value.sort_index(inplace=True)
+
+    logger.debug("Portfolio history shape: %s", portfolio_value.shape)
+    return portfolio_value
+
+
+def plot_portfolio_history(portfolio_name: str, dbfile: str):
+    """Plot the historical value of a portfolio.
+
+    Args:
+        portfolio_name: Name of the portfolio
+        dbfile: Path to database file
+    """
+    df = get_portfolio_history(portfolio_name, dbfile)
+
+    if df.empty:
+        st.info("No historical data available for this portfolio")
+        return
+
+    # Get target currency from settings
+    target_currency = st.session_state.settings.get("fiat_currency", "EUR")
+    currency_symbols = {
+        "EUR": "€", "USD": "$", "GBP": "£", "CHF": "CHF",
+        "CAD": "CA$", "AUD": "A$", "JPY": "¥", "CNY": "¥",
+        "KRW": "₩", "BRL": "R$", "MXN": "MX$", "INR": "₹",
+        "RUB": "₽", "TRY": "₺"
+    }
+    currency_symbol = currency_symbols.get(target_currency, target_currency)
+
+    # Create plotly figure
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(
+        x=df.index,
+        y=df['Value'],
+        mode='lines',
+        name=portfolio_name,
+        fill='tozeroy',
+        line=dict(width=2)
+    ))
+
+    fig.update_layout(
+        title=f"Historical Value - {portfolio_name}",
+        xaxis_title="Date",
+        yaxis_title=f"Value ({currency_symbol})",
+        hovermode='x unified',
+        height=400
+    )
+
+    st.plotly_chart(fig, use_container_width=True)
+
+
 @st.fragment
 def execute_search():
     """Execute token search and display results.
@@ -230,18 +342,16 @@ def execute_search():
 
 g_portfolios = load_portfolios(st.session_state.settings["dbfile"])
 
-# Fonction callback pour garantir la persistance du toggle
-def on_toggle_change():
-    """Callback pour garantir la synchronisation de l'état du toggle."""
-    # Force la sauvegarde explicite de l'état
-    if "show_empty_portfolios" in st.session_state:
-        # Rien à faire, l'état est déjà synchronisé par Streamlit
-        pass
 
-# Toggle persistant pour afficher/masquer les portefeuilles vides
-# Initialisation robuste avec validation
-if "show_empty_portfolios" not in st.session_state:
-    st.session_state["show_empty_portfolios"] = True
+def save_toggle_preference():
+    """Save toggle state to settings file when it changes."""
+    logger.debug("Saving toggle preference: %s", st.session_state.show_empty_portfolios)
+    # Update settings in session state
+    st.session_state.settings["show_empty_portfolios"] = st.session_state.show_empty_portfolios
+    # Save to file
+    config = configuration()
+    config.saveConfig(st.session_state.settings)
+
 
 with st.sidebar:
     # Add new portfolio dialog
@@ -285,12 +395,16 @@ with st.sidebar:
 
     st.divider()
 
-    # Toggle pour afficher/masquer les portefeuilles vides avec callback
+    # Initialize toggle state from settings if not exists
+    if "show_empty_portfolios" not in st.session_state:
+        st.session_state.show_empty_portfolios = st.session_state.settings.get("show_empty_portfolios", True)
+
+    # Toggle pour afficher/masquer les portefeuilles vides
     st.toggle(
         "Afficher les portefeuilles vides",
         key="show_empty_portfolios",
         help="Afficher ou masquer les portefeuilles sans token ou avec un solde nul.",
-        on_change=on_toggle_change
+        on_change=save_toggle_preference
     )
 
 

@@ -3,16 +3,191 @@ import os
 
 import pandas as pd
 import streamlit as st
+import plotly.graph_objects as go
 
+from modules.configuration import configuration
 from modules.database.apimarket import ApiMarket
 from modules.database.market import Market
 from modules.database.portfolios import Portfolios
 from modules.database.tokensdb import TokensDatabase
-from modules.plotter import plot_as_graph, plot_as_pie
+from modules.plotter import plot_as_pie
 from modules.tools import create_portfolio_dataframe, interpolate_price
 from modules.utils import toTimestamp_A, toTimestamp_B
 
 logger = logging.getLogger(__name__)
+
+
+def plot_modern_graph(df: pd.DataFrame, title: str = None, y_label: str = None, optimize_y_range: bool = False):
+    """Plot data with modern style matching other pages.
+
+    Args:
+        df: DataFrame with datetime index and one or more value columns
+        title: Optional chart title
+        y_label: Optional y-axis label
+        optimize_y_range: If True, adjusts y-axis range to fit data tightly
+    """
+    if df is None or df.empty:
+        st.info("No data available")
+        return
+
+    # Get target currency from settings
+    target_currency = st.session_state.settings.get("fiat_currency", "EUR")
+    currency_symbols = {
+        "EUR": "€", "USD": "$", "GBP": "£", "CHF": "CHF",
+        "CAD": "CA$", "AUD": "A$", "JPY": "¥", "CNY": "¥",
+        "KRW": "₩", "BRL": "R$", "MXN": "MX$", "INR": "₹",
+        "RUB": "₽", "TRY": "₺"
+    }
+    currency_symbol = currency_symbols.get(target_currency, target_currency)
+
+    # Create plotly figure
+    fig = go.Figure()
+
+    # Add traces for each column
+    for col in df.columns:
+        fig.add_trace(go.Scatter(
+            x=df.index,
+            y=df[col],
+            mode='lines',
+            name=col,
+            fill='tozeroy' if len(df.columns) == 1 else None,
+            line=dict(width=2)
+        ))
+
+    # Set default labels if not provided
+    if y_label is None:
+        y_label = f"Value ({currency_symbol})"
+    if title is None:
+        title = "Chart"
+
+    layout_config = {
+        "title": title,
+        "xaxis_title": "Date",
+        "yaxis_title": y_label,
+        "hovermode": 'x unified',
+        "height": 400
+    }
+
+    # Optimize y-axis range if requested
+    if optimize_y_range:
+        # Calculate min and max values across all columns
+        y_min = df.min().min()
+        y_max = df.max().max()
+
+        # Add 2% margin on each side for better visualization
+        y_range = y_max - y_min
+        margin = y_range * 0.02
+
+        layout_config["yaxis"] = {
+            "title": y_label,
+            "range": [y_min - margin, y_max + margin]
+        }
+
+    fig.update_layout(**layout_config)
+
+    st.plotly_chart(fig, use_container_width=True)
+
+
+def plot_dual_axis_graph(df: pd.DataFrame, title: str = None, token: str = None):
+    """Plot data with two separate optimized y-axes for Value and Count.
+
+    Args:
+        df: DataFrame with datetime index, 'Value' and 'Count' columns
+        title: Optional chart title
+        token: Token symbol for labeling
+    """
+    if df is None or df.empty:
+        st.info("No data available")
+        return
+
+    # Get target currency from settings
+    target_currency = st.session_state.settings.get("fiat_currency", "EUR")
+    currency_symbols = {
+        "EUR": "€", "USD": "$", "GBP": "£", "CHF": "CHF",
+        "CAD": "CA$", "AUD": "A$", "JPY": "¥", "CNY": "¥",
+        "KRW": "₩", "BRL": "R$", "MXN": "MX$", "INR": "₹",
+        "RUB": "₽", "TRY": "₺"
+    }
+    currency_symbol = currency_symbols.get(target_currency, target_currency)
+
+    # Create plotly figure with dual y-axes
+    fig = go.Figure()
+
+    # Find the Value column (case-insensitive)
+    value_col = None
+    count_col = None
+    for col in df.columns:
+        if col.lower() == 'value':
+            value_col = col
+        elif col.lower() == 'count':
+            count_col = col
+
+    if value_col is None or count_col is None:
+        st.error("DataFrame must contain 'Value' and 'Count' columns")
+        return
+
+    # Add Value trace on primary y-axis (left)
+    fig.add_trace(go.Scatter(
+        x=df.index,
+        y=df[value_col],
+        mode='lines',
+        name=f'Value ({currency_symbol})',
+        line=dict(width=2, color='#1f77b4'),
+        yaxis='y1'
+    ))
+
+    # Add Count trace on secondary y-axis (right)
+    fig.add_trace(go.Scatter(
+        x=df.index,
+        y=df[count_col],
+        mode='lines',
+        name='Count',
+        line=dict(width=2, color='#ff7f0e'),
+        yaxis='y2'
+    ))
+
+    # Calculate optimized ranges for both axes
+    value_min = df[value_col].min()
+    value_max = df[value_col].max()
+    value_range = value_max - value_min
+    value_margin = value_range * 0.02
+
+    count_min = df[count_col].min()
+    count_max = df[count_col].max()
+    count_range = count_max - count_min
+    count_margin = count_range * 0.02
+
+    # Set title
+    if title is None:
+        title = f"{token} - Assets Balance Over Time" if token else "Assets Balance Over Time"
+
+    # Configure layout with dual y-axes
+    fig.update_layout(
+        title=title,
+        xaxis_title="Date",
+        yaxis=dict(
+            title=f"Value ({currency_symbol})",
+            range=[value_min - value_margin, value_max + value_margin],
+            side='left'
+        ),
+        yaxis2=dict(
+            title="Count",
+            range=[count_min - count_margin, count_max + count_margin],
+            overlaying='y',
+            side='right'
+        ),
+        hovermode='x unified',
+        height=400,
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=1.02,
+            xanchor="right",
+            x=1
+        )
+    )
+
+    st.plotly_chart(fig, use_container_width=True)
 
 
 def load_portfolios(dbfile: str) -> Portfolios:
@@ -91,11 +266,21 @@ def draw_tab_content(
         df_view = None
     if df_view is not None:
         if section == "Assets Balances":
-            column_value = "Value"
+            column_value = "value"  # Match the actual column name from database
             label = "Balance"
         else:
             column_value = "Price"
             label = "Current Price"
+
+        # Find the actual column name (case-insensitive)
+        actual_column = None
+        for col in df_view.columns:
+            if col.lower() == column_value.lower():
+                actual_column = col
+                break
+        if actual_column is None:
+            actual_column = column_value
+
         mcol1, mcol2, mcol3, mcol4 = st.columns(4)
         with mcol1:
             nbr_days = df_view.index[-1] - df_view.index[0]
@@ -107,7 +292,7 @@ def draw_tab_content(
         with mcol2:
             first = df_view.iloc[0].values[0]
             last = df_view.iloc[-1].values[0]
-            current_price = df_view[column_value].iloc[-1]
+            current_price = df_view[actual_column].iloc[-1]
             st.metric(
                 label,
                 value=f"{round(current_price, 2)} €",
@@ -120,9 +305,9 @@ def draw_tab_content(
                 ),
             )
         with mcol3:
-            min_price = df_view[column_value].min()
+            min_price = df_view[actual_column].min()
             min_price_date = df_view.index[
-                df_view[column_value] == df_view[column_value].min()
+                df_view[actual_column] == df_view[actual_column].min()
             ]
             st.metric(
                 "Timeframe Low",
@@ -131,9 +316,9 @@ def draw_tab_content(
                 delta=f"{round(((current_price - min_price) / min_price) * 100, 2)} %",
             )
         with mcol4:
-            max_price = df_view[column_value].max()
+            max_price = df_view[actual_column].max()
             max_price_date = df_view.index[
-                df_view[column_value] == df_view[column_value].max()
+                df_view[actual_column] == df_view[actual_column].max()
             ]
             st.metric(
                 "Timeframe High",
@@ -144,7 +329,13 @@ def draw_tab_content(
 
         col1, col2 = st.columns([3, 1])
         with col1:
-            plot_as_graph(df_view)
+            if section == "Assets Balances":
+                # Use dual-axis graph for Assets Balances
+                plot_dual_axis_graph(df_view, token=token)
+            else:
+                # Use single-axis graph for Market with optimized y-range
+                chart_title = f"{token} - {label} Over Time"
+                plot_modern_graph(df_view, title=chart_title, optimize_y_range=True)
         with col2:
             col2.dataframe(df_view, width='stretch')
 
@@ -176,6 +367,13 @@ def build_tabs(section: str = "Assets Balances"):
     if temp_tokens != st.session_state.tokens:
         st.session_state.tokens = temp_tokens
         logger.debug("Tokens list changed")
+
+        # Save token preferences to settings
+        st.session_state.settings["graphs_selected_tokens"] = temp_tokens
+        config = configuration()
+        config.saveConfig(st.session_state.settings)
+        logger.debug("Saved token preferences: %s", temp_tokens)
+
         st.rerun()
     else:
         logger.debug("Tokens list not changed")
@@ -227,7 +425,7 @@ def build_price_tab(df: pd.DataFrame):
             )
         col1, col2 = st.columns([3, 1])
         with col1:
-            plot_as_graph(df_view)
+            plot_modern_graph(df_view, title="USD/EUR Exchange Rate Over Time", y_label="EUR", optimize_y_range=True)
         with col2:
             col2.dataframe(df_view, width='stretch')
 
@@ -281,7 +479,8 @@ markgetdb = Market(
 )
 
 if "tokens" not in st.session_state:
-    st.session_state.tokens = []
+    # Load saved token preferences from settings
+    st.session_state.tokens = st.session_state.settings.get("graphs_selected_tokens", [])
 
 if add_selectbox == "Global":
     logger.debug("Global")
