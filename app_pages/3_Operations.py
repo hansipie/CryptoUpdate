@@ -432,6 +432,31 @@ def swap_unarchive_dialog(rows: list):
         st.rerun()
 
 
+@st.dialog("Delete Archived Swap")
+def swap_arch_delete_dialog(rows: list):
+    """Display confirmation dialog for deleting an archived swap operation.
+
+    Args:
+        rows: List of row indices to delete
+
+    Shows a confirmation prompt with operation details.
+    On confirm, deletes the archived operations.
+    """
+    todelete = []
+    for rowidx in rows:
+        data = df_swap_arch.iloc[rowidx].to_dict()
+        todelete.append(data)
+
+    logger.debug("Dialog Delete archived row: %s", todelete)
+    st.write(f"{len(todelete)} archived swap(s) selected. Are you sure you want to delete?")
+
+    if st.button("Confirm"):
+        for data in todelete:
+            logger.debug("Delete archived row: %s - %s", data, type(data["id"]))
+            g_swaps.delete(data["id"])
+        st.rerun()
+
+
 def buy_edit():
     """Handle editing of selected buy operation.
 
@@ -515,6 +540,20 @@ def swap_unarchive():
         st.toast("Please select a row", icon=":material/warning:")
     else:
         swap_unarchive_dialog(rowidx)
+
+
+def swap_arch_delete():
+    """Handle deletion of selected archived swap operation.
+
+    Shows confirmation dialog if a row is selected.
+    Otherwise displays a warning toast.
+    """
+    logger.debug("Delete archived row")
+    rowidx = rows_selected(st.session_state.swapachselection)
+    if rowidx is None:
+        st.toast("Please select a row", icon=":material/warning:")
+    else:
+        swap_arch_delete_dialog(rowidx)
         
 
 
@@ -967,4 +1006,11 @@ with swap_tab:
             width='stretch',
             icon=":material/unarchive:",
             key="swap_unarchive",
+        )
+        st.button(
+            "Delete",
+            on_click=swap_arch_delete,
+            width='stretch',
+            icon=":material/delete:",
+            key="swap_arch_delete",
         )

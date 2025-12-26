@@ -414,3 +414,24 @@ class Market:
                 con,
             )
             return df_low, df_high
+
+    def get_currency_lowhigh(self, currency: str, timestamp: int) -> pd.DataFrame:
+        """Get the low and high values for a fiat currency at a given timestamp.
+
+        Args:
+            currency: Currency symbol (e.g., 'USD', 'EUR')
+            timestamp: Unix timestamp
+
+        Returns:
+            Tuple of (df_low, df_high) DataFrames with low and high values
+        """
+        with sqlite3.connect(self.db_path) as con:
+            df_low = pd.read_sql_query(
+                f"SELECT timestamp, price from Currency WHERE currency = '{currency}' AND timestamp <= {timestamp} ORDER BY timestamp DESC LIMIT 1;",
+                con,
+            )
+            df_high = pd.read_sql_query(
+                f"SELECT timestamp, price from Currency WHERE currency = '{currency}' AND timestamp >= {timestamp} ORDER BY timestamp ASC LIMIT 1;",
+                con,
+            )
+            return df_low, df_high
