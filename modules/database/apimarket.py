@@ -60,7 +60,7 @@ class ApiMarket:
             # L'API retourne un objet unique, créer une liste pour DataFrame
             df = pd.DataFrame([data])
             df["date"] = pd.to_datetime(df["date"], utc=True)
-            df["date"] = df["date"].dt.tz_convert(self.local_timezone)
+            df["date"] = df["date"].dt.tz_convert(self.local_timezone).dt.tz_localize(None)
             df.rename(columns={"date": "Date", "eur": "price"}, inplace=True)
             df.set_index("Date", inplace=True)
             df.sort_index(inplace=True)
@@ -127,7 +127,7 @@ class ApiMarket:
         """
         # Reconstruct DataFrame from cached dict
         df = pd.DataFrame([{
-            "Date": pd.to_datetime(cached_data["date"], utc=True).tz_convert(self.local_timezone),
+            "Date": pd.to_datetime(cached_data["date"], utc=True).tz_convert(self.local_timezone).tz_localize(None),
             "price": cached_data["price"]
         }])
 
@@ -174,7 +174,7 @@ class ApiMarket:
 
                 df = pd.DataFrame(results)
                 df["date"] = pd.to_datetime(df["date"], utc=True)
-                df["date"] = df["date"].dt.tz_convert(self.local_timezone)
+                df["date"] = df["date"].dt.tz_convert(self.local_timezone).dt.tz_localize(None)
                 df.rename(columns={"date": "Date", "eur": "price"}, inplace=True)
                 df.set_index("Date", inplace=True)
 
@@ -224,7 +224,7 @@ class ApiMarket:
 
         df = pd.DataFrame(all_results)
         df["date"] = pd.to_datetime(df["date"], utc=True)
-        df["date"] = df["date"].dt.tz_convert(self.local_timezone)
+        df["date"] = df["date"].dt.tz_convert(self.local_timezone).dt.tz_localize(None)
         df.rename(columns={"date": "Date", "eur": "price"}, inplace=True)
         df.set_index("Date", inplace=True)
         df.sort_index(inplace=True)

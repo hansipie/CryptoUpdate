@@ -38,7 +38,7 @@ class TokensDatabase:
 
             df_sum["timestamp"] = pd.to_datetime(
                 df_sum["timestamp"], unit="s", utc=True
-            ).dt.tz_convert(self.local_timezone)
+            ).dt.tz_convert(self.local_timezone).dt.tz_localize(None)
             df_sum.rename(columns={"timestamp": "Date", "value": "Sum"}, inplace=True)
             df_sum.set_index("Date", inplace=True)
             df_sum.sort_index(inplace=True)
@@ -83,7 +83,7 @@ class TokensDatabase:
             )
             df_balance["timestamp"] = df_balance["timestamp"].dt.tz_convert(
                 self.local_timezone
-            )
+            ).dt.tz_localize(None)
             df_balance.rename(columns={"timestamp": "Date"}, inplace=True)
             df_balance.set_index("Date", inplace=True)
             df_balance.sort_index(inplace=True)
@@ -124,7 +124,7 @@ class TokensDatabase:
                 logger.warning("No data found for token %s in database", token)
                 return None
             df["Date"] = pd.to_datetime(df["Date"], unit="s", utc=True)
-            df["Date"] = df["Date"].dt.tz_convert(self.local_timezone)
+            df["Date"] = df["Date"].dt.tz_convert(self.local_timezone).dt.tz_localize(None)
             df.set_index("Date", inplace=True)
             df.sort_index(inplace=True)
             logger.debug("Balances for token %s:\n%s", token, df)

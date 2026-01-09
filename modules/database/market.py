@@ -92,7 +92,7 @@ class Market:
 
             df_market["timestamp"] = pd.to_datetime(
                 df_market["timestamp"], unit="s", utc=True
-            ).dt.tz_convert(self.local_timezone)
+            ).dt.tz_convert(self.local_timezone).dt.tz_localize(None)
             df_market.rename(columns={"timestamp": "Date"}, inplace=True)
             df_market.set_index("Date", inplace=True)
             df_market.sort_index(inplace=True)
@@ -137,7 +137,7 @@ class Market:
             if df.empty:
                 return None
             df["Date"] = pd.to_datetime(df["Date"], unit="s", utc=True)
-            df["Date"] = df["Date"].dt.tz_convert(self.local_timezone)
+            df["Date"] = df["Date"].dt.tz_convert(self.local_timezone).dt.tz_localize(None)
             df.set_index("Date", inplace=True)
             df.sort_index(inplace=True)
             return df

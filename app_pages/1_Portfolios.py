@@ -262,7 +262,7 @@ def get_portfolio_history(portfolio_name: str, dbfile: str) -> pd.DataFrame:
 
     # Convert timestamp to datetime
     df['timestamp'] = pd.to_datetime(df['timestamp'], unit='s', utc=True)
-    df['timestamp'] = df['timestamp'].dt.tz_convert(tokensdb.local_timezone)
+    df['timestamp'] = df['timestamp'].dt.tz_convert(tokensdb.local_timezone).dt.tz_localize(None)
 
     # Calculate value for each token at each timestamp
     df['amount'] = df['token'].map(lambda t: float(tokens_dict.get(t, 0)))

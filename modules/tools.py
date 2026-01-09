@@ -293,6 +293,67 @@ def load_settings(settings: dict):
         ),
     )
 
+    # Ensure data and archive directories exist and are writable. If creation
+    # fails, fall back to a safe local path inside the project directory.
+    try:
+        os.makedirs(st.session_state.settings["data_path"], exist_ok=True)
+    except Exception as e:
+        logger.error(
+            "Unable to create data_path %s: %s",
+            st.session_state.settings["data_path"],
+            e,
+        )
+        fallback_data = os.path.join(os.getcwd(), "data")
+        try:
+            os.makedirs(fallback_data, exist_ok=True)
+            st.session_state.settings["data_path"] = fallback_data
+            logger.info("Falling back to data_path: %s", fallback_data)
+        except Exception as e2:
+            logger.critical(
+                "Unable to create fallback data path %s: %s", fallback_data, e2
+            )
+
+    try:
+        os.makedirs(st.session_state.settings["archive_path"], exist_ok=True)
+    except Exception as e:
+        logger.warning(
+            "Unable to create archive_path %s: %s",
+            st.session_state.settings["archive_path"],
+            e,
+        )
+
+    # Ensure the directory for the DB file exists and that the DB file is
+    # creatable. If not, try a fallback local DB file.
+    db_dir = os.path.dirname(st.session_state.settings["dbfile"])
+    if db_dir:
+        try:
+            os.makedirs(db_dir, exist_ok=True)
+        except Exception as e:
+            logger.error("Unable to create db directory %s: %s", db_dir, e)
+
+    try:
+        import sqlite3 as _sqlite
+
+        # Attempt to open/create the database file
+        with _sqlite.connect(st.session_state.settings["dbfile"]) as _conn:
+            pass
+    except Exception as e:
+        logger.error(
+            "Unable to create/open DB file %s: %s",
+            st.session_state.settings["dbfile"],
+            e,
+        )
+        fallback_db = os.path.join(os.getcwd(), "db.sqlite3")
+        try:
+            with _sqlite.connect(fallback_db) as _conn:
+                pass
+            st.session_state.settings["dbfile"] = fallback_db
+            logger.info("Falling back to dbfile: %s", fallback_db)
+        except Exception as e2:
+            logger.critical(
+                "Unable to create fallback DB file %s: %s", fallback_db, e2
+            )
+
     # Load fiat currency setting
     st.session_state.settings["fiat_currency"] = settings.get(
         "FiatCurrency", {}

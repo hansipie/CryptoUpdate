@@ -609,7 +609,7 @@ def build_buy_dataframe() -> pd.DataFrame:
     df["Date"] = pd.to_datetime(df["timestamp"], unit="s", utc=True)
     local_timezone = tzlocal.get_localzone()
     logger.debug("Timezone locale: %s", local_timezone)
-    df["Date"] = df["Date"].dt.tz_convert(local_timezone)
+    df["Date"] = df["Date"].dt.tz_convert(local_timezone).dt.tz_localize(None)
     df["Buy Rate"] = df["From"] / df["To"]
 
     df = calc_perf(df, "Token", "Buy Rate")
@@ -698,7 +698,7 @@ def build_swap_dataframe(df: pd.DataFrame) -> pd.DataFrame:
     df["Date"] = pd.to_datetime(df["timestamp"], unit="s", utc=True)
     local_timezone = tzlocal.get_localzone()
     logger.debug("Timezone locale: %s", local_timezone)
-    df["Date"] = df["Date"].dt.tz_convert(local_timezone)
+    df["Date"] = df["Date"].dt.tz_convert(local_timezone).dt.tz_localize(None)
 
     df["Swap Rate"] = df.apply(
         lambda row: float(row["To Amount"]) / float(row["From Amount"]), axis=1
