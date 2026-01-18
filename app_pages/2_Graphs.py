@@ -85,7 +85,7 @@ def plot_modern_graph(df: pd.DataFrame, title: str = None, y_label: str = None, 
 
     fig.update_layout(**layout_config)
 
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width="stretch")
 
 
 def plot_dual_axis_graph(df: pd.DataFrame, title: str = None, token: str = None):
@@ -187,7 +187,7 @@ def plot_dual_axis_graph(df: pd.DataFrame, title: str = None, token: str = None)
         )
     )
 
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width="stretch")
 
 
 def load_portfolios(dbfile: str) -> Portfolios:
