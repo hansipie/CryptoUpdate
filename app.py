@@ -37,6 +37,8 @@ def setup_logging():
         format="%(asctime)s - %(levelname)s - %(name)s - %(pathname)s:%(lineno)d - %(message)s",
         handlers=[logging.StreamHandler(sys.stdout)],
     )
+    # Silence noisy third-party loggers
+    logging.getLogger("watchdog").setLevel(logging.WARNING)
     return logging.getLogger(__name__)
 
 
