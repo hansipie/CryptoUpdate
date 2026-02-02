@@ -17,6 +17,48 @@ from modules.utils import toTimestamp_A, toTimestamp_B
 logger = logging.getLogger(__name__)
 
 
+# Cached API wrappers for instant toggle responses
+@st.cache_data(ttl=3600, show_spinner=False)
+def fetch_api_coins(api_url: str, cache_file: str, symbols: tuple = None) -> pd.DataFrame:
+    """Fetch coins from API with Streamlit session cache.
+
+    Args:
+        api_url: MarketRaccoon API URL
+        cache_file: Path to JSON cache file
+        symbols: Optional tuple of symbols to filter (tuple for hashability)
+
+    Returns:
+        DataFrame with coin information or None if empty
+    """
+    api = ApiMarket(api_url, cache_file=cache_file)
+    symbols_list = list(symbols) if symbols else None
+    return api.get_coins_cached(symbols_list)
+
+
+@st.cache_data(ttl=3600, show_spinner=False)
+def fetch_api_crypto_market(
+    api_url: str, cache_file: str, token_symbol: str, from_ts: int, to_ts: int
+) -> pd.DataFrame:
+    """Fetch cryptocurrency market data from API with Streamlit session cache.
+
+    Args:
+        api_url: MarketRaccoon API URL
+        cache_file: Path to JSON cache file
+        token_symbol: Token symbol to fetch
+        from_ts: Unix timestamp for start date
+        to_ts: Unix timestamp for end date
+
+    Returns:
+        DataFrame with columns: Date (index), Price or None if empty
+    """
+    api = ApiMarket(api_url, cache_file=cache_file)
+    return api.get_cryptocurrency_market_cached(
+        token_symbol=token_symbol,
+        from_timestamp=from_ts,
+        to_timestamp=to_ts
+    )
+
+
 def plot_modern_graph(df: pd.DataFrame, title: str = None, y_label: str = None, optimize_y_range: bool = False):
     """Plot data with modern style matching other pages.
 
@@ -253,15 +295,51 @@ def aggregater_ui():
 
 
 def draw_tab_content(
-    section: str, token: str, start_timestamp: int, end_timestamp: int
+    section: str, token: str, start_timestamp: int, end_timestamp: int, use_api: bool = False
 ):
     logger.debug("Draw tab content for token %s", token)
     if section == "Assets Balances":
         with st.spinner("Loading assets balances...", show_time=True):
-            df_view = tokensdb.get_token_balances(token, start_timestamp, end_timestamp)
+            if use_api:
+                # Get counts from local database
+                df_counts = tokensdb.get_token_counts(token, start_timestamp, end_timestamp)
+                if df_counts is None:
+                    st.warning(f"No balance data found for {token} in local database")
+                    df_view = None
+                else:
+                    # Get prices from API (cached)
+                    api_url = st.session_state.settings["marketraccoon_url"]
+                    cache_file = os.path.join(st.session_state.settings["data_path"], "api_cache.json")
+                    df_prices = fetch_api_crypto_market(
+                        api_url, cache_file, token, start_timestamp, end_timestamp
+                    )
+                    if df_prices is None:
+                        st.warning(f"No price data found for {token} in API, falling back to local database")
+                        df_view = tokensdb.get_token_balances(token, start_timestamp, end_timestamp)
+                    else:
+                        # Merge counts with API prices
+                        df_view = df_counts.join(df_prices, how='outer')
+                        df_view = df_view.ffill()  # Forward fill missing values
+                        df_view = df_view.dropna()  # Remove rows with missing data
+                        # Calculate Value = Price * Count
+                        df_view['Value'] = df_view['Price'] * df_view['Count']
+                        # Keep only Value and Count columns
+                        df_view = df_view[['Value', 'Count']]
+            else:
+                # Use local SQLite database
+                df_view = tokensdb.get_token_balances(token, start_timestamp, end_timestamp)
     elif section == "Market":
         with st.spinner("Loading market...", show_time=True):
-            df_view = markgetdb.get_token_market(token, start_timestamp, end_timestamp)
+            if use_api:
+                # Use MarketRaccoon API (cached)
+                api_url = st.session_state.settings["marketraccoon_url"]
+                cache_file = os.path.join(st.session_state.settings["data_path"], "api_cache.json")
+                df_view = fetch_api_crypto_market(
+                    api_url, cache_file, token, start_timestamp, end_timestamp
+                )
+            else:
+                # Use local SQLite database
+                df_view = markgetdb.get_token_market(token, start_timestamp, end_timestamp)
     else:
         df_view = None
     if df_view is not None:
@@ -343,7 +421,7 @@ def draw_tab_content(
         st.info("No data available")
 
 
-def build_tabs(section: str = "Assets Balances"):
+def build_tabs(section: str = "Assets Balances", use_api: bool = False):
     start_timestamp = toTimestamp_A(
         st.session_state.startdate, pd.to_datetime("00:00:00").time()
     )
@@ -351,9 +429,21 @@ def build_tabs(section: str = "Assets Balances"):
         st.session_state.enddate, pd.to_datetime("23:59:59").time()
     )
     if section == "Assets Balances":
+        # For Assets Balances, always use local tokens since we need count data
         available_tokens = tokensdb.get_tokens()
     elif section == "Market":
-        available_tokens = markgetdb.getTokens()
+        if use_api:
+            # Get tokens from API (cached)
+            api_url = st.session_state.settings["marketraccoon_url"]
+            cache_file = os.path.join(st.session_state.settings["data_path"], "api_cache.json")
+            coins_df = fetch_api_coins(api_url, cache_file)
+            if coins_df is not None and not coins_df.empty:
+                available_tokens = coins_df["symbol"].unique().tolist()
+            else:
+                st.warning("Unable to fetch tokens from API, falling back to local database")
+                available_tokens = markgetdb.getTokens()
+        else:
+            available_tokens = markgetdb.getTokens()
     else:
         available_tokens = []
     if not available_tokens:
@@ -388,6 +478,7 @@ def build_tabs(section: str = "Assets Balances"):
                     st.session_state.tokens[idx_token],
                     start_timestamp,
                     end_timestamp,
+                    use_api,
                 )
             idx_token += 1
 
@@ -433,6 +524,8 @@ def build_price_tab(df: pd.DataFrame):
         st.error("The end date must be after the start date")
 
 
+use_api_sidebar = False  # Default value, may be overridden in sidebar
+
 with st.sidebar:
     add_selectbox = st.selectbox(
         "Assets View",
@@ -472,10 +565,37 @@ with st.sidebar:
         else:  # "All" == selected_timeframe:
             st.session_state.startdate = pd.to_datetime("1900-01-01")
 
+    # Data source toggle for Market and Assets Balances views
+    if add_selectbox in ("Market", "Assets Balances"):
+        st.divider()
+        use_api_sidebar = st.toggle(
+            "Use API",
+            value=False,
+            help="Use MarketRaccoon API instead of local SQLite database",
+            key="data_source_toggle"
+        )
+        if use_api_sidebar:
+            st.caption("📡 API MarketRaccoon")
+            # Clear cache button
+            if st.button("Clear API Cache", help="Clear cached API responses"):
+                fetch_api_coins.clear()
+                fetch_api_crypto_market.clear()
+                st.success("Cache cleared!")
+                st.rerun()
+        else:
+            st.caption("💾 SQLite local")
+
 tokensdb = TokensDatabase(st.session_state.settings["dbfile"])
 markgetdb = Market(
     st.session_state.settings["dbfile"],
     st.session_state.settings["coinmarketcap_token"],
+)
+
+# Initialize ApiMarket for MarketRaccoon API access
+cache_file = os.path.join(st.session_state.settings["data_path"], "api_cache.json")
+apimarket = ApiMarket(
+    st.session_state.settings["marketraccoon_url"],
+    cache_file=cache_file
 )
 
 if "tokens" not in st.session_state:
@@ -490,12 +610,12 @@ if add_selectbox == "Global":
 if add_selectbox == "Assets Balances":
     logger.debug("Assets Balances")
     st.title("Assets Balances")
-    build_tabs()
+    build_tabs(use_api=use_api_sidebar)
 
 if add_selectbox == "Market":
     logger.debug("Market")
     st.title("Market")
-    build_tabs("Market")
+    build_tabs("Market", use_api=use_api_sidebar)
 
 if add_selectbox == "Currency (USDEUR)":
     logger.debug("Currency (USDEUR)")

@@ -94,6 +94,52 @@ class TokensDatabase:
             logger.debug("Balances:\n%s", df_balance.head())
             return df_balance
 
+    def get_token_counts(
+        self, token: str, from_timestamp: int = None, to_timestamp: int = None
+    ) -> pd.DataFrame:
+        """Get the token counts (quantities held) through time.
+
+        Args:
+            token: Token symbol
+            from_timestamp: Optional start timestamp
+            to_timestamp: Optional end timestamp
+
+        Returns:
+            DataFrame with columns: Date (index), Count
+            Returns None if no data is found
+        """
+        logger.debug("Get counts for token %s", token)
+        with sqlite3.connect(self.db_path) as con:
+            if from_timestamp is not None and to_timestamp is not None:
+                df = pd.read_sql_query(
+                    f"SELECT timestamp AS Date, count AS Count FROM TokensDatabase WHERE token = '{token}' AND timestamp >= {from_timestamp} AND timestamp <= {to_timestamp}",
+                    con,
+                )
+            elif from_timestamp is not None:
+                df = pd.read_sql_query(
+                    f"SELECT timestamp AS Date, count AS Count FROM TokensDatabase WHERE token = '{token}' AND timestamp >= {from_timestamp}",
+                    con,
+                )
+            elif to_timestamp is not None:
+                df = pd.read_sql_query(
+                    f"SELECT timestamp AS Date, count AS Count FROM TokensDatabase WHERE token = '{token}' AND timestamp <= {to_timestamp}",
+                    con,
+                )
+            else:
+                df = pd.read_sql_query(
+                    f"SELECT timestamp AS Date, count AS Count FROM TokensDatabase WHERE token = '{token}'",
+                    con,
+                )
+            if df.empty:
+                logger.warning("No count data found for token %s in database", token)
+                return None
+            df["Date"] = pd.to_datetime(df["Date"], unit="s", utc=True)
+            df["Date"] = df["Date"].dt.tz_convert(self.local_timezone).dt.tz_localize(None)
+            df.set_index("Date", inplace=True)
+            df.sort_index(inplace=True)
+            logger.debug("Counts for token %s:\n%s", token, df)
+            return df
+
     def get_token_balances(
         self, token: str, from_timestamp: int = None, to_timestamp: int = None
     ) -> pd.DataFrame:

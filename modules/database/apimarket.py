@@ -36,7 +36,8 @@ class ApiMarket:
             url: Base URL of the MarketRaccoon API
             cache_file: Optional path to cache file. If provided, enables caching.
         """
-        self.url = url
+        # Remove trailing slash from URL if present
+        self.url = url.rstrip('/')
         self.local_timezone = tzlocal.get_localzone()
         self.cache = FiatCacheManager(cache_file) if cache_file else None
 
@@ -231,3 +232,320 @@ class ApiMarket:
 
         logger.info("Retrieved %d total fiat records", len(df))
         return df
+
+    def get_coins(self, symbols: list = None) -> pd.DataFrame:
+        """Get list of coins from the API.
+
+        Args:
+            symbols: Optional list of symbols to filter
+
+        Returns:
+            DataFrame with coin information (id, symbol, name)
+            Returns None if no data is available or an error occurs
+        """
+        logger.debug("Get coins list")
+
+        params = {}
+        if symbols:
+            params["symbols"] = ",".join(symbols)
+
+        request = requests.get(
+            self.url + "/api/v1/coins",
+            params=params,
+            timeout=10,
+        )
+
+        if request.status_code == 200:
+            data = request.json()
+            results = data.get("results", [])
+
+            if not results:
+                logger.info("No coins available")
+                return None
+
+            df = pd.DataFrame(results)
+            return df
+        elif request.status_code == 204:
+            logger.info("No coins data available (204)")
+            return None
+        else:
+            logger.error("Error fetching coins: %s", request.status_code)
+            return None
+
+    def get_cryptocurrency_market(
+        self, coinid: int = None, token_symbol: str = None,
+        from_timestamp: int = None, to_timestamp: int = None
+    ) -> pd.DataFrame:
+        """Get cryptocurrency market data from the API.
+
+        Args:
+            coinid: Optional coin ID to filter
+            token_symbol: Optional token symbol (will fetch coinid first)
+            from_timestamp: Optional Unix timestamp for start date
+            to_timestamp: Optional Unix timestamp for end date
+
+        Returns:
+            DataFrame with columns: Date (index), Price
+            Returns None if no data is available or an error occurs
+        """
+        # If token_symbol provided, get coinid first
+        if token_symbol and not coinid:
+            coins_df = self.get_coins(symbols=[token_symbol])
+            if coins_df is None or coins_df.empty:
+                logger.warning("Token %s not found in API", token_symbol)
+                return None
+            coinid = coins_df.iloc[0]["id"]
+            logger.debug("Found coinid %d for token %s", coinid, token_symbol)
+
+        if not coinid:
+            logger.error("coinid or token_symbol required")
+            return None
+
+        logger.debug("Get cryptocurrency market data for coinid: %d", coinid)
+        all_results = []
+        next_url = self.url + "/api/v1/cryptocurrency"
+
+        # Build query parameters
+        params = {"coinid": coinid}
+        if from_timestamp:
+            from datetime import datetime
+            dt = datetime.fromtimestamp(from_timestamp, tz=self.local_timezone)
+            params["startdate"] = dt.astimezone(pd.Timestamp.now(tz='UTC').tz).isoformat()
+        if to_timestamp:
+            from datetime import datetime
+            dt = datetime.fromtimestamp(to_timestamp, tz=self.local_timezone)
+            params["enddate"] = dt.astimezone(pd.Timestamp.now(tz='UTC').tz).isoformat()
+
+        # Fetch all pages
+        while next_url:
+            logger.debug("Fetching page: %s", next_url)
+            request = requests.get(next_url, params=params if next_url == self.url + "/api/v1/cryptocurrency" else None, timeout=10)
+
+            if request.status_code == 200:
+                data = request.json()
+                results = data.get("results", [])
+                all_results.extend(results)
+
+                # Get next page URL
+                next_url = data.get("next")
+
+                logger.debug(
+                    "Retrieved %d records, total so far: %d",
+                    len(results),
+                    len(all_results),
+                )
+            elif request.status_code == 204:
+                logger.info("No cryptocurrency data available (204)")
+                return None
+            else:
+                logger.error("Error fetching cryptocurrency data: %s", request.status_code)
+                return None
+
+        # Convert to DataFrame
+        if not all_results:
+            logger.info("No cryptocurrency data retrieved")
+            return None
+
+        df = pd.DataFrame(all_results)
+        df["last_updated"] = pd.to_datetime(df["last_updated"], format='ISO8601', utc=True)
+        df["last_updated"] = df["last_updated"].dt.tz_convert(self.local_timezone).dt.tz_localize(None)
+        df.rename(columns={"last_updated": "Date", "price": "Price"}, inplace=True)
+        df = df[["Date", "Price"]]  # Keep only relevant columns
+        df.set_index("Date", inplace=True)
+        df.sort_index(inplace=True)
+
+        logger.info("Retrieved %d total cryptocurrency records", len(df))
+        return df
+
+    def get_coins_cached(self, symbols: list = None) -> Optional[pd.DataFrame]:
+        """Get list of coins with caching support.
+
+        This is the cached version of get_coins(). If cache is disabled
+        (cache_file=None), falls back to direct API call.
+
+        Args:
+            symbols: Optional list of symbols to filter
+
+        Returns:
+            DataFrame with coin information or None if empty
+        """
+        if not self.cache:
+            return self.get_coins(symbols)
+
+        # Create cache key based on symbols
+        if symbols:
+            symbols_key = "_".join(sorted(symbols))
+            cache_key = f"coins_{symbols_key}"
+        else:
+            cache_key = "coins"
+
+        cached_data = self.cache.get_or_fetch(
+            cache_key,
+            lambda: self._fetch_and_serialize_coins(symbols)
+        )
+
+        if cached_data is None:
+            return None
+
+        return self._deserialize_coins(cached_data)
+
+    def _fetch_and_serialize_coins(self, symbols: list = None) -> Optional[dict]:
+        """Fetch coins from API and serialize for caching.
+
+        Args:
+            symbols: Optional list of symbols to filter
+
+        Returns:
+            Serialized coins data dict or None if fetch failed
+        """
+        df = self.get_coins(symbols)
+
+        if df is None or df.empty:
+            return None
+
+        # Serialize DataFrame to cacheable dict
+        return {
+            "records": df.to_dict(orient='records')
+        }
+
+    def _deserialize_coins(self, cached_data: dict) -> pd.DataFrame:
+        """Deserialize cached coins data back to DataFrame.
+
+        Args:
+            cached_data: Serialized coins data from cache
+
+        Returns:
+            DataFrame with same structure as get_coins()
+        """
+        return pd.DataFrame(cached_data["records"])
+
+    def get_cryptocurrency_market_cached(
+        self, coinid: int = None, token_symbol: str = None,
+        from_timestamp: int = None, to_timestamp: int = None
+    ) -> Optional[pd.DataFrame]:
+        """Get cryptocurrency market data with caching support.
+
+        This is the cached version of get_cryptocurrency_market(). If cache is disabled
+        (cache_file=None), falls back to direct API call.
+
+        Args:
+            coinid: Optional coin ID to filter
+            token_symbol: Optional token symbol (will fetch coinid first)
+            from_timestamp: Optional Unix timestamp for start date
+            to_timestamp: Optional Unix timestamp for end date
+
+        Returns:
+            DataFrame with columns: Date (index), Price or None if empty
+        """
+        if not self.cache:
+            return self.get_cryptocurrency_market(coinid, token_symbol, from_timestamp, to_timestamp)
+
+        # Resolve token_symbol to coinid if needed (use cached coins)
+        if token_symbol and not coinid:
+            coins_df = self.get_coins_cached(symbols=[token_symbol])
+            if coins_df is None or coins_df.empty:
+                logger.warning("Token %s not found in API", token_symbol)
+                return None
+            coinid = coins_df.iloc[0]["id"]
+            logger.debug("Found coinid %d for token %s", coinid, token_symbol)
+
+        if not coinid:
+            logger.error("coinid or token_symbol required")
+            return None
+
+        # Create cache key based on parameters
+        cache_key = f"crypto_{coinid}_{from_timestamp or 0}_{to_timestamp or 0}"
+
+        cached_data = self.cache.get_or_fetch(
+            cache_key,
+            lambda: self._fetch_and_serialize_crypto_market(coinid, from_timestamp, to_timestamp)
+        )
+
+        if cached_data is None:
+            return None
+
+        return self._deserialize_crypto_market(cached_data)
+
+    def _fetch_and_serialize_crypto_market(
+        self, coinid: int, from_timestamp: int = None, to_timestamp: int = None
+    ) -> Optional[dict]:
+        """Fetch cryptocurrency market data from API and serialize for caching.
+
+        Args:
+            coinid: Coin ID to fetch
+            from_timestamp: Optional Unix timestamp for start date
+            to_timestamp: Optional Unix timestamp for end date
+
+        Returns:
+            Serialized market data dict or None if fetch failed
+        """
+        df = self.get_cryptocurrency_market(coinid=coinid, from_timestamp=from_timestamp, to_timestamp=to_timestamp)
+
+        if df is None or df.empty:
+            return None
+
+        # Serialize DataFrame to cacheable dict
+        # Convert datetime index to ISO strings
+        records = []
+        for date, row in df.iterrows():
+            records.append({
+                "date": date.isoformat(),
+                "price": float(row["Price"])
+            })
+
+        return {"records": records}
+
+    def _deserialize_crypto_market(self, cached_data: dict) -> pd.DataFrame:
+        """Deserialize cached cryptocurrency market data back to DataFrame.
+
+        Args:
+            cached_data: Serialized market data from cache
+
+        Returns:
+            DataFrame with same structure as get_cryptocurrency_market()
+        """
+        records = cached_data["records"]
+
+        # Reconstruct DataFrame
+        df = pd.DataFrame(records)
+        df["date"] = pd.to_datetime(df["date"], format='ISO8601')
+        df.rename(columns={"date": "Date", "price": "Price"}, inplace=True)
+        df.set_index("Date", inplace=True)
+        df.sort_index(inplace=True)
+
+        return df
+
+    def get_cryptocurrency_latest(self) -> pd.DataFrame:
+        """Get latest cryptocurrency market data for all coins.
+
+        Returns:
+            DataFrame with latest market data
+            Returns None if no data is available or an error occurs
+        """
+        logger.debug("Get latest cryptocurrency data")
+        request = requests.get(
+            self.url + "/api/v1/cryptocurrency/latests",
+            timeout=10,
+        )
+
+        if request.status_code == 200:
+            data = request.json()
+
+            if not data:
+                logger.info("No latest cryptocurrency data available")
+                return None
+
+            df = pd.DataFrame(data)
+            df["last_updated"] = pd.to_datetime(df["last_updated"], format='ISO8601', utc=True)
+            df["last_updated"] = df["last_updated"].dt.tz_convert(self.local_timezone).dt.tz_localize(None)
+            df.rename(columns={"last_updated": "Date"}, inplace=True)
+            df.set_index("Date", inplace=True)
+
+            logger.info("Retrieved %d latest cryptocurrency records", len(df))
+            return df
+        elif request.status_code == 204:
+            logger.info("No latest cryptocurrency data available (204)")
+            return None
+        else:
+            logger.error("Error fetching latest cryptocurrency data: %s", request.status_code)
+            return None
