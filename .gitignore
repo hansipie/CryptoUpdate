@@ -20,4 +20,7 @@ backend/db.sqlite3
 requirements.txt
 /debug_archives
 .grepai/
-.github/copilot-instructions.md
+.github/*
+!.github/workflows/
+.ruff_cache/
+.claude/
