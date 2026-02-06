@@ -42,6 +42,7 @@ def _get_cached_api_market() -> ApiMarket:
 
         st.session_state.api_market_instance = ApiMarket(
             settings["marketraccoon_url"],
+            api_key=settings.get("marketraccoon_token"),
             cache_file=cache_file
         )
         logger.debug("Created cached ApiMarket instance with cache file: %s", cache_file)
@@ -268,6 +269,7 @@ def load_settings(settings: dict):
     if "settings" not in st.session_state:
         st.session_state.settings = {}
     st.session_state.settings["marketraccoon_url"] = settings["MarketRaccoon"]["url"]
+    st.session_state.settings["marketraccoon_token"] = settings["MarketRaccoon"].get("token", "")
     st.session_state.settings["notion_token"] = settings["Notion"]["token"]
     st.session_state.settings["notion_database"] = settings["Notion"]["database"]
     st.session_state.settings["notion_parentpage"] = settings["Notion"]["parentpage"]

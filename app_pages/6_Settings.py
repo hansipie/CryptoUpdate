@@ -23,10 +23,21 @@ with st.form(key="settings_form"):
         key="marketraccoon_url",
         value=st.session_state.settings.get("marketraccoon_url"),
     )
+    marketraccoon_token = st.text_input(
+        "MarketRaccoon API token",
+        key="marketraccoon_token",
+        type="password",
+        value=st.session_state.settings.get("marketraccoon_token", ""),
+    )
 
     try:
+        headers = {}
+        if marketraccoon_token:
+            headers["X-API-Key"] = marketraccoon_token
+        
         response = requests.get(
             f"{marketraccoon_url}/api/healthcheck",
+            headers=headers,
             timeout=5,
         )
         if response.status_code == 200:
@@ -120,6 +131,7 @@ with st.form(key="settings_form"):
     if submitted:
         logger.debug("Submitted")
         st.session_state.settings["marketraccoon_url"] = marketraccoon_url
+        st.session_state.settings["marketraccoon_token"] = marketraccoon_token
         st.session_state.settings["coinmarketcap_token"] = coinmarketcap_token
         st.session_state.settings["ai_apitoken"] = ai_apitoken
         st.session_state.settings["debug_flag"] = debug_flag

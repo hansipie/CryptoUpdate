@@ -11,7 +11,7 @@ from modules.database.market import Market
 from modules.database.portfolios import Portfolios
 from modules.database.tokensdb import TokensDatabase
 from modules.plotter import plot_as_pie
-from modules.tools import create_portfolio_dataframe, interpolate_price
+from modules.tools import create_portfolio_dataframe
 from modules.utils import toTimestamp_A, toTimestamp_B
 
 logger = logging.getLogger(__name__)
@@ -19,30 +19,32 @@ logger = logging.getLogger(__name__)
 
 # Cached API wrappers for instant toggle responses
 @st.cache_data(ttl=3600, show_spinner=False)
-def fetch_api_coins(api_url: str, cache_file: str, symbols: tuple = None) -> pd.DataFrame:
+def fetch_api_coins(api_url: str, api_key: str, cache_file: str, symbols: tuple = None) -> pd.DataFrame:
     """Fetch coins from API with Streamlit session cache.
 
     Args:
         api_url: MarketRaccoon API URL
+        api_key: MarketRaccoon API key
         cache_file: Path to JSON cache file
         symbols: Optional tuple of symbols to filter (tuple for hashability)
 
     Returns:
         DataFrame with coin information or None if empty
     """
-    api = ApiMarket(api_url, cache_file=cache_file)
+    api = ApiMarket(api_url, api_key=api_key, cache_file=cache_file)
     symbols_list = list(symbols) if symbols else None
     return api.get_coins_cached(symbols_list)
 
 
 @st.cache_data(ttl=3600, show_spinner=False)
 def fetch_api_crypto_market(
-    api_url: str, cache_file: str, token_symbol: str, from_ts: int, to_ts: int
+    api_url: str, api_key: str, cache_file: str, token_symbol: str, from_ts: int, to_ts: int
 ) -> pd.DataFrame:
     """Fetch cryptocurrency market data from API with Streamlit session cache.
 
     Args:
         api_url: MarketRaccoon API URL
+        api_key: MarketRaccoon API key
         cache_file: Path to JSON cache file
         token_symbol: Token symbol to fetch
         from_ts: Unix timestamp for start date
@@ -51,7 +53,7 @@ def fetch_api_crypto_market(
     Returns:
         DataFrame with columns: Date (index), Price or None if empty
     """
-    api = ApiMarket(api_url, cache_file=cache_file)
+    api = ApiMarket(api_url, api_key=api_key, cache_file=cache_file)
     return api.get_cryptocurrency_market_cached(
         token_symbol=token_symbol,
         from_timestamp=from_ts,
@@ -309,9 +311,10 @@ def draw_tab_content(
                 else:
                     # Get prices from API (cached)
                     api_url = st.session_state.settings["marketraccoon_url"]
+                    api_key = st.session_state.settings.get("marketraccoon_token")
                     cache_file = os.path.join(st.session_state.settings["data_path"], "api_cache.json")
                     df_prices = fetch_api_crypto_market(
-                        api_url, cache_file, token, start_timestamp, end_timestamp
+                        api_url, api_key, cache_file, token, start_timestamp, end_timestamp
                     )
                     if df_prices is None:
                         st.warning(f"No price data found for {token} in API, falling back to local database")
@@ -333,9 +336,10 @@ def draw_tab_content(
             if use_api:
                 # Use MarketRaccoon API (cached)
                 api_url = st.session_state.settings["marketraccoon_url"]
+                api_key = st.session_state.settings.get("marketraccoon_token")
                 cache_file = os.path.join(st.session_state.settings["data_path"], "api_cache.json")
                 df_view = fetch_api_crypto_market(
-                    api_url, cache_file, token, start_timestamp, end_timestamp
+                    api_url, api_key, cache_file, token, start_timestamp, end_timestamp
                 )
             else:
                 # Use local SQLite database
@@ -435,8 +439,9 @@ def build_tabs(section: str = "Assets Balances", use_api: bool = False):
         if use_api:
             # Get tokens from API (cached)
             api_url = st.session_state.settings["marketraccoon_url"]
+            api_key = st.session_state.settings.get("marketraccoon_token")
             cache_file = os.path.join(st.session_state.settings["data_path"], "api_cache.json")
-            coins_df = fetch_api_coins(api_url, cache_file)
+            coins_df = fetch_api_coins(api_url, api_key, cache_file)
             if coins_df is not None and not coins_df.empty:
                 available_tokens = coins_df["symbol"].unique().tolist()
             else:
@@ -595,6 +600,7 @@ markgetdb = Market(
 cache_file = os.path.join(st.session_state.settings["data_path"], "api_cache.json")
 apimarket = ApiMarket(
     st.session_state.settings["marketraccoon_url"],
+    api_key=st.session_state.settings.get("marketraccoon_token"),
     cache_file=cache_file
 )
 
@@ -625,6 +631,7 @@ if add_selectbox == "Currency (USDEUR)":
     cache_file = os.path.join(st.session_state.settings["data_path"], "api_cache.json")
     market = ApiMarket(
         st.session_state.settings["marketraccoon_url"],
+        api_key=st.session_state.settings.get("marketraccoon_token"),
         cache_file=cache_file
     )
 

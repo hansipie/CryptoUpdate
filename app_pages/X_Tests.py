@@ -1,5 +1,4 @@
 import logging
-import os
 import sqlite3
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
@@ -53,11 +52,12 @@ def find_missing_dates(dbfile: str) -> list:
         return missing_dates
 
 
-def check_api_data_for_date(api_url: str, date) -> bool:
+def check_api_data_for_date(api_url: str, api_key: str, date) -> bool:
     """Check if MarketRaccoon API has cryptocurrency data for a specific date.
 
     Args:
         api_url: Base URL of the MarketRaccoon API
+        api_key: API key for authentication
         date: Date to check (datetime.date object)
 
     Returns:
@@ -76,6 +76,10 @@ def check_api_data_for_date(api_url: str, date) -> bool:
 
         # Query the API for cryptocurrency data for the entire day
         # Use page_size=1 to minimize data transfer (we only need to know if data exists)
+        headers = {}
+        if api_key:
+            headers["X-API-Key"] = api_key
+
         request = requests.get(
             api_url + "/api/v1/cryptocurrency",
             params={
@@ -83,6 +87,7 @@ def check_api_data_for_date(api_url: str, date) -> bool:
                 "enddate": enddate,
                 "page_size": 1
             },
+            headers=headers,
             timeout=10,
         )
 
@@ -143,8 +148,9 @@ if missing_dates:
         # Check API for each missing date
         st.info("Checking MarketRaccoon API for cryptocurrency data availability...")
 
-        # Get API URL from settings
+        # Get API URL and key from settings
         api_url = st.session_state.settings["marketraccoon_url"]
+        api_key = st.session_state.settings.get("marketraccoon_token")
 
         # Check each date with parallel requests (10 at a time)
         api_status_dict = {}
@@ -155,7 +161,7 @@ if missing_dates:
         with ThreadPoolExecutor(max_workers=10) as executor:
             # Submit all tasks
             future_to_date = {
-                executor.submit(check_api_data_for_date, api_url, date): date
+                executor.submit(check_api_data_for_date, api_url, api_key, date): date
                 for date in missing_dates
             }
 

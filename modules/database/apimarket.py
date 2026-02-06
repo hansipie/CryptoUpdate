@@ -25,19 +25,22 @@ class ApiMarket:
 
     Attributes:
         url (str): Base URL of the MarketRaccoon API
+        api_key (str): API key for authentication
         local_timezone: Local timezone for date conversion
         cache (FiatCacheManager): Optional cache manager for API responses
     """
 
-    def __init__(self, url: str, cache_file: Optional[str] = None):
+    def __init__(self, url: str, api_key: str = None, cache_file: Optional[str] = None):
         """Initialize ApiMarket client.
 
         Args:
             url: Base URL of the MarketRaccoon API
+            api_key: API key for authentication (optional)
             cache_file: Optional path to cache file. If provided, enables caching.
         """
         # Remove trailing slash from URL if present
         self.url = url.rstrip('/')
+        self.api_key = api_key
         self.local_timezone = tzlocal.get_localzone()
         self.cache = FiatCacheManager(cache_file) if cache_file else None
 
@@ -48,8 +51,13 @@ class ApiMarket:
             DataFrame with currency rates or None if empty
         """
         logger.debug("Get currency")
+        headers = {}
+        if self.api_key:
+            headers["X-API-Key"] = self.api_key
+        
         request = requests.get(
             self.url + "/api/v1/fiat/latest",
+            headers=headers,
             timeout=10,
         )
         if request.status_code == 200:
@@ -159,9 +167,14 @@ class ApiMarket:
             dt = datetime.fromtimestamp(timestamp, tz=self.local_timezone)
             date_str = dt.astimezone(pd.Timestamp.now(tz='UTC').tz).isoformat()
 
+            headers = {}
+            if self.api_key:
+                headers["X-API-Key"] = self.api_key
+
             request = requests.get(
                 self.url + "/api/v1/fiat",
                 params={"date": date_str},
+                headers=headers,
                 timeout=10,
             )
 
@@ -194,9 +207,13 @@ class ApiMarket:
         next_url = self.url + "/api/v1/fiat"
 
         # Fetch all pages
+        headers = {}
+        if self.api_key:
+            headers["X-API-Key"] = self.api_key
+
         while next_url:
             logger.debug("Fetching page: %s", next_url)
-            request = requests.get(next_url, timeout=10)
+            request = requests.get(next_url, headers=headers, timeout=10)
 
             if request.status_code == 200:
                 data = request.json()
@@ -249,9 +266,14 @@ class ApiMarket:
         if symbols:
             params["symbols"] = ",".join(symbols)
 
+        headers = {}
+        if self.api_key:
+            headers["X-API-Key"] = self.api_key
+
         request = requests.get(
             self.url + "/api/v1/coins",
             params=params,
+            headers=headers,
             timeout=10,
         )
 
@@ -317,9 +339,13 @@ class ApiMarket:
             params["enddate"] = dt.astimezone(pd.Timestamp.now(tz='UTC').tz).isoformat()
 
         # Fetch all pages
+        headers = {}
+        if self.api_key:
+            headers["X-API-Key"] = self.api_key
+
         while next_url:
             logger.debug("Fetching page: %s", next_url)
-            request = requests.get(next_url, params=params if next_url == self.url + "/api/v1/cryptocurrency" else None, timeout=10)
+            request = requests.get(next_url, params=params if next_url == self.url + "/api/v1/cryptocurrency" else None, headers=headers, timeout=10)
 
             if request.status_code == 200:
                 data = request.json()
@@ -523,8 +549,13 @@ class ApiMarket:
             Returns None if no data is available or an error occurs
         """
         logger.debug("Get latest cryptocurrency data")
+        headers = {}
+        if self.api_key:
+            headers["X-API-Key"] = self.api_key
+
         request = requests.get(
             self.url + "/api/v1/cryptocurrency/latests",
+            headers=headers,
             timeout=10,
         )
 
