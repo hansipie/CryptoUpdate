@@ -14,7 +14,7 @@ import plotly.graph_objects as go
 from modules.database.customdata import Customdata
 from modules.database.operations import operations
 from modules.database.tokensdb import TokensDatabase
-from modules.tools import update, parse_last_update
+from modules.tools import update, parse_last_update, get_currency_symbol
 
 logger = logging.getLogger(__name__)
 
@@ -31,13 +31,7 @@ def plot_total_value(df: pd.DataFrame):
 
     # Get target currency from settings
     target_currency = st.session_state.settings.get("fiat_currency", "EUR")
-    currency_symbols = {
-        "EUR": "€", "USD": "$", "GBP": "£", "CHF": "CHF",
-        "CAD": "CA$", "AUD": "A$", "JPY": "¥", "CNY": "¥",
-        "KRW": "₩", "BRL": "R$", "MXN": "MX$", "INR": "₹",
-        "RUB": "₽", "TRY": "₺"
-    }
-    currency_symbol = currency_symbols.get(target_currency, target_currency)
+    currency_symbol = get_currency_symbol(target_currency)
 
     # Create plotly figure
     fig = go.Figure()
@@ -92,8 +86,9 @@ with st.sidebar:
 with st.container(border=True):
     col1, col2, col3 = st.columns(3)
     total = operations(st.session_state.settings["dbfile"]).sum_buyoperations()
+    currency_symbol = get_currency_symbol()
     with col1:
-        st.metric("Invested", value=f"{total} €")
+        st.metric("Invested", value=f"{total} {currency_symbol}")
     with col2:
         # get last values
         balance = (
@@ -102,11 +97,11 @@ with st.container(border=True):
             else df_balance.iloc[-1, 1:].sum()
         )
         balance = round(balance, 2)
-        st.metric("Total value", value=f"{balance} €")
+        st.metric("Total value", value=f"{balance} {currency_symbol}")
     with col3:
         st.metric(
             "Profit",
-            value=f"{round(balance - total, 2)} €",
+            value=f"{round(balance - total, 2)} {currency_symbol}",
             delta=f"{round((((balance - total) / total) * 100) if total != 0 else 0, 2)} %",
         )
 
@@ -122,5 +117,6 @@ else:
     # last_V = df_balance.copy()
     last_V = last_V.loc[:, (last_V != 0).any(axis=0)]
     last_V = round(last_V, 2)
-    last_V = last_V.astype(str) + " €"
+    currency_symbol = get_currency_symbol()
+    last_V = last_V.astype(str) + f" {currency_symbol}"
     st.dataframe(last_V)

@@ -27,6 +27,176 @@ from modules.utils import debug_prefix, interpolate
 logger = logging.getLogger(__name__)
 
 
+def get_currency_symbol(currency_code: str = None) -> str:
+    """Obtient le symbole pour un code devise donné.
+
+    Args:
+        currency_code: Code ISO devise (ex: "EUR", "USD").
+                      Si None, utilise fiat_currency depuis settings.
+
+    Returns:
+        Symbole de devise (ex: "€", "$") ou le code lui-même si inconnu.
+    """
+    if currency_code is None:
+        currency_code = st.session_state.settings.get("fiat_currency", "EUR")
+
+    currency_symbols = {
+        "EUR": "€", "USD": "$"
+    }
+    return currency_symbols.get(currency_code, currency_code)
+
+
+def convert_price_to_target_currency(
+    value: float,
+    source_currency: str,
+    target_currency: str = None
+) -> float:
+    """Convertit un montant d'une devise source vers une devise cible (taux actuel).
+
+    Utilise le taux de change le plus récent. Pour une conversion avec taux
+    historiques sur un DataFrame, utiliser convert_dataframe_prices_historical().
+
+    Args:
+        value: Montant à convertir
+        source_currency: Devise source (ex: "USD", "EUR")
+        target_currency: Devise cible (ex: "EUR", "GBP").
+                        Si None, utilise fiat_currency depuis settings.
+
+    Returns:
+        Montant converti dans la devise cible
+    """
+    if target_currency is None:
+        target_currency = st.session_state.settings.get("fiat_currency", "EUR")
+
+    # Si devises identiques, pas de conversion
+    if source_currency == target_currency:
+        return value
+
+    # Seul EUR↔USD supporté dans v1
+    if source_currency not in ["EUR", "USD"] or target_currency not in ["EUR", "USD"]:
+        logger.warning(
+            "Conversion %s→%s non supportée (seul EUR↔USD disponible)",
+            source_currency,
+            target_currency
+        )
+        return value
+
+    # Récupérer le taux USD→EUR depuis MarketRaccoon API
+    try:
+        api_market = _get_cached_api_market()
+        df_rate = api_market.get_fiat_latest_rate_cached()
+
+        if df_rate is None or df_rate.empty:
+            logger.warning("Taux de change non disponible, retour valeur originale")
+            return value
+
+        usd_to_eur_rate = df_rate["price"].iloc[-1]  # Ex: 0.85 (1 USD = 0.85 EUR)
+
+        # Conversion USD → EUR
+        if source_currency == "USD" and target_currency == "EUR":
+            return value * usd_to_eur_rate
+
+        # Conversion EUR → USD
+        elif source_currency == "EUR" and target_currency == "USD":
+            return value / usd_to_eur_rate
+
+        else:
+            logger.warning(
+                "Conversion %s→%s non supportée", source_currency, target_currency
+            )
+            return value
+
+    except Exception as e:
+        logger.error("Erreur conversion devise: %s", e)
+        return value
+
+
+def convert_dataframe_prices_historical(
+    df: pd.DataFrame,
+    price_column: str,
+    source_currency: str,
+    target_currency: str = None,
+    fiat_rates_df: pd.DataFrame = None
+) -> pd.DataFrame:
+    """Convertit les prix d'un DataFrame en utilisant les taux de change historiques.
+
+    Utilise pd.merge_asof pour associer à chaque date de prix le taux de change
+    le plus proche temporellement, garantissant une conversion précise même pour
+    les données historiques.
+
+    Args:
+        df: DataFrame avec DatetimeIndex contenant les prix à convertir
+        price_column: Nom de la colonne contenant les prix (ex: "Price")
+        source_currency: Devise source (ex: "USD")
+        target_currency: Devise cible. Si None, utilise fiat_currency depuis settings.
+        fiat_rates_df: DataFrame avec DatetimeIndex et colonne "price" contenant
+                      les taux USD→EUR historiques. Si None, fallback sur taux actuel.
+
+    Returns:
+        Copie du DataFrame avec les prix convertis
+    """
+    if target_currency is None:
+        target_currency = st.session_state.settings.get("fiat_currency", "EUR")
+
+    if source_currency == target_currency:
+        return df
+
+    # Seul EUR↔USD supporté
+    if source_currency not in ["EUR", "USD"] or target_currency not in ["EUR", "USD"]:
+        logger.warning(
+            "Conversion historique %s→%s non supportée (seul EUR↔USD disponible)",
+            source_currency,
+            target_currency
+        )
+        return df
+
+    # Fallback sur taux actuel si pas de données historiques
+    if fiat_rates_df is None or fiat_rates_df.empty:
+        logger.warning("Pas de taux historiques disponibles, utilisation du taux actuel")
+        df = df.copy()
+        df[price_column] = df[price_column].apply(
+            lambda x: convert_price_to_target_currency(x, source_currency, target_currency)
+        )
+        return df
+
+    df = df.copy()
+
+    # Préparer les prix et taux pour merge_asof (nécessite des colonnes, pas un index)
+    prices = df[[price_column]].reset_index()
+    prices.columns = ["Date", "price_value"]
+
+    rates = fiat_rates_df[["price"]].sort_index().reset_index()
+    rates.columns = ["Date", "rate"]
+
+    # merge_asof : associer chaque date de prix au taux le plus proche
+    merged = pd.merge_asof(
+        prices.sort_values("Date"),
+        rates.sort_values("Date"),
+        on="Date",
+        direction="nearest"
+    )
+
+    logger.info(
+        "Conversion historique %s→%s : %d prix, taux min=%.4f max=%.4f",
+        source_currency,
+        target_currency,
+        len(merged),
+        merged["rate"].min(),
+        merged["rate"].max()
+    )
+
+    # Appliquer la conversion selon la direction
+    if source_currency == "USD" and target_currency == "EUR":
+        converted = merged["price_value"] * merged["rate"]
+    else:  # EUR → USD
+        converted = merged["price_value"] / merged["rate"]
+
+    # Remettre les valeurs converties dans le DataFrame original (même ordre d'index)
+    df[price_column] = converted.values
+
+    return df
+
+
 def _get_cached_api_market() -> ApiMarket:
     """Get or create cached ApiMarket instance in session state.
 

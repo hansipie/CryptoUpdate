@@ -75,15 +75,12 @@ with st.form(key="settings_form"):
     )
 
     st.subheader("Currency")
-    fiat_currencies = [
-        "USD", "EUR", "GBP", "CHF", "CAD", "AUD", "JPY", 
-        "CNY", "KRW", "BRL", "MXN", "INR", "RUB", "TRY"
-    ]
+    fiat_currencies = ["EUR", "USD"]
     fiat_currency = st.selectbox(
         "Reference fiat currency",
         key="fiat_currency_select",
         options=fiat_currencies,
-        index=fiat_currencies.index(st.session_state.settings.get("fiat_currency", "EUR")),
+        index=fiat_currencies.index(st.session_state.settings.get("fiat_currency", "EUR")) if st.session_state.settings.get("fiat_currency", "EUR") in fiat_currencies else 0,
         help="Select the reference currency for price display and conversions"
     )
 

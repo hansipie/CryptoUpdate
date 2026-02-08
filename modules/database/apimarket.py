@@ -376,7 +376,8 @@ class ApiMarket:
         df["last_updated"] = pd.to_datetime(df["last_updated"], format='ISO8601', utc=True)
         df["last_updated"] = df["last_updated"].dt.tz_convert(self.local_timezone).dt.tz_localize(None)
         df.rename(columns={"last_updated": "Date", "price": "Price"}, inplace=True)
-        df = df[["Date", "Price"]]  # Keep only relevant columns
+        df["source_currency"] = "USD"  # MÉTADONNÉE : Prix en USD
+        df = df[["Date", "Price", "source_currency"]]  # Keep only relevant columns
         df.set_index("Date", inplace=True)
         df.sort_index(inplace=True)
 
@@ -519,7 +520,10 @@ class ApiMarket:
                 "price": float(row["Price"])
             })
 
-        return {"records": records}
+        # Préserver la métadonnée de devise source
+        source_currency = df["source_currency"].iloc[0] if "source_currency" in df.columns else "USD"
+
+        return {"records": records, "source_currency": source_currency}
 
     def _deserialize_crypto_market(self, cached_data: dict) -> pd.DataFrame:
         """Deserialize cached cryptocurrency market data back to DataFrame.
@@ -536,6 +540,8 @@ class ApiMarket:
         df = pd.DataFrame(records)
         df["date"] = pd.to_datetime(df["date"], format='ISO8601')
         df.rename(columns={"date": "Date", "price": "Price"}, inplace=True)
+        # Restaurer la métadonnée de devise source (USD par défaut pour rétrocompatibilité cache)
+        df["source_currency"] = cached_data.get("source_currency", "USD")
         df.set_index("Date", inplace=True)
         df.sort_index(inplace=True)
 

@@ -11,7 +11,11 @@ from modules.database.market import Market
 from modules.database.portfolios import Portfolios
 from modules.database.tokensdb import TokensDatabase
 from modules.plotter import plot_as_pie
-from modules.tools import create_portfolio_dataframe
+from modules.tools import (
+    create_portfolio_dataframe,
+    get_currency_symbol,
+    convert_dataframe_prices_historical
+)
 from modules.utils import toTimestamp_A, toTimestamp_B
 
 logger = logging.getLogger(__name__)
@@ -61,6 +65,23 @@ def fetch_api_crypto_market(
     )
 
 
+@st.cache_data(ttl=3600, show_spinner=False)
+def fetch_api_fiat_rates(api_url: str, api_key: str, cache_file: str) -> pd.DataFrame:
+    """Fetch all historical fiat exchange rates from API with Streamlit cache.
+
+    Args:
+        api_url: MarketRaccoon API URL
+        api_key: MarketRaccoon API key
+        cache_file: Path to JSON cache file
+
+    Returns:
+        DataFrame with columns: Date (index), price (USD→EUR rate)
+        or None if empty
+    """
+    api = ApiMarket(api_url, api_key=api_key, cache_file=cache_file)
+    return api.get_currency()
+
+
 def plot_modern_graph(df: pd.DataFrame, title: str = None, y_label: str = None, optimize_y_range: bool = False):
     """Plot data with modern style matching other pages.
 
@@ -76,13 +97,7 @@ def plot_modern_graph(df: pd.DataFrame, title: str = None, y_label: str = None, 
 
     # Get target currency from settings
     target_currency = st.session_state.settings.get("fiat_currency", "EUR")
-    currency_symbols = {
-        "EUR": "€", "USD": "$", "GBP": "£", "CHF": "CHF",
-        "CAD": "CA$", "AUD": "A$", "JPY": "¥", "CNY": "¥",
-        "KRW": "₩", "BRL": "R$", "MXN": "MX$", "INR": "₹",
-        "RUB": "₽", "TRY": "₺"
-    }
-    currency_symbol = currency_symbols.get(target_currency, target_currency)
+    currency_symbol = get_currency_symbol(target_currency)
 
     # Create plotly figure
     fig = go.Figure()
@@ -146,13 +161,7 @@ def plot_dual_axis_graph(df: pd.DataFrame, title: str = None, token: str = None)
 
     # Get target currency from settings
     target_currency = st.session_state.settings.get("fiat_currency", "EUR")
-    currency_symbols = {
-        "EUR": "€", "USD": "$", "GBP": "£", "CHF": "CHF",
-        "CAD": "CA$", "AUD": "A$", "JPY": "¥", "CNY": "¥",
-        "KRW": "₩", "BRL": "R$", "MXN": "MX$", "INR": "₹",
-        "RUB": "₽", "TRY": "₺"
-    }
-    currency_symbol = currency_symbols.get(target_currency, target_currency)
+    currency_symbol = get_currency_symbol(target_currency)
 
     # Create plotly figure with dual y-axes
     fig = go.Figure()
@@ -275,13 +284,7 @@ def aggregater_ui():
             st.dataframe(df, width='stretch', height=height)
 
             # Display total with appropriate currency symbol
-            currency_symbols = {
-                "EUR": "€", "USD": "$", "GBP": "£", "CHF": "CHF",
-                "CAD": "CA$", "AUD": "A$", "JPY": "¥", "CNY": "¥",
-                "KRW": "₩", "BRL": "R$", "MXN": "MX$", "INR": "₹",
-                "RUB": "₽", "TRY": "₺"
-            }
-            currency_symbol = currency_symbols.get(target_currency, target_currency)
+            currency_symbol = get_currency_symbol(target_currency)
             st.write(f"Total value: {currency_symbol}" + str(round(df[f"Value({target_currency})"].sum(), 2)))
         else:
             st.info("No data available")
@@ -319,8 +322,30 @@ def draw_tab_content(
                     if df_prices is None:
                         st.warning(f"No price data found for {token} in API, falling back to local database")
                         df_view = tokensdb.get_token_balances(token, start_timestamp, end_timestamp)
+
+                        # Fallback local (EUR) : convertir si nécessaire
+                        target_currency = st.session_state.settings.get("fiat_currency", "EUR")
+                        if df_view is not None and target_currency != "EUR":
+                            df_fiat = fetch_api_fiat_rates(api_url, api_key, cache_file)
+                            value_col = "Value" if "Value" in df_view.columns else "value"
+                            df_view = convert_dataframe_prices_historical(
+                                df_view, value_col, "EUR", target_currency, df_fiat
+                            )
                     else:
-                        # Merge counts with API prices
+                        # Conversion USD → devise cible avec taux historiques
+                        if "source_currency" in df_prices.columns:
+                            source_currency = df_prices["source_currency"].iloc[0]
+                            target_currency = st.session_state.settings.get("fiat_currency", "EUR")
+
+                            if source_currency != target_currency:
+                                df_fiat = fetch_api_fiat_rates(api_url, api_key, cache_file)
+                                df_prices = convert_dataframe_prices_historical(
+                                    df_prices, "Price", source_currency, target_currency, df_fiat
+                                )
+
+                            df_prices = df_prices.drop(columns=["source_currency"])
+
+                        # Merge counts with API prices (déjà converti)
                         df_view = df_counts.join(df_prices, how='outer')
                         df_view = df_view.ffill()  # Forward fill missing values
                         df_view = df_view.dropna()  # Remove rows with missing data
@@ -329,8 +354,21 @@ def draw_tab_content(
                         # Keep only Value and Count columns
                         df_view = df_view[['Value', 'Count']]
             else:
-                # Use local SQLite database
+                # Use local SQLite database (données en EUR)
                 df_view = tokensdb.get_token_balances(token, start_timestamp, end_timestamp)
+
+                # Conversion EUR → devise cible si nécessaire
+                target_currency = st.session_state.settings.get("fiat_currency", "EUR")
+                if df_view is not None and target_currency != "EUR":
+                    api_url = st.session_state.settings["marketraccoon_url"]
+                    api_key = st.session_state.settings.get("marketraccoon_token")
+                    cache_file = os.path.join(st.session_state.settings["data_path"], "api_cache.json")
+                    df_fiat = fetch_api_fiat_rates(api_url, api_key, cache_file)
+                    # Value = price * count (en EUR), convertir la colonne Value
+                    value_col = "Value" if "Value" in df_view.columns else "value"
+                    df_view = convert_dataframe_prices_historical(
+                        df_view, value_col, "EUR", target_currency, df_fiat
+                    )
     elif section == "Market":
         with st.spinner("Loading market...", show_time=True):
             if use_api:
@@ -341,9 +379,34 @@ def draw_tab_content(
                 df_view = fetch_api_crypto_market(
                     api_url, api_key, cache_file, token, start_timestamp, end_timestamp
                 )
+
+                # Conversion USD → devise cible avec taux historiques
+                if df_view is not None and "source_currency" in df_view.columns:
+                    source_currency = df_view["source_currency"].iloc[0]
+                    target_currency = st.session_state.settings.get("fiat_currency", "EUR")
+
+                    if source_currency != target_currency:
+                        df_fiat = fetch_api_fiat_rates(api_url, api_key, cache_file)
+                        df_view = convert_dataframe_prices_historical(
+                            df_view, "Price", source_currency, target_currency, df_fiat
+                        )
+
+                    # Supprimer la colonne de métadonnée pour l'affichage
+                    df_view = df_view.drop(columns=["source_currency"])
             else:
-                # Use local SQLite database
+                # Use local SQLite database (données en EUR)
                 df_view = markgetdb.get_token_market(token, start_timestamp, end_timestamp)
+
+                # Conversion EUR → devise cible si nécessaire
+                target_currency = st.session_state.settings.get("fiat_currency", "EUR")
+                if df_view is not None and target_currency != "EUR":
+                    api_url = st.session_state.settings["marketraccoon_url"]
+                    api_key = st.session_state.settings.get("marketraccoon_token")
+                    cache_file = os.path.join(st.session_state.settings["data_path"], "api_cache.json")
+                    df_fiat = fetch_api_fiat_rates(api_url, api_key, cache_file)
+                    df_view = convert_dataframe_prices_historical(
+                        df_view, "Price", "EUR", target_currency, df_fiat
+                    )
     else:
         df_view = None
     if df_view is not None:
@@ -363,6 +426,10 @@ def draw_tab_content(
         if actual_column is None:
             actual_column = column_value
 
+        # Récupérer le symbole de devise dynamique
+        target_currency = st.session_state.settings.get("fiat_currency", "EUR")
+        currency_symbol = get_currency_symbol(target_currency)
+
         mcol1, mcol2, mcol3, mcol4 = st.columns(4)
         with mcol1:
             nbr_days = df_view.index[-1] - df_view.index[0]
@@ -377,7 +444,7 @@ def draw_tab_content(
             current_price = df_view[actual_column].iloc[-1]
             st.metric(
                 label,
-                value=f"{round(current_price, 2)} €",
+                value=f"{round(current_price, 2)} {currency_symbol}",
                 delta=(
                     f"{round(((last - first) / first) * 100, 2)} %"
                     if first != 0
@@ -393,7 +460,7 @@ def draw_tab_content(
             ]
             st.metric(
                 "Timeframe Low",
-                value=f"{round(min_price, 2)} €",
+                value=f"{round(min_price, 2)} {currency_symbol}",
                 help=f"Date: {min_price_date[0]}",
                 delta=f"{round(((current_price - min_price) / min_price) * 100, 2)} %",
             )
@@ -404,7 +471,7 @@ def draw_tab_content(
             ]
             st.metric(
                 "Timeframe High",
-                value=f"{round(max_price, 2)} €",
+                value=f"{round(max_price, 2)} {currency_symbol}",
                 help=f"Date: {max_price_date[0]}",
                 delta=f"{round(((current_price - max_price) / max_price) * 100, 2)} %",
             )
@@ -488,7 +555,7 @@ def build_tabs(section: str = "Assets Balances", use_api: bool = False):
             idx_token += 1
 
 
-def build_price_tab(df: pd.DataFrame):
+def build_price_tab(df: pd.DataFrame, chart_title: str = None, chart_y_label: str = None):
     logger.debug("Build tabs")
     if df is None or df.empty:
         st.info("No data available")
@@ -521,7 +588,10 @@ def build_price_tab(df: pd.DataFrame):
             )
         col1, col2 = st.columns([3, 1])
         with col1:
-            plot_modern_graph(df_view, title="USD/EUR Exchange Rate Over Time", y_label="EUR", optimize_y_range=True)
+            # Use provided title and y_label, or defaults
+            title = chart_title if chart_title else "USD/EUR Exchange Rate Over Time"
+            y_label = chart_y_label if chart_y_label else "EUR"
+            plot_modern_graph(df_view, title=title, y_label=y_label, optimize_y_range=True)
         with col2:
             col2.dataframe(df_view, width='stretch')
 
@@ -534,7 +604,7 @@ use_api_sidebar = False  # Default value, may be overridden in sidebar
 with st.sidebar:
     add_selectbox = st.selectbox(
         "Assets View",
-        ("Global", "Assets Balances", "Market", "Currency (USDEUR)"),
+        ("Global", "Assets Balances", "Market", "Currency"),
     )
 
     if add_selectbox != "Global":
@@ -590,6 +660,16 @@ with st.sidebar:
         else:
             st.caption("💾 SQLite local")
 
+    # Currency direction toggle
+    if add_selectbox == "Currency":
+        st.divider()
+        currency_inverted = st.toggle(
+            "EUR/USD",
+            value=True,
+            help="EUR/USD (default) or USD/EUR",
+            key="currency_direction_toggle"
+        )
+
 tokensdb = TokensDatabase(st.session_state.settings["dbfile"])
 markgetdb = Market(
     st.session_state.settings["dbfile"],
@@ -623,9 +703,22 @@ if add_selectbox == "Market":
     st.title("Market")
     build_tabs("Market", use_api=use_api_sidebar)
 
-if add_selectbox == "Currency (USDEUR)":
-    logger.debug("Currency (USDEUR)")
-    st.title("Currency (USDEUR)")
+if add_selectbox == "Currency":
+    # Determine currency direction from toggle
+    currency_inverted = st.session_state.get("currency_direction_toggle", True)
+    
+    # Update title and labels based on direction
+    if currency_inverted:
+        title_text = "Currency (EUR/USD)"
+        chart_title = "EUR/USD Exchange Rate Over Time"
+        chart_y_label = "USD"
+    else:
+        title_text = "Currency (USD/EUR)"
+        chart_title = "USD/EUR Exchange Rate Over Time"
+        chart_y_label = "EUR"
+    
+    logger.debug(title_text)
+    st.title(title_text)
 
     # Initialize ApiMarket with caching support
     cache_file = os.path.join(st.session_state.settings["data_path"], "api_cache.json")
@@ -637,8 +730,13 @@ if add_selectbox == "Currency (USDEUR)":
 
     # Fetch currency data (will use cache internally)
     currency_data = market.get_currency()
+    
+    # Invert prices if EUR/USD is selected
+    if currency_inverted and currency_data is not None and not currency_data.empty:
+        currency_data = currency_data.copy()
+        currency_data["price"] = 1 / currency_data["price"]
 
-    build_price_tab(currency_data)
+    build_price_tab(currency_data, chart_title=chart_title, chart_y_label=chart_y_label)
 
     # Initialize session state for interpolation results
     if "interpolation_result" not in st.session_state:
@@ -660,9 +758,15 @@ if add_selectbox == "Currency (USDEUR)":
             if df_result is not None and not df_result.empty:
                 value = df_result["price"].iloc[0]
                 is_interpolated = df_result.get("interpolated", pd.Series([False])).iloc[0]
+                
+                # Invert value if EUR/USD is selected
+                if currency_inverted:
+                    value = 1 / value
+                
                 st.session_state.interpolation_result = {
                     "value": value,
-                    "is_interpolated": is_interpolated
+                    "is_interpolated": is_interpolated,
+                    "currency_inverted": currency_inverted
                 }
             else:
                 st.session_state.interpolation_result = None
@@ -672,12 +776,16 @@ if add_selectbox == "Currency (USDEUR)":
         result = st.session_state.interpolation_result
         value = result["value"]
         is_interpolated = result["is_interpolated"]
+        result_currency_inverted = result.get("currency_inverted", True)
+        
+        # Determine the currency unit to display
+        unit = "USD" if result_currency_inverted else "EUR"
 
         if value != 0.0:
             if is_interpolated:
-                st.info(f"Interpolated value: {value:.6f} EUR")
+                st.info(f"Interpolated value: {value:.6f} {unit}")
             else:
-                st.info(f"Exact value: {value:.6f} EUR")
+                st.info(f"Exact value: {value:.6f} {unit}")
         else:
             st.warning("Value is 0.0")
     elif st.session_state.interpolation_result is None and "interpolation_result" in st.session_state:

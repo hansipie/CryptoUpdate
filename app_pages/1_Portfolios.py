@@ -8,7 +8,12 @@ import plotly.graph_objects as go
 from modules.database.customdata import Customdata
 from modules.database.portfolios import Portfolios
 from modules.database.tokensdb import TokensDatabase
-from modules.tools import create_portfolio_dataframe, update, parse_last_update
+from modules.tools import (
+    create_portfolio_dataframe,
+    update,
+    parse_last_update,
+    get_currency_symbol
+)
 from modules.utils import dataframe_diff
 from modules.configuration import configuration
 
@@ -135,13 +140,7 @@ def portfolioUI(tabs: list):
                 df.sort_values(by=[value_column], ascending=False, inplace=True)
 
                 # Display total with appropriate currency symbol
-                currency_symbols = {
-                    "EUR": "€", "USD": "$", "GBP": "£", "CHF": "CHF",
-                    "CAD": "CA$", "AUD": "A$", "JPY": "¥", "CNY": "¥",
-                    "KRW": "₩", "BRL": "R$", "MXN": "MX$", "INR": "₹",
-                    "RUB": "₽", "TRY": "₺"
-                }
-                currency_symbol = currency_symbols.get(target_currency, target_currency)
+                currency_symbol = get_currency_symbol(target_currency)
                 st.write(f"Total value: {currency_symbol}{round(balance, 2)}")
 
                 height = (len(df) * 35) + 38
@@ -293,13 +292,7 @@ def plot_portfolio_history(portfolio_name: str, dbfile: str):
 
     # Get target currency from settings
     target_currency = st.session_state.settings.get("fiat_currency", "EUR")
-    currency_symbols = {
-        "EUR": "€", "USD": "$", "GBP": "£", "CHF": "CHF",
-        "CAD": "CA$", "AUD": "A$", "JPY": "¥", "CNY": "¥",
-        "KRW": "₩", "BRL": "R$", "MXN": "MX$", "INR": "₹",
-        "RUB": "₽", "TRY": "₺"
-    }
-    currency_symbol = currency_symbols.get(target_currency, target_currency)
+    currency_symbol = get_currency_symbol(target_currency)
 
     # Create plotly figure
     fig = go.Figure()
