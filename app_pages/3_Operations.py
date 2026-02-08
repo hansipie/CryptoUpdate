@@ -16,7 +16,7 @@ from modules.database.tokensdb import TokensDatabase
 from modules.database.operations import operations
 from modules.database.market import Market
 from modules.database.swaps import swaps
-from modules.tools import calculate_crypto_rate, update, parse_last_update
+from modules.tools import batch_convert_historical, calculate_crypto_rate, update, parse_last_update
 from modules.utils import get_file_hash, toTimestamp_A
 
 logger = logging.getLogger(__name__)
@@ -589,7 +589,9 @@ def swap_perf(rate_swap, rate_now) -> float:
     return ((rate_swap * 100) / rate_now) - 100
 
 
-def build_buy_dataframe() -> pd.DataFrame:
+def build_buy_dataframe(
+    convert_from: str = None, convert_to: str = None
+) -> pd.DataFrame:
     # save buylist to a dataframe
     df = pd.DataFrame(
         g_operation.get_operations_by_type("buy"),
@@ -605,6 +607,10 @@ def build_buy_dataframe() -> pd.DataFrame:
         ],
     )
 
+    # Ensure amount columns are numeric
+    df["From"] = pd.to_numeric(df["From"], errors="coerce")
+    df["To"] = pd.to_numeric(df["To"], errors="coerce")
+
     # convert timestamp to datetime
     df["Date"] = pd.to_datetime(df["timestamp"], unit="s", utc=True)
     local_timezone = tzlocal.get_localzone()
@@ -612,7 +618,43 @@ def build_buy_dataframe() -> pd.DataFrame:
     df["Date"] = df["Date"].dt.tz_convert(local_timezone).dt.tz_localize(None)
     df["Buy Rate"] = df["From"] / df["To"]
 
-    df = calc_perf(df, "Token", "Buy Rate")
+    # Historical conversion of From column
+    if convert_from and not df.empty:
+        col_name = f"From ({convert_from})"
+        df[col_name] = batch_convert_historical(
+            df, "From", "Currency", convert_from, "timestamp",
+            st.session_state.settings["dbfile"],
+        )
+
+    # Historical conversion of To column
+    if convert_to and not df.empty:
+        col_name = f"To ({convert_to})"
+        df[col_name] = batch_convert_historical(
+            df, "To", "Token", convert_to, "timestamp",
+            st.session_state.settings["dbfile"],
+        )
+
+    # Recalculate Buy Rate if conversions are active
+    if (convert_from or convert_to) and not df.empty:
+        from_col = f"From ({convert_from})" if convert_from else "From"
+        to_col = f"To ({convert_to})" if convert_to else "To"
+        df["Converted Rate"] = df[from_col] / df[to_col]
+
+    # Current Rate and Perf. — use converted units when active
+    if (convert_from or convert_to) and not df.empty:
+        now_ts = int(pd.Timestamp.now(tz="UTC").timestamp())
+        dbfile = st.session_state.settings["dbfile"]
+        df["Current Rate"] = df.apply(
+            lambda row: calculate_crypto_rate(
+                convert_to if convert_to else row["Token"],
+                convert_from if convert_from else row["Currency"],
+                now_ts, dbfile,
+            ),
+            axis=1,
+        )
+        df["Perf."] = ((df["Current Rate"] * 100) / df["Converted Rate"]) - 100
+    else:
+        df = calc_perf(df, "Token", "Buy Rate")
 
     return df
 
@@ -650,7 +692,11 @@ def build_buy_avg_table():
 @st.cache_data(
     hash_funcs={str: lambda x: get_file_hash(x) if os.path.isfile(x) else hash(x)},
 )
-def build_swap_dataframes(db_file: str) -> pd.DataFrame:
+def build_swap_dataframes(
+    db_file: str,
+    convert_from: str = None,
+    convert_to: str = None,
+) -> pd.DataFrame:
     df1 = pd.DataFrame(
         g_swaps.get_by_tag(""),
         columns=[
@@ -666,7 +712,7 @@ def build_swap_dataframes(db_file: str) -> pd.DataFrame:
         ],
     )
     if not df1.empty:
-        df1 = build_swap_dataframe(df1)
+        df1 = build_swap_dataframe(df1, convert_from, convert_to)
     else:
         st.info("No swap operations")
 
@@ -685,7 +731,7 @@ def build_swap_dataframes(db_file: str) -> pd.DataFrame:
         ],
     )
     if not df2.empty:
-        df2 = build_swap_dataframe(df2)
+        df2 = build_swap_dataframe(df2, convert_from, convert_to)
     else:
         st.info("No archived swaps")
 
@@ -693,25 +739,55 @@ def build_swap_dataframes(db_file: str) -> pd.DataFrame:
 
 
 @st.cache_data()
-def build_swap_dataframe(df: pd.DataFrame) -> pd.DataFrame:
+def build_swap_dataframe(
+    df: pd.DataFrame,
+    convert_from: str = None,
+    convert_to: str = None,
+) -> pd.DataFrame:
+    # Ensure amount columns are numeric
+    df["From Amount"] = pd.to_numeric(df["From Amount"], errors="coerce")
+    df["To Amount"] = pd.to_numeric(df["To Amount"], errors="coerce")
+
     # convert timestamp to datetime
     df["Date"] = pd.to_datetime(df["timestamp"], unit="s", utc=True)
     local_timezone = tzlocal.get_localzone()
     logger.debug("Timezone locale: %s", local_timezone)
     df["Date"] = df["Date"].dt.tz_convert(local_timezone).dt.tz_localize(None)
 
-    df["Swap Rate"] = df.apply(
-        lambda row: float(row["To Amount"]) / float(row["From Amount"]), axis=1
-    )
+    df["Swap Rate"] = df["To Amount"] / df["From Amount"]
 
-    df["Current Rate"] = df.apply(
-        lambda row: calculate_crypto_rate(
-            row["From Token"],
-            row["To Token"],
-            int(pd.Timestamp.now(tz="UTC").timestamp()),
+    # Historical conversion of From Amount column
+    if convert_from and not df.empty:
+        col_name = f"From Amount ({convert_from})"
+        df[col_name] = batch_convert_historical(
+            df, "From Amount", "From Token", convert_from, "timestamp",
             st.session_state.settings["dbfile"],
         )
-        if row["From Token"] != row["To Token"]
+
+    # Historical conversion of To Amount column
+    if convert_to and not df.empty:
+        col_name = f"To Amount ({convert_to})"
+        df[col_name] = batch_convert_historical(
+            df, "To Amount", "To Token", convert_to, "timestamp",
+            st.session_state.settings["dbfile"],
+        )
+
+    # Recalculate Swap Rate if conversions are active
+    if (convert_from or convert_to) and not df.empty:
+        from_col = f"From Amount ({convert_from})" if convert_from else "From Amount"
+        to_col = f"To Amount ({convert_to})" if convert_to else "To Amount"
+        df["Swap Rate"] = df[to_col] / df[from_col]
+
+    # Current Rate and Perf. — use converted units when active
+    now_ts = int(pd.Timestamp.now(tz="UTC").timestamp())
+    dbfile = st.session_state.settings["dbfile"]
+    df["Current Rate"] = df.apply(
+        lambda row: calculate_crypto_rate(
+            convert_from if convert_from else row["From Token"],
+            convert_to if convert_to else row["To Token"],
+            now_ts, dbfile,
+        )
+        if (convert_from or row["From Token"]) != (convert_to or row["To Token"])
         else 1.0,
         axis=1,
     )
@@ -722,7 +798,7 @@ def build_swap_dataframe(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def draw_swap(df: pd.DataFrame):
+def draw_swap(df: pd.DataFrame, convert_from: str = None, convert_to: str = None):
     if df.empty:
         st.info("No swap operations")
     else:
@@ -730,7 +806,7 @@ def draw_swap(df: pd.DataFrame):
         green_threshold = st.session_state.settings.get("operations_green_threshold", 100)
         orange_threshold = st.session_state.settings.get("operations_orange_threshold", 50)
         red_threshold = st.session_state.settings.get("operations_red_threshold", 0)
-        
+
         def color_rows(row):
             if pd.isna(row['Perf.']):
                 return [''] * len(row)
@@ -742,41 +818,48 @@ def draw_swap(df: pd.DataFrame):
                 return ['background-color: #FFB6C1'] * len(row)  # Light red
             else:
                 return [''] * len(row)
-        
+
         styled_df = df.style.apply(color_rows, axis=1)
-        
+
+        # Build dynamic column order and config
+        col_from_amount = f"From Amount ({convert_from})" if convert_from else "From Amount"
+        col_to_amount = f"To Amount ({convert_to})" if convert_to else "To Amount"
+        rate_col = "Swap Rate"
+
+        column_order = [
+            "Date",
+            col_from_amount,
+            *(() if convert_from else ("From Token",)),
+            col_to_amount,
+            *(() if convert_to else ("To Token",)),
+            "From Wallet",
+            "To Wallet",
+            rate_col,
+            "Current Rate",
+            "Perf.",
+        ]
+
+        column_config = {
+            col_from_amount: st.column_config.NumberColumn(format="%.8g"),
+            col_to_amount: st.column_config.NumberColumn(format="%.8g"),
+            rate_col: st.column_config.NumberColumn(format="%.8g"),
+            "Current Rate": st.column_config.NumberColumn(format="%.8g"),
+            "Perf.": st.column_config.NumberColumn(format="%.2f%%"),
+        }
+
         st.dataframe(
             styled_df,
             width='stretch',
             hide_index=True,
-            column_order=(
-                "Date",
-                "From Amount",
-                "From Token",
-                "To Amount",
-                "To Token",
-                "From Wallet",
-                "To Wallet",
-                "Swap Rate",
-                "Current Rate",
-                "Perf.",  # Ajout de la colonne Perf. dans l'ordre des colonnes
-            ),
-            column_config={
-                "From Amount": st.column_config.NumberColumn(format="%.8g"),
-                "To Amount": st.column_config.NumberColumn(format="%.8g"),
-                "Swap Rate": st.column_config.NumberColumn(format="%.8g"),
-                "Current Rate": st.column_config.NumberColumn(format="%.8g"),
-                "Perf.": st.column_config.NumberColumn(
-                    format="%.2f%%"
-                ),  # Configuration du format pour Perf.
-            },
+            column_order=column_order,
+            column_config=column_config,
             on_select="rerun",
             selection_mode="multi-row",
             key="swapselection",
         )
 
 
-def draw_swap_arch(df: pd.DataFrame):
+def draw_swap_arch(df: pd.DataFrame, convert_from: str = None, convert_to: str = None):
     if df.empty:
         st.info("No archived swaps")
     else:
@@ -784,7 +867,7 @@ def draw_swap_arch(df: pd.DataFrame):
         green_threshold = st.session_state.settings.get("operations_green_threshold", 100)
         orange_threshold = st.session_state.settings.get("operations_orange_threshold", 50)
         red_threshold = st.session_state.settings.get("operations_red_threshold", 0)
-        
+
         def color_rows(row):
             if pd.isna(row['Perf.']):
                 return [''] * len(row)
@@ -796,34 +879,41 @@ def draw_swap_arch(df: pd.DataFrame):
                 return ['background-color: #FFB6C1'] * len(row)  # Light red
             else:
                 return [''] * len(row)
-        
+
         styled_df = df.style.apply(color_rows, axis=1)
-        
+
+        # Build dynamic column order and config
+        col_from_amount = f"From Amount ({convert_from})" if convert_from else "From Amount"
+        col_to_amount = f"To Amount ({convert_to})" if convert_to else "To Amount"
+        rate_col = "Swap Rate"
+
+        column_order = [
+            "Date",
+            col_from_amount,
+            *(() if convert_from else ("From Token",)),
+            col_to_amount,
+            *(() if convert_to else ("To Token",)),
+            "From Wallet",
+            "To Wallet",
+            rate_col,
+            "Current Rate",
+            "Perf.",
+        ]
+
+        column_config = {
+            col_from_amount: st.column_config.NumberColumn(format="%.8g"),
+            col_to_amount: st.column_config.NumberColumn(format="%.8g"),
+            rate_col: st.column_config.NumberColumn(format="%.8g"),
+            "Current Rate": st.column_config.NumberColumn(format="%.8g"),
+            "Perf.": st.column_config.NumberColumn(format="%.2f%%"),
+        }
+
         st.dataframe(
             styled_df,
             width='stretch',
             hide_index=True,
-            column_order=(
-                "Date",
-                "From Amount",
-                "From Token",
-                "To Amount",
-                "To Token",
-                "From Wallet",
-                "To Wallet",
-                "Swap Rate",
-                "Current Rate",
-                "Perf.",  # Ajout de la colonne Perf. dans l'ordre des colonnes
-            ),
-            column_config={
-                "From Amount": st.column_config.NumberColumn(format="%.8g"),
-                "To Amount": st.column_config.NumberColumn(format="%.8g"),
-                "Swap Rate": st.column_config.NumberColumn(format="%.8g"),
-                "Current Rate": st.column_config.NumberColumn(format="%.8g"),
-                "Perf.": st.column_config.NumberColumn(
-                    format="%.2f%%"
-                ),  # Configuration du format pour Perf.
-            },
+            column_order=column_order,
+            column_config=column_config,
             on_select="rerun",
             selection_mode="multi-row",
             key="swapachselection",
@@ -858,37 +948,60 @@ with st.sidebar:
 
 buy_tab, swap_tab = st.tabs(["Buy", "Swap"])
 with buy_tab:
+    # Conversion selectboxes for Buy
+    g_convert_options = ["Original", "EUR", "USD"] + g_tokens
+    col_conv_from, col_conv_to = st.columns(2)
+    with col_conv_from:
+        buy_convert_from_sel = st.selectbox(
+            "Convert From to:", g_convert_options, key="buy_convert_from"
+        )
+    with col_conv_to:
+        buy_convert_to_sel = st.selectbox(
+            "Convert To to:", g_convert_options, key="buy_convert_to"
+        )
+    buy_cf = None if buy_convert_from_sel == "Original" else buy_convert_from_sel
+    buy_ct = None if buy_convert_to_sel == "Original" else buy_convert_to_sel
+
     # build buy table with performance metrics
-    df_buy = build_buy_dataframe()
+    df_buy = build_buy_dataframe(convert_from=buy_cf, convert_to=buy_ct)
 
     col_buylist, col_buybtns = st.columns([8, 1])
     with col_buylist:
         if df_buy.empty:
             st.info("No buy operations")
         else:
+            # Build dynamic column order and config
+            col_from = f"From ({buy_cf})" if buy_cf else "From"
+            col_to = f"To ({buy_ct})" if buy_ct else "To"
+            rate_col = "Converted Rate" if (buy_cf or buy_ct) else "Buy Rate"
+
+            column_order = [
+                "Date",
+                col_from,
+                *(() if buy_cf else ("Currency",)),
+                col_to,
+                *(() if buy_ct else ("Token",)),
+                "Portfolio",
+                rate_col,
+                "Current Rate",
+                "Perf.",
+            ]
+
+            column_config = {
+                col_from: st.column_config.NumberColumn(format="%.8g"),
+                col_to: st.column_config.NumberColumn(format="%.8g"),
+                rate_col: st.column_config.NumberColumn(format="%.8g"),
+                "Current Rate": st.column_config.NumberColumn(format="%.8g"),
+                "Perf.": st.column_config.NumberColumn(format="%.2f%%"),
+            }
+
             st.dataframe(
                 df_buy,
                 width='stretch',
                 height=600,
                 hide_index=True,
-                column_order=(
-                    "Date",
-                    "From",
-                    "Currency",
-                    "To",
-                    "Token",
-                    "Portfolio",
-                    "Buy Rate",
-                    "Current Rate",
-                    "Perf.",
-                ),
-                column_config={
-                    "From": st.column_config.NumberColumn(format="%.8g"),
-                    "To": st.column_config.NumberColumn(format="%.8g"),
-                    "Buy Rate": st.column_config.NumberColumn(format="%.8g"),
-                    "Current Rate": st.column_config.NumberColumn(format="%.8g"),
-                    "Perf.": st.column_config.NumberColumn(format="%.2f%%"),
-                },
+                column_order=column_order,
+                column_config=column_config,
                 on_select="rerun",
                 selection_mode="single-row",
                 key="buyselection",
@@ -959,12 +1072,29 @@ with buy_tab:
         )
 
 with swap_tab:
+    # Conversion selectboxes for Swap
+    col_sconv_from, col_sconv_to = st.columns(2)
+    with col_sconv_from:
+        swap_convert_from_sel = st.selectbox(
+            "Convert From to:", g_convert_options, key="swap_convert_from"
+        )
+    with col_sconv_to:
+        swap_convert_to_sel = st.selectbox(
+            "Convert To to:", g_convert_options, key="swap_convert_to"
+        )
+    swap_cf = None if swap_convert_from_sel == "Original" else swap_convert_from_sel
+    swap_ct = None if swap_convert_to_sel == "Original" else swap_convert_to_sel
+
     # build swap table with performance metrics
-    df_swap, df_swap_arch = build_swap_dataframes(st.session_state.settings["dbfile"])
+    df_swap, df_swap_arch = build_swap_dataframes(
+        st.session_state.settings["dbfile"],
+        convert_from=swap_cf,
+        convert_to=swap_ct,
+    )
 
     col_swaplist, col_swapbtns = st.columns([8, 1])
     with col_swaplist:
-        draw_swap(df_swap)
+        draw_swap(df_swap, convert_from=swap_cf, convert_to=swap_ct)
     with col_swapbtns:
         st.button(
             "New",
@@ -998,7 +1128,7 @@ with swap_tab:
     st.title("Archived Swaps")
     col_archlist, col_archbtns = st.columns([8, 1])
     with col_archlist:
-        draw_swap_arch(df_swap_arch)
+        draw_swap_arch(df_swap_arch, convert_from=swap_cf, convert_to=swap_ct)
     with col_archbtns:
         st.button(
             "Unarchive",

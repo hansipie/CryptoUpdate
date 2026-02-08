@@ -633,6 +633,57 @@ def calculate_crypto_rate(
     return rate
 
 
+def batch_convert_historical(
+    df: pd.DataFrame,
+    amount_column: str,
+    source_token_column: str,
+    target_token: str,
+    timestamp_column: str,
+    dbfile: str,
+) -> pd.Series:
+    """Convert amounts in a DataFrame using historical rates via calculate_crypto_rate().
+
+    Groups unique (source_token, timestamp) pairs to minimize DB queries,
+    then maps the rates back to produce converted amounts.
+
+    Args:
+        df: DataFrame containing the data
+        amount_column: Column name with amounts to convert
+        source_token_column: Column name containing the source token per row
+        target_token: Target token/currency to convert to
+        timestamp_column: Column name containing unix timestamps
+        dbfile: Path to database file
+
+    Returns:
+        Series with converted amounts (same index as df)
+    """
+    if df.empty:
+        return pd.Series(dtype=float)
+
+    # Build unique pairs to query
+    pairs = df[[source_token_column, timestamp_column]].drop_duplicates()
+    rate_cache = {}
+    for _, row in pairs.iterrows():
+        src = row[source_token_column]
+        ts = int(row[timestamp_column])
+        if src == target_token:
+            rate_cache[(src, ts)] = 1.0
+        else:
+            rate = calculate_crypto_rate(src, target_token, ts, dbfile)
+            rate_cache[(src, ts)] = rate
+
+    # Map rates back and compute converted amounts
+    rates = df.apply(
+        lambda row: rate_cache.get(
+            (row[source_token_column], int(row[timestamp_column]))
+        ),
+        axis=1,
+    )
+    amounts = pd.to_numeric(df[amount_column], errors="coerce")
+    converted = amounts * rates
+    return converted
+
+
 def update():
     """Update cryptocurrency prices in database.
 
