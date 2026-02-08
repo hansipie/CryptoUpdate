@@ -8,15 +8,19 @@ dependencies = [
     "alive-progress>=3.2.0",
     "anthropic>=0.42.0",
     "dash>=2.18.2",
+    "filelock>=3.20.3",
     "matplotlib>=3.10.0",
     "pandas>=2.2.3",
     "plotly>=6.0.0",
+    "protobuf>=6.33.5",
     "python-dotenv>=1.0.1",
     "ruff>=0.9.6",
     "st-pages>=1.0.1",
     "streamlit>=1.42.0",
     "typer>=0.15.1",
     "tzlocal>=5.3",
+    "urllib3>=2.6.3",
+    "werkzeug>=3.1.5",
 ]
 
 [dependency-groups]
