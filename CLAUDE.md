@@ -393,9 +393,25 @@ uv run streamlit run app.py
 **Container operations:**
 
 ```bash
-# Run container
+# Build and run with docker compose
 docker compose up
+
+# Port mapping: 8042:8080 (host:container)
+# Access application at: http://localhost:8042
+# Note: Container runs Streamlit on port 8080, mapped to host port 8042
+
+# Development mode with live reload
+docker compose up --watch
 ```
+
+**Volume mounts:**
+- `./archives` → Container archives directory
+- `./data` → Container data directory (persists database)
+
+**Container details:**
+- User: docker (UID 1000, GID 1000)
+- Base image: python:3-slim
+- Command: `uv run streamlit run app.py --server.port 8080`
 
 ## Project Structure
 
@@ -639,6 +655,128 @@ except Exception as e:
     st.error("An unexpected error occurred. Please contact support.")
 ```
 
+## External API Integration
+
+### MarketRaccoon API
+
+Primary source for historical cryptocurrency prices and fiat exchange rates.
+
+**Configuration:**
+- Base URL: Configurable in settings.json (default: http://api.marketraccoon.eu)
+- Authentication: Optional X-API-Key header
+- Documentation: http://api.marketraccoon.eu/api/yaml
+
+**Key Endpoints:**
+
+1. `/api/v1/cryptocurrency` - Historical crypto prices (USD)
+   - Pagination via "next" field
+   - Returns time-series price data
+
+2. `/api/v1/cryptocurrency/latests` - Latest crypto prices (USD)
+   - Bulk fetch current prices
+
+3. `/api/v1/fiat` - Historical USD↔EUR exchange rates
+   - Date-range queries supported
+   - Cached locally with FiatCacheManager
+
+4. `/api/v1/fiat/latest` - Current USD/EUR rate
+   - Used for real-time conversions
+
+5. `/api/v1/coins` - Token symbol to ID mapping
+   - Required for price queries
+
+**Important:** All crypto prices from MarketRaccoon are in USD - requires conversion for EUR display.
+
+**Caching:**
+```python
+from modules.database.fiat_cache import FiatCacheManager
+
+# FiatCacheManager uses api_cache.json for TTL-based caching
+# Reduces API calls for frequently accessed fiat rates
+```
+
+### CoinMarketCap API
+
+Primary source for current cryptocurrency prices in EUR.
+
+**Endpoints:**
+- `/v2/cryptocurrency/quotes/latest` - Current prices
+- `/v2/tools/price-conversion` - Fiat rate conversions
+
+**Debug Mode:** Switches to sandbox API with public key
+
+### RatesDB.com API
+
+Fallback for historical fiat rates when MarketRaccoon unavailable.
+
+**Endpoint:** `https://free.ratesdb.com/v1/rates?from=EUR&to=USD&date={date}`
+**Rate Limit:** 1 second sleep between requests
+
+## Currency Conversion Patterns
+
+The application supports EUR ↔ USD conversion with different strategies for current vs historical data.
+
+### Current Rate Conversion
+
+Use `tools.convert_price_to_target_currency()` for single price conversion:
+
+```python
+# Converts current USD price to EUR (or vice versa)
+price_eur = tools.convert_price_to_target_currency(
+    price_usd,
+    from_currency="USD",
+    to_currency="EUR",
+    settings=st.session_state.settings
+)
+```
+
+**Implementation:**
+- Fetches latest USD→EUR rate from MarketRaccoon API
+- Uses FiatCacheManager for caching
+- USD→EUR: multiply by rate
+- EUR→USD: divide by rate
+
+### Historical Rate Conversion
+
+Use `tools.convert_dataframe_prices_historical()` for time-series data:
+
+```python
+# Converts historical price series with date-matched rates
+df_eur = tools.convert_dataframe_prices_historical(
+    df_usd,  # DataFrame with timestamp column
+    from_currency="USD",
+    to_currency="EUR",
+    dbfile=st.session_state.dbfile
+)
+```
+
+**Implementation:**
+- Fetches historical USD→EUR rate series from MarketRaccoon
+- Uses `pd.merge_asof` to match each price to nearest rate timestamp
+- Ensures accurate historical conversions
+
+### Crypto-to-Crypto Historical Conversion
+
+For calculating historical exchange rates between cryptocurrencies:
+
+```python
+# API method (recommended for large datasets)
+rate = apimarket.batch_convert_historical_api(
+    token_from="BTC",
+    token_to="ETH",
+    timestamp=1609459200
+)
+
+# DB method (uses local Market table)
+rate = market.batch_convert_historical(
+    token_from="BTC",
+    token_to="ETH",
+    timestamp=1609459200
+)
+```
+
+**Use case:** Calculate performance of token swaps (e.g., Operations page)
+
 # Database Architecture and Critical Rules
 
 ## SQLite Database Schema
@@ -737,13 +875,16 @@ See `DATABASE_RULES.md` for complete validation rules and delisted token list.
 ```
 app.py (entry point)
   ↓
-setup_logging() → Configure DEBUG level logging
-setup_config() → Load settings.json
-setup_navigation() → Define page structure
+1. setup_logging() → Configure DEBUG level logging to stdout
+2. st.set_page_config(layout="wide") → Streamlit page configuration
+3. init_config() → Load settings.json into memory
+4. tools.load_settings() → Populate st.session_state.settings
+5. setup_navigation() → Define multi-page navigation structure
+6. navigator.run() → Start Streamlit page router
   ↓
 Streamlit multi-page app with sections:
   - Main: Home, Portfolios, Graphs
-  - Tools: Operations, Import
+  - Tools: Operations, Import, Token Metadata
   - Settings: Configuration
   - Dev: Tests
 ```
@@ -788,21 +929,53 @@ Streamlit session state stores:
 
 ### Configuration File (settings.json)
 
+**Complete settings.json structure:**
 ```json
 {
-    "Notion": {"token": "...", "database": "...", "parentpage": "..."},
-    "Coinmarketcap": {"token": "..."},
-    "AI": {"token": "..."},
-    "Debug": {"flag": "False"},
+    "MarketRaccoon": {
+        "url": "http://api.marketraccoon.eu",
+        "token": "optional_api_key"
+    },
+    "Notion": {
+        "token": "optional_notion_token",
+        "database": "database_id",
+        "parentpage": "page_id"
+    },
+    "Coinmarketcap": {
+        "token": "required_cmc_api_key"
+    },
+    "AI": {
+        "token": "optional_anthropic_api_key"
+    },
+    "Debug": {
+        "flag": "False"
+    },
     "Local": {
         "archive_path": "archive",
         "data_path": "data",
         "sqlite_file": "db.sqlite3"
+    },
+    "OperationsColors": {
+        "green_threshold": 100,
+        "orange_threshold": 50,
+        "red_threshold": 0
+    },
+    "FiatCurrency": {
+        "currency": "EUR"
+    },
+    "UIPreferences": {
+        "show_empty_portfolios": true,
+        "graphs_selected_tokens": []
     }
 }
 ```
 
-**Never commit this file with real tokens!**
+**Configuration Notes:**
+- `MarketRaccoon.token`: Optional API authentication (not required for public endpoints)
+- `Coinmarketcap.token`: Required for real-time price updates (public key for debug mode)
+- `FiatCurrency.currency`: Set to "EUR" or "USD" for display preference
+- `OperationsColors.*`: Thresholds for color-coded transaction visualization
+- **Never commit this file with real tokens!**
 
 ## Common Development Patterns
 
@@ -841,6 +1014,62 @@ def load_crypto_data(symbol: str) -> pd.DataFrame:
 - Use indexed columns (`timestamp`, `token`) in WHERE clauses
 - Leverage `pivot_table` instead of multiple merges
 - Run `drop_duplicate()` regularly to reduce table size
+
+## Known Issues & Workarounds
+
+### Zero Prices in Active Tokens
+
+Some active tokens have historical price entries of 0 due to API errors:
+
+| Token | Zero Price Count | Status | Action |
+|-------|------------------|--------|--------|
+| SEN   | 187              | ✅ Active | Keep in DB (historical record) |
+| MXNA  | 23               | ✅ Active | Keep in DB |
+| D2T   | 23               | ✅ Active | Keep in DB |
+| LUNA  | 6 (May 2022)     | ✅ Active | LUNA 2.0 crash event |
+| TITA  | 2                | ✅ Active | Keep in DB |
+
+**Solution:** These are kept in the database as historical records. Use `TokenMetadataManager` to filter if needed.
+
+### Missing Historical Fiat Rates
+
+If historical USD→EUR rates are unavailable:
+- Application logs: "Pas de taux historiques disponibles"
+- Fallback: Uses current rate for all historical conversions
+- Impact: Slight inaccuracy in historical EUR valuations
+
+### Memory Issues with Large Merges
+
+**Problem:** Multiple `df.merge(..., how='outer')` operations cause memory explosion (28GB+)
+
+**Solution:** Always use `pivot_table` for wide-format transformations:
+```python
+# ❌ WRONG
+df_result = pd.DataFrame()
+for token in tokens:
+    df = query_token(token)
+    df_result = df_result.merge(df, on='timestamp', how='outer')
+
+# ✅ CORRECT
+df_all = query_all_tokens()
+df_result = df_all.pivot_table(
+    index='timestamp',
+    columns='token',
+    values='value'
+)
+```
+
+### Duplicate Entries After Import
+
+**Problem:** Bulk CSV imports can create duplicate entries in TokensDatabase
+
+**Solution:** Always run cleanup after imports:
+```python
+from modules.database.tokensdb import TokensDatabase
+
+tokensdb = TokensDatabase(dbfile)
+tokensdb.drop_duplicate()  # Removes duplicates based on (timestamp, token)
+```
 
 # important-instruction-reminders
 Do what has been asked; nothing more, nothing less.
