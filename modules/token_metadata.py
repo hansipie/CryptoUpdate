@@ -193,7 +193,7 @@ class TokenMetadataManager:
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
             cursor.execute(
-                "SELECT mr_id FROM TokenMetadata WHERE token = ?", (token,)
+                "SELECT mraccoon_id FROM TokenMetadata WHERE token = ?", (token,)
             )
             result = cursor.fetchone()
             return result[0] if result and result[0] is not None else None
@@ -202,36 +202,36 @@ class TokenMetadataManager:
         """Get all tokens that have a MarketRaccoon ID, as a DataFrame.
 
         Returns:
-            DataFrame with columns token, mr_id, name or None if empty
+            DataFrame with columns token, mraccoon_id, name or None if empty
         """
         with sqlite3.connect(self.db_path) as conn:
             df = pd.read_sql_query(
-                "SELECT token, mr_id, name FROM TokenMetadata"
-                " WHERE mr_id IS NOT NULL ORDER BY token",
+                "SELECT token, mraccoon_id, name FROM TokenMetadata"
+                " WHERE mraccoon_id IS NOT NULL ORDER BY token",
                 conn,
             )
             return df if not df.empty else None
 
-    def upsert_token_info(self, token: str, mr_id: int, name: str) -> None:
+    def upsert_token_info(self, token: str, mraccoon_id: int, name: str) -> None:
         """Insert or update MarketRaccoon ID and name for a token.
 
         Preserves existing status and other fields on conflict.
 
         Args:
             token: Token symbol
-            mr_id: MarketRaccoon integer ID
+            mraccoon_id: MarketRaccoon integer ID
             name: Full token name
         """
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
             cursor.execute(
-                """INSERT INTO TokenMetadata (token, mr_id, name, updated_at)
+                """INSERT INTO TokenMetadata (token, mraccoon_id, name, updated_at)
                    VALUES (?, ?, ?, strftime('%s', 'now'))
                    ON CONFLICT(token) DO UPDATE SET
-                       mr_id = excluded.mr_id,
+                       mraccoon_id = excluded.mraccoon_id,
                        name = excluded.name,
                        updated_at = strftime('%s', 'now')""",
-                (token, mr_id, name),
+                (token, mraccoon_id, name),
             )
             conn.commit()
 

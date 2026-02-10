@@ -130,9 +130,17 @@ def _migrate_v2(conn: sqlite3.Connection) -> None:
             pass  # colonne déjà présente
 
 
+def _migrate_v3(conn: sqlite3.Connection) -> None:
+    """Renommage mr_id → mraccoon_id dans TokenMetadata."""
+    conn.execute(
+        "ALTER TABLE TokenMetadata RENAME COLUMN mr_id TO mraccoon_id"
+    )
+
+
 MIGRATIONS: dict = {
     1: _migrate_v1,
     2: _migrate_v2,
+    3: _migrate_v3,
 }
 
 
