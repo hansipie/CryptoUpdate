@@ -13,6 +13,7 @@ import os
 import shutil
 import traceback
 
+import numpy as np
 import pandas as pd
 import requests
 import streamlit as st
@@ -682,6 +683,330 @@ def batch_convert_historical(
     amounts = pd.to_numeric(df[amount_column], errors="coerce")
     converted = amounts * rates
     return converted
+
+
+def _get_api_latest_prices() -> dict:
+    """Fetch latest USD prices for all tokens from MarketRaccoon API.
+
+    Returns:
+        Dict mapping symbol to USD price, e.g. {"BTC": 97000.0, "ETH": 3200.0}
+    """
+    api = _get_cached_api_market()
+    
+    # Get list of tokens we actually use from the database
+    try:
+        from modules.database.portfolios import Portfolios
+        portfolios = Portfolios(st.session_state.settings["dbfile"])
+        portfolio_tokens = portfolios.getTokens()
+        logger.debug("Portfolio tokens: %s", portfolio_tokens)
+        
+        # Fetch prices with symbol filter to avoid duplicates
+        # NOTE: Bypass cache to pass symbols parameter
+        latest_df = api.get_cryptocurrency_latest(symbols=portfolio_tokens)
+    except Exception as e:
+        logger.warning("Could not get portfolio tokens, fetching all: %s", e)
+        latest_df = api.get_cryptocurrency_latest()
+    
+    if latest_df is None or latest_df.empty:
+        logger.warning("No latest cryptocurrency data from API")
+        return {}
+
+    coins_df = api.get_coins_cached()
+    if coins_df is None or coins_df.empty:
+        logger.warning("No coins data from API")
+        return {}
+
+    # Build id -> symbol mapping
+    id_to_symbol = dict(zip(coins_df["id"], coins_df["symbol"]))
+    
+    logger.debug("Latest df columns: %s", latest_df.columns.tolist())
+    logger.debug("Latest df shape: %s", latest_df.shape)
+
+    # Sort by rank (ascending) so the highest-ranked coin wins for duplicate symbols
+    # e.g. Bitcoin (rank=1) beats "Bitcoin AI" (rank=9000+) for symbol "BTC"
+    if "rank" in latest_df.columns:
+        latest_df = latest_df.sort_values("rank", ascending=True, na_position="last")
+
+    # latest_df has columns: coin (id), price, rank, ...
+    prices = {}
+    for _, row in latest_df.iterrows():
+        coin_id = row["coin"]
+        symbol = id_to_symbol.get(coin_id)
+        if symbol:
+            # If symbol already exists, keep the one with better rank (lower is better)
+            if symbol in prices:
+                logger.debug("Duplicate symbol %s found (coin_id=%d): keeping higher-ranked coin", symbol, coin_id)
+                continue
+            prices[symbol] = float(row["price"])
+            logger.info("API price: %s (coin_id=%d) = %.8f USD", symbol, coin_id, row["price"])
+        else:
+            logger.debug("No symbol found for coin_id=%s", coin_id)
+
+    logger.info("API: fetched %d token prices", len(prices))
+    return prices
+
+
+def _get_api_fiat_rate() -> float:
+    """Fetch the latest USD→EUR rate from MarketRaccoon API (cached).
+
+    Returns:
+        USD to EUR rate (e.g. 0.85 means 1 USD = 0.85 EUR), or None on error
+    """
+    api = _get_cached_api_market()
+    fiat_df = api.get_fiat_latest_rate()
+    if fiat_df is not None and not fiat_df.empty:
+        rate = fiat_df.iloc[-1]["price"]
+        logger.info("API fiat rate USD→EUR: %s", rate)
+        return rate
+    logger.error("API fiat rate unavailable - fiat_df is %s", "None" if fiat_df is None else "empty")
+    return None
+
+
+def _interpolate_from_series(series: pd.Series, timestamp: int) -> float:
+    """Interpolate a value from a pandas Series (DatetimeIndex -> float) at a Unix timestamp.
+
+    Args:
+        series: Series with DatetimeIndex and float values (prices in USD)
+        timestamp: Unix timestamp to interpolate at
+
+    Returns:
+        Interpolated float value, or None if series is empty
+    """
+    if series is None or series.empty:
+        return None
+
+    # Convert DatetimeIndex to Unix timestamps
+    ts_array = series.index.astype(np.int64) // 10**9
+    return float(np.interp(timestamp, ts_array, series.values))
+
+
+def calculate_crypto_rate_api(
+    token_a: str,
+    token_b: str,
+    prices_usd: dict = None,
+    usd_to_eur: float = None,
+) -> float:
+    """Calculate the current rate between two tokens using MarketRaccoon API.
+
+    All crypto prices are in USD. Fiat rates use get_fiat_latest_rate_cached().
+
+    Args:
+        token_a: Numerator token (e.g. "BTC")
+        token_b: Denominator token (e.g. "EUR")
+        prices_usd: Pre-loaded dict of symbol→USD price. If None, fetched internally.
+        usd_to_eur: Pre-loaded USD→EUR rate. If None, fetched internally.
+
+    Returns:
+        Rate: how many token_b per 1 token_a, or None on error
+    """
+    if prices_usd is None:
+        prices_usd = _get_api_latest_prices()
+    if usd_to_eur is None:
+        usd_to_eur = _get_api_fiat_rate()
+
+    def price_usd(token):
+        if token == "USD":
+            return 1.0
+        if token == "EUR":
+            # 1 EUR = 1/usd_to_eur USD  (e.g. 1/0.85 = 1.176)
+            return (1.0 / usd_to_eur) if usd_to_eur else None
+        return prices_usd.get(token)
+
+    pa = price_usd(token_a)
+    pb = price_usd(token_b)
+    if pa is None or pb is None or pb == 0:
+        logger.warning(
+            "Cannot compute API rate %s/%s: pa=%s pb=%s", token_a, token_b, pa, pb
+        )
+        return None
+    rate = pa / pb
+    logger.debug("API rate: 1 %s = %f %s", token_a, rate, token_b)
+    return rate
+
+
+def batch_convert_historical_api(
+    df: pd.DataFrame,
+    amount_column: str,
+    source_token_column: str,
+    target_token: str,
+    timestamp_column: str,
+) -> pd.Series:
+    """Convert amounts using historical API data (MarketRaccoon).
+
+    Pre-loads historical price series per token, then interpolates locally.
+
+    Args:
+        df: DataFrame containing the data
+        amount_column: Column with amounts to convert
+        source_token_column: Column with source token per row
+        target_token: Target token/currency
+        timestamp_column: Column with unix timestamps
+
+    Returns:
+        Series with converted amounts (same index as df)
+    """
+    if df.empty:
+        return pd.Series(dtype=float)
+
+    api = _get_cached_api_market()
+
+    # Collect all unique tokens (sources + target)
+    all_tokens = set(df[source_token_column].unique())
+    all_tokens.add(target_token)
+
+    min_ts = int(df[timestamp_column].min())
+    max_ts = int(df[timestamp_column].max())
+
+    # Pre-load price series for each token (in USD)
+    series_cache = {}
+    for token in all_tokens:
+        if token == "USD":
+            series_cache[token] = None  # Always 1.0
+        elif token == "EUR":
+            # Fetch fiat history -> Series of USD->EUR rates
+            fiat_df = api.get_currency()
+            if fiat_df is not None and not fiat_df.empty:
+                # price = usd_to_eur rate, we need price in USD: 1/rate
+                series_cache[token] = 1.0 / fiat_df["price"]
+            else:
+                series_cache[token] = None
+        else:
+            crypto_df = api.get_cryptocurrency_market_cached(
+                token_symbol=token, from_timestamp=min_ts, to_timestamp=max_ts
+            )
+            if crypto_df is not None and not crypto_df.empty:
+                series_cache[token] = crypto_df["Price"]
+            else:
+                series_cache[token] = None
+
+    def _price_usd(token, ts):
+        if token == "USD":
+            return 1.0
+        s = series_cache.get(token)
+        if s is None:
+            return None
+        return _interpolate_from_series(s, ts)
+
+    # Build unique pairs to minimize interpolations
+    pairs = df[[source_token_column, timestamp_column]].drop_duplicates()
+    rate_cache = {}
+    for _, row in pairs.iterrows():
+        src = row[source_token_column]
+        ts = int(row[timestamp_column])
+        if src == target_token:
+            rate_cache[(src, ts)] = 1.0
+        else:
+            p_src = _price_usd(src, ts)
+            p_tgt = _price_usd(target_token, ts)
+            if p_src is not None and p_tgt is not None and p_tgt != 0:
+                rate_cache[(src, ts)] = p_src / p_tgt
+            else:
+                rate_cache[(src, ts)] = None
+
+    # Map rates back
+    rates = df.apply(
+        lambda row: rate_cache.get(
+            (row[source_token_column], int(row[timestamp_column]))
+        ),
+        axis=1,
+    )
+    amounts = pd.to_numeric(df[amount_column], errors="coerce")
+    return amounts * rates
+
+
+def calc_perf_api(
+    df: pd.DataFrame,
+    col_token: str,
+    col_rate: str,
+    col_currency: str = None,
+    prices_usd: dict = None,
+    usd_to_eur: float = None,
+) -> pd.DataFrame:
+    """Calculate current performance using MarketRaccoon API prices.
+
+    Args:
+        df: DataFrame with operations data
+        col_token: Column containing token symbols
+        col_rate: Column containing original rates
+        col_currency: Column containing currency symbols. When provided, Current Rate
+                     is calculated as the token price in that currency (matching Buy Rate units).
+        prices_usd: Pre-loaded dict of symbol→USD price. If None, fetched internally.
+        usd_to_eur: Pre-loaded USD→EUR rate. If None, fetched internally.
+
+    Returns:
+        DataFrame with Current Rate and Perf. columns added
+    """
+    if prices_usd is None:
+        prices_usd = _get_api_latest_prices()
+    if not prices_usd:
+        df["Current Rate"] = None
+        df["Perf."] = None
+        return df
+
+    if usd_to_eur is None:
+        usd_to_eur = _get_api_fiat_rate()
+
+    # If col_currency is provided, calculate Current Rate as token price in that currency
+    # This matches the Buy Rate semantics: From/To where From is in col_currency
+    if col_currency:
+        logger.debug("calc_perf_api with currency conversion - usd_to_eur=%s", usd_to_eur)
+        
+        def get_token_price_in_currency(token, currency):
+            """Get token price expressed in the given currency."""
+            # Get both prices in USD
+            token_price_usd = prices_usd.get(token)
+            if token_price_usd is None:
+                logger.debug("No USD price for token %s", token)
+                return None
+            
+            logger.debug("Token %s: USD price = %f, converting to %s", token, token_price_usd, currency)
+            
+            # Convert token USD price to target currency
+            if currency == "USD":
+                return token_price_usd
+            elif currency == "EUR":
+                if usd_to_eur is not None:
+                    converted = token_price_usd * usd_to_eur
+                    logger.debug("Converted %f USD * %f = %f EUR", token_price_usd, usd_to_eur, converted)
+                    return converted
+                else:
+                    logger.warning("USD→EUR rate unavailable for %s, returning USD price", token)
+                    return token_price_usd  # Return USD price as fallback instead of None
+            else:
+                logger.warning("Unsupported currency: %s, returning USD price", currency)
+                return token_price_usd  # Return USD price as fallback
+        
+        df["Current Rate"] = df.apply(
+            lambda row: get_token_price_in_currency(row[col_token], row[col_currency]),
+            axis=1,
+        )
+    else:
+        # Fallback to old behavior: direct token price in target currency
+        target_currency = st.session_state.settings.get("fiat_currency", "EUR")
+
+        def convert_to_target(price_usd_val, token):
+            """Convert a USD price to the target fiat currency."""
+            if price_usd_val is None:
+                return None
+            if target_currency == "USD":
+                return price_usd_val
+            if target_currency == "EUR":
+                if usd_to_eur is not None:
+                    return price_usd_val * usd_to_eur
+                logger.warning("USD→EUR rate unavailable, cannot convert %s", token)
+                return None
+            return price_usd_val
+
+        def get_price_target(token):
+            usd_price = prices_usd.get(token)
+            return convert_to_target(usd_price, token)
+
+        df["Current Rate"] = df[col_token].map(
+            lambda t: get_price_target(t)
+        )
+    
+    df["Perf."] = ((df["Current Rate"] * 100) / df[col_rate]) - 100
+    return df
 
 
 def update():

@@ -547,8 +547,70 @@ class ApiMarket:
 
         return df
 
-    def get_cryptocurrency_latest(self) -> pd.DataFrame:
+    def get_cryptocurrency_latest_cached(self) -> Optional[pd.DataFrame]:
+        """Get latest cryptocurrency market data with caching support.
+
+        This is the cached version of get_cryptocurrency_latest(). If cache is disabled
+        (cache_file=None), falls back to direct API call.
+
+        Returns:
+            DataFrame with latest market data or None if empty
+        """
+        if not self.cache:
+            return self.get_cryptocurrency_latest()
+
+        cached_data = self.cache.get_or_fetch(
+            "crypto_latest",
+            self._fetch_and_serialize_latest
+        )
+
+        if cached_data is None:
+            return None
+
+        return self._deserialize_latest(cached_data)
+
+    def _fetch_and_serialize_latest(self) -> Optional[dict]:
+        """Fetch latest cryptocurrency data from API and serialize for caching.
+
+        Returns:
+            Serialized latest data dict or None if fetch failed
+        """
+        df = self.get_cryptocurrency_latest()
+
+        if df is None or df.empty:
+            return None
+
+        records = []
+        for date, row in df.iterrows():
+            records.append({
+                "date": date.isoformat(),
+                "coin": int(row["coin"]),
+                "price": float(row["price"]),
+            })
+
+        return {"records": records}
+
+    def _deserialize_latest(self, cached_data: dict) -> pd.DataFrame:
+        """Deserialize cached latest cryptocurrency data back to DataFrame.
+
+        Args:
+            cached_data: Serialized latest data from cache
+
+        Returns:
+            DataFrame with same structure as get_cryptocurrency_latest()
+        """
+        df = pd.DataFrame(cached_data["records"])
+        df["date"] = pd.to_datetime(df["date"], format='ISO8601')
+        df.rename(columns={"date": "Date"}, inplace=True)
+        df.set_index("Date", inplace=True)
+        return df
+
+    def get_cryptocurrency_latest(self, symbols: list = None) -> pd.DataFrame:
         """Get latest cryptocurrency market data for all coins.
+
+        Args:
+            symbols: Optional list of token symbols to filter (e.g., ['BTC', 'ETH']).
+                    When provided, uses API's symbol filter to avoid duplicate symbols.
 
         Returns:
             DataFrame with latest market data
@@ -559,8 +621,15 @@ class ApiMarket:
         if self.api_key:
             headers["X-API-Key"] = self.api_key
 
+        params = {}
+        if symbols:
+            # Use API's symbol filter to get the canonical tokens
+            params["symbols"] = ",".join(symbols)
+            logger.debug("Filtering by symbols: %s", params["symbols"])
+
         request = requests.get(
             self.url + "/api/v1/cryptocurrency/latests",
+            params=params,
             headers=headers,
             timeout=10,
         )
@@ -574,6 +643,9 @@ class ApiMarket:
 
             df = pd.DataFrame(data)
             df["last_updated"] = pd.to_datetime(df["last_updated"], format='ISO8601', utc=True)
+            # Sort by last_updated and drop duplicates to ensure only the latest price per coin is kept
+            df.sort_values(by="last_updated", ascending=False, inplace=True)
+            df.drop_duplicates(subset="coin", keep="first", inplace=True)
             df["last_updated"] = df["last_updated"].dt.tz_convert(self.local_timezone).dt.tz_localize(None)
             df.rename(columns={"last_updated": "Date"}, inplace=True)
             df.set_index("Date", inplace=True)

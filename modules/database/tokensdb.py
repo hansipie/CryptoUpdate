@@ -31,7 +31,7 @@ class TokensDatabase:
                 return None
 
             serie_sum = df_sql.groupby("timestamp").apply(
-                lambda x: sum(x["price"] * x["count"])
+                lambda x: sum(x["price"] * x["count"]), include_groups=False
             )
             df_sum = pd.DataFrame(serie_sum, columns=["value"])
             df_sum.reset_index(inplace=True)

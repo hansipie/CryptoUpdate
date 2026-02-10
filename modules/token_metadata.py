@@ -7,6 +7,8 @@ from typing import Optional, List, Dict
 from enum import Enum
 from datetime import datetime
 
+import pandas as pd
+
 
 class TokenStatus(Enum):
     """Status des tokens"""
@@ -178,6 +180,75 @@ class TokenMetadataManager:
             Liste filtrée contenant uniquement les tokens actifs
         """
         return [token for token in tokens if self.is_token_active(token)]
+
+    def get_mr_id(self, token: str) -> Optional[int]:
+        """Get MarketRaccoon ID for a token symbol.
+
+        Args:
+            token: Token symbol
+
+        Returns:
+            MarketRaccoon ID or None if not found / not set
+        """
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT mr_id FROM TokenMetadata WHERE token = ?", (token,)
+            )
+            result = cursor.fetchone()
+            return result[0] if result and result[0] is not None else None
+
+    def get_all_tokens_df(self) -> Optional[pd.DataFrame]:
+        """Get all tokens that have a MarketRaccoon ID, as a DataFrame.
+
+        Returns:
+            DataFrame with columns token, mr_id, name or None if empty
+        """
+        with sqlite3.connect(self.db_path) as conn:
+            df = pd.read_sql_query(
+                "SELECT token, mr_id, name FROM TokenMetadata"
+                " WHERE mr_id IS NOT NULL ORDER BY token",
+                conn,
+            )
+            return df if not df.empty else None
+
+    def upsert_token_info(self, token: str, mr_id: int, name: str) -> None:
+        """Insert or update MarketRaccoon ID and name for a token.
+
+        Preserves existing status and other fields on conflict.
+
+        Args:
+            token: Token symbol
+            mr_id: MarketRaccoon integer ID
+            name: Full token name
+        """
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """INSERT INTO TokenMetadata (token, mr_id, name, updated_at)
+                   VALUES (?, ?, ?, strftime('%s', 'now'))
+                   ON CONFLICT(token) DO UPDATE SET
+                       mr_id = excluded.mr_id,
+                       name = excluded.name,
+                       updated_at = strftime('%s', 'now')""",
+                (token, mr_id, name),
+            )
+            conn.commit()
+
+    def delete_token(self, token: str) -> bool:
+        """Delete a token entry from TokenMetadata.
+
+        Args:
+            token: Token symbol to delete
+
+        Returns:
+            True if the row was deleted, False if not found
+        """
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM TokenMetadata WHERE token = ?", (token,))
+            conn.commit()
+            return cursor.rowcount > 0
 
     def get_all_metadata(self) -> List[Dict]:
         """

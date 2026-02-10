@@ -16,7 +16,13 @@ from modules.database.tokensdb import TokensDatabase
 from modules.database.operations import operations
 from modules.database.market import Market
 from modules.database.swaps import swaps
-from modules.tools import batch_convert_historical, calculate_crypto_rate, update, parse_last_update
+from modules.tools import (
+    batch_convert_historical, batch_convert_historical_api,
+    calculate_crypto_rate, calculate_crypto_rate_api,
+    calc_perf_api,
+    update, parse_last_update,
+    _get_api_latest_prices, _get_api_fiat_rate,
+)
 from modules.utils import get_file_hash, toTimestamp_A
 
 logger = logging.getLogger(__name__)
@@ -590,8 +596,20 @@ def swap_perf(rate_swap, rate_now) -> float:
 
 
 def build_buy_dataframe(
-    convert_from: str = None, convert_to: str = None
+    convert_from: str = None, convert_to: str = None, use_api: bool = False
 ) -> pd.DataFrame:
+    # Pre-load API data once for the entire function
+    if use_api:
+        prices_usd = _get_api_latest_prices()
+        usd_to_eur = _get_api_fiat_rate()
+        if not prices_usd:
+            logger.warning("API: aucun prix crypto disponible")
+        if usd_to_eur is None:
+            logger.warning("API: taux USD→EUR non disponible")
+    else:
+        prices_usd = None
+        usd_to_eur = None
+
     # save buylist to a dataframe
     df = pd.DataFrame(
         g_operation.get_operations_by_type("buy"),
@@ -621,18 +639,28 @@ def build_buy_dataframe(
     # Historical conversion of From column
     if convert_from and not df.empty:
         col_name = f"From ({convert_from})"
-        df[col_name] = batch_convert_historical(
-            df, "From", "Currency", convert_from, "timestamp",
-            st.session_state.settings["dbfile"],
-        )
+        if use_api:
+            df[col_name] = batch_convert_historical_api(
+                df, "From", "Currency", convert_from, "timestamp",
+            )
+        else:
+            df[col_name] = batch_convert_historical(
+                df, "From", "Currency", convert_from, "timestamp",
+                st.session_state.settings["dbfile"],
+            )
 
     # Historical conversion of To column
     if convert_to and not df.empty:
         col_name = f"To ({convert_to})"
-        df[col_name] = batch_convert_historical(
-            df, "To", "Token", convert_to, "timestamp",
-            st.session_state.settings["dbfile"],
-        )
+        if use_api:
+            df[col_name] = batch_convert_historical_api(
+                df, "To", "Token", convert_to, "timestamp",
+            )
+        else:
+            df[col_name] = batch_convert_historical(
+                df, "To", "Token", convert_to, "timestamp",
+                st.session_state.settings["dbfile"],
+            )
 
     # Recalculate Buy Rate if conversions are active
     if (convert_from or convert_to) and not df.empty:
@@ -642,28 +670,45 @@ def build_buy_dataframe(
 
     # Current Rate and Perf. — use converted units when active
     if (convert_from or convert_to) and not df.empty:
-        now_ts = int(pd.Timestamp.now(tz="UTC").timestamp())
-        dbfile = st.session_state.settings["dbfile"]
-        df["Current Rate"] = df.apply(
-            lambda row: calculate_crypto_rate(
-                convert_to if convert_to else row["Token"],
-                convert_from if convert_from else row["Currency"],
-                now_ts, dbfile,
-            ),
-            axis=1,
-        )
+        if use_api:
+            df["Current Rate"] = df.apply(
+                lambda row: calculate_crypto_rate_api(
+                    convert_to if convert_to else row["Token"],
+                    convert_from if convert_from else row["Currency"],
+                    prices_usd=prices_usd,
+                    usd_to_eur=usd_to_eur,
+                ),
+                axis=1,
+            )
+        else:
+            now_ts = int(pd.Timestamp.now(tz="UTC").timestamp())
+            dbfile = st.session_state.settings["dbfile"]
+            df["Current Rate"] = df.apply(
+                lambda row: calculate_crypto_rate(
+                    convert_to if convert_to else row["Token"],
+                    convert_from if convert_from else row["Currency"],
+                    now_ts, dbfile,
+                ),
+                axis=1,
+            )
         df["Perf."] = ((df["Current Rate"] * 100) / df["Converted Rate"]) - 100
     else:
-        df = calc_perf(df, "Token", "Buy Rate")
+        if use_api:
+            df = calc_perf_api(df, "Token", "Buy Rate", col_currency="Currency", prices_usd=prices_usd, usd_to_eur=usd_to_eur)
+        else:
+            df = calc_perf(df, "Token", "Buy Rate")
 
     return df
 
 
-def build_buy_avg_table():
+def build_buy_avg_table(use_api: bool = False):
     """Build a table showing average purchase metrics per token.
 
     Calculates average rates and performance metrics for each token
     bought across all buy operations.
+
+    Args:
+        use_api: If True, use MarketRaccoon API for current rates
 
     Returns:
         DataFrame containing token averages and performance indicators
@@ -682,7 +727,12 @@ def build_buy_avg_table():
         return df
 
     df["Avg. Rate"] = df["Total Bought"] / df["Tokens Obtained"]
-    df = calc_perf(df, "Token", "Avg. Rate")
+    if use_api:
+        prices_usd = _get_api_latest_prices()
+        usd_to_eur = _get_api_fiat_rate()
+        df = calc_perf_api(df, "Token", "Avg. Rate", prices_usd=prices_usd, usd_to_eur=usd_to_eur)
+    else:
+        df = calc_perf(df, "Token", "Avg. Rate")
     logger.debug("Average table:\n%s", df)
     # order by Perf.
     df = df.sort_values(by=["Perf."], ascending=False)
@@ -696,6 +746,7 @@ def build_swap_dataframes(
     db_file: str,
     convert_from: str = None,
     convert_to: str = None,
+    use_api: bool = False,
 ) -> pd.DataFrame:
     df1 = pd.DataFrame(
         g_swaps.get_by_tag(""),
@@ -712,7 +763,7 @@ def build_swap_dataframes(
         ],
     )
     if not df1.empty:
-        df1 = build_swap_dataframe(df1, convert_from, convert_to)
+        df1 = build_swap_dataframe(df1, convert_from, convert_to, use_api)
     else:
         st.info("No swap operations")
 
@@ -731,7 +782,7 @@ def build_swap_dataframes(
         ],
     )
     if not df2.empty:
-        df2 = build_swap_dataframe(df2, convert_from, convert_to)
+        df2 = build_swap_dataframe(df2, convert_from, convert_to, use_api)
     else:
         st.info("No archived swaps")
 
@@ -743,7 +794,20 @@ def build_swap_dataframe(
     df: pd.DataFrame,
     convert_from: str = None,
     convert_to: str = None,
+    use_api: bool = False,
 ) -> pd.DataFrame:
+    # Pre-load API data once for the entire function
+    if use_api:
+        prices_usd = _get_api_latest_prices()
+        usd_to_eur = _get_api_fiat_rate()
+        if not prices_usd:
+            logger.warning("API: aucun prix crypto disponible")
+        if usd_to_eur is None:
+            logger.warning("API: taux USD→EUR non disponible")
+    else:
+        prices_usd = None
+        usd_to_eur = None
+
     # Ensure amount columns are numeric
     df["From Amount"] = pd.to_numeric(df["From Amount"], errors="coerce")
     df["To Amount"] = pd.to_numeric(df["To Amount"], errors="coerce")
@@ -759,18 +823,28 @@ def build_swap_dataframe(
     # Historical conversion of From Amount column
     if convert_from and not df.empty:
         col_name = f"From Amount ({convert_from})"
-        df[col_name] = batch_convert_historical(
-            df, "From Amount", "From Token", convert_from, "timestamp",
-            st.session_state.settings["dbfile"],
-        )
+        if use_api:
+            df[col_name] = batch_convert_historical_api(
+                df, "From Amount", "From Token", convert_from, "timestamp",
+            )
+        else:
+            df[col_name] = batch_convert_historical(
+                df, "From Amount", "From Token", convert_from, "timestamp",
+                st.session_state.settings["dbfile"],
+            )
 
     # Historical conversion of To Amount column
     if convert_to and not df.empty:
         col_name = f"To Amount ({convert_to})"
-        df[col_name] = batch_convert_historical(
-            df, "To Amount", "To Token", convert_to, "timestamp",
-            st.session_state.settings["dbfile"],
-        )
+        if use_api:
+            df[col_name] = batch_convert_historical_api(
+                df, "To Amount", "To Token", convert_to, "timestamp",
+            )
+        else:
+            df[col_name] = batch_convert_historical(
+                df, "To Amount", "To Token", convert_to, "timestamp",
+                st.session_state.settings["dbfile"],
+            )
 
     # Recalculate Swap Rate if conversions are active
     if (convert_from or convert_to) and not df.empty:
@@ -779,18 +853,31 @@ def build_swap_dataframe(
         df["Swap Rate"] = df[to_col] / df[from_col]
 
     # Current Rate and Perf. — use converted units when active
-    now_ts = int(pd.Timestamp.now(tz="UTC").timestamp())
-    dbfile = st.session_state.settings["dbfile"]
-    df["Current Rate"] = df.apply(
-        lambda row: calculate_crypto_rate(
-            convert_from if convert_from else row["From Token"],
-            convert_to if convert_to else row["To Token"],
-            now_ts, dbfile,
+    if use_api:
+        df["Current Rate"] = df.apply(
+            lambda row: calculate_crypto_rate_api(
+                convert_from if convert_from else row["From Token"],
+                convert_to if convert_to else row["To Token"],
+                prices_usd=prices_usd,
+                usd_to_eur=usd_to_eur,
+            )
+            if (convert_from or row["From Token"]) != (convert_to or row["To Token"])
+            else 1.0,
+            axis=1,
         )
-        if (convert_from or row["From Token"]) != (convert_to or row["To Token"])
-        else 1.0,
-        axis=1,
-    )
+    else:
+        now_ts = int(pd.Timestamp.now(tz="UTC").timestamp())
+        dbfile = st.session_state.settings["dbfile"]
+        df["Current Rate"] = df.apply(
+            lambda row: calculate_crypto_rate(
+                convert_from if convert_from else row["From Token"],
+                convert_to if convert_to else row["To Token"],
+                now_ts, dbfile,
+            )
+            if (convert_from or row["From Token"]) != (convert_to or row["To Token"])
+            else 1.0,
+            axis=1,
+        )
 
     # Calculate performance for each swap
     df["Perf."] = swap_perf(df["Swap Rate"], df["Current Rate"])
@@ -946,6 +1033,18 @@ with st.sidebar:
     else:
         st.markdown(" - *No update yet*")
 
+    st.divider()
+    use_api = st.toggle(
+        "Use API",
+        value=False,
+        help="Use MarketRaccoon API instead of local SQLite database",
+        key="ops_data_source_toggle",
+    )
+    if use_api:
+        st.caption("📡 API MarketRaccoon")
+    else:
+        st.caption("💾 SQLite local")
+
 buy_tab, swap_tab = st.tabs(["Buy", "Swap"])
 with buy_tab:
     # Conversion selectboxes for Buy
@@ -963,7 +1062,7 @@ with buy_tab:
     buy_ct = None if buy_convert_to_sel == "Original" else buy_convert_to_sel
 
     # build buy table with performance metrics
-    df_buy = build_buy_dataframe(convert_from=buy_cf, convert_to=buy_ct)
+    df_buy = build_buy_dataframe(convert_from=buy_cf, convert_to=buy_ct, use_api=use_api)
 
     col_buylist, col_buybtns = st.columns([8, 1])
     with col_buylist:
@@ -1031,7 +1130,7 @@ with buy_tab:
 
     # aquisition average table
     st.title("Aquisition Averages")
-    df_avg = build_buy_avg_table()
+    df_avg = build_buy_avg_table(use_api=use_api)
     if df_avg.empty:
         st.info("No data available")
     else:
@@ -1090,6 +1189,7 @@ with swap_tab:
         st.session_state.settings["dbfile"],
         convert_from=swap_cf,
         convert_to=swap_ct,
+        use_api=use_api,
     )
 
     col_swaplist, col_swapbtns = st.columns([8, 1])

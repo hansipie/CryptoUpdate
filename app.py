@@ -91,6 +91,12 @@ def main():
     config = init_config()
     tools.load_settings(config.conf)
 
+    # Apply pending database migrations (once per session)
+    if "db_migrations_applied" not in st.session_state:
+        from modules.database.migrations import run_migrations
+        run_migrations(st.session_state.settings["dbfile"])
+        st.session_state["db_migrations_applied"] = True
+
     # Setup and run navigation
     navigator = setup_navigation()
     navigator.run()
