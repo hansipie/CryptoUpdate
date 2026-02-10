@@ -14,7 +14,6 @@ import pandas as pd
 import pytz
 import requests
 import tzlocal
-import streamlit as st
 
 from modules.cmc import cmc
 

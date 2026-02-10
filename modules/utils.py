@@ -101,22 +101,17 @@ def get_file_hash(filename):
 
 
 def list_files_recursive(directory, fileslist=None):
-    # list all files in directory recurcively
-
+    """Recursively list all files in a directory"""
     if fileslist is None:
         fileslist = []
 
     items = os.listdir(directory)
-    # logger.debug(f"list directory {directory}: {items}")
     for item in items:
         path = os.path.join(directory, item)
         if os.path.isdir(path):
-            # logger.debug(f"{path} is a directory.")
             list_files_recursive(path, fileslist)
         else:
-            # logger.debug(f"Add file {path}")
             fileslist.append(path)
-    # logger.debug(f"Return {fileslist}")
     return fileslist
 
 
