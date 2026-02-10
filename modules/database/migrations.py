@@ -137,10 +137,62 @@ def _migrate_v3(conn: sqlite3.Connection) -> None:
     )
 
 
+def _migrate_v4(conn: sqlite3.Connection) -> None:
+    """Ajout d'une cle primaire id et suppression de l'unicite de token."""
+    cursor = conn.cursor()
+    cursor.executescript(
+        """
+        CREATE TABLE IF NOT EXISTS TokenMetadata_new (
+            id                   INTEGER PRIMARY KEY AUTOINCREMENT,
+            token                TEXT,
+            status               TEXT,
+            delisting_date       INTEGER,
+            last_valid_price_date INTEGER,
+            notes                TEXT,
+            created_at           INTEGER DEFAULT (strftime('%s', 'now')),
+            updated_at           INTEGER DEFAULT (strftime('%s', 'now')),
+            mraccoon_id          INTEGER,
+            name                 TEXT
+        );
+
+        INSERT INTO TokenMetadata_new (
+            token,
+            status,
+            delisting_date,
+            last_valid_price_date,
+            notes,
+            created_at,
+            updated_at,
+            mraccoon_id,
+            name
+        )
+        SELECT
+            token,
+            status,
+            delisting_date,
+            last_valid_price_date,
+            notes,
+            created_at,
+            updated_at,
+            mraccoon_id,
+            name
+        FROM TokenMetadata;
+
+        DROP TABLE TokenMetadata;
+        ALTER TABLE TokenMetadata_new RENAME TO TokenMetadata;
+
+        CREATE INDEX IF NOT EXISTS idx_tokenmetadata_token ON TokenMetadata (token);
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_tokenmetadata_mraccoon_id
+            ON TokenMetadata (mraccoon_id);
+        """
+    )
+
+
 MIGRATIONS: dict = {
     1: _migrate_v1,
     2: _migrate_v2,
     3: _migrate_v3,
+    4: _migrate_v4,
 }
 
 

@@ -13,6 +13,7 @@ from datetime import datetime, timezone
 import pandas as pd
 import streamlit as st
 
+from modules import tools
 from modules.token_metadata import TokenMetadataManager, TokenStatus
 
 logger = logging.getLogger(__name__)
@@ -22,17 +23,191 @@ st.title("Token Metadata Management")
 # Initialize token metadata manager
 manager = TokenMetadataManager(st.session_state.settings["dbfile"])
 
+
+@st.dialog("Sélectionner le token MarketRaccoon")
+def _select_coin_dialog():
+    """Dialog pour sélectionner le bon token parmi plusieurs résultats MarketRaccoon."""
+    coins_df = st.session_state.get("pending_coins")
+    token_symbol = st.session_state.get("pending_token_symbol")
+
+    if coins_df is None or coins_df.empty:
+        st.rerun()
+        return
+
+    st.write(f"Plusieurs tokens trouvés pour **{token_symbol}**. Sélectionnez le bon :")
+
+    options = []
+    for _, row in coins_df.iterrows():
+        ucid = row.get("cmc_id")
+        ucid_part = f", UCID: {ucid}" if pd.notna(ucid) else ""
+        options.append(
+            f"{row['symbol']} — {row['name']} (ID: {row['id']}{ucid_part})"
+        )
+    selected_idx = st.selectbox(
+        "Token",
+        range(len(options)),
+        format_func=lambda i: options[i]
+    )
+
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button("Confirmer", type="primary", icon=":material/check:", use_container_width=True):
+            row = coins_df.iloc[selected_idx]
+            st.session_state["checked_mr_id"] = int(row["id"])
+            st.session_state["checked_mr_name"] = row["name"]
+            st.session_state["checked_token"] = row["symbol"]
+            del st.session_state["pending_coins"]
+            del st.session_state["pending_token_symbol"]
+            st.rerun()
+    with col2:
+        if st.button("Ignorer", icon=":material/cancel:", use_container_width=True):
+            del st.session_state["pending_coins"]
+            del st.session_state["pending_token_symbol"]
+            st.rerun()
+
+
+@st.dialog("⚠️ Confirmer la suppression")
+def _delete_confirmation_dialog():
+    """Dialog de confirmation avant suppression d'un token."""
+    token_symbol = st.session_state.get("token_to_delete")
+    mr_id = st.session_state.get("token_to_delete_id")
+
+    if not token_symbol or mr_id is None:
+        st.rerun()
+        return
+
+    # Récupérer les infos du token en utilisant le mraccoon_id
+    token_info = manager.get_token_info_by_mr_id(mr_id)
+    token_name = token_info.get("name") if token_info else None
+    display_symbol = token_info.get("token") if token_info else token_symbol
+
+    if token_name:
+        st.warning(f"Êtes-vous sûr de vouloir supprimer **{display_symbol}** ({token_name}) ?")
+    else:
+        st.warning(f"Êtes-vous sûr de vouloir supprimer **{display_symbol}** ?")
+    st.write("Cette action supprimera toutes les métadonnées associées à ce token.")
+
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button("Supprimer", type="primary", icon=":material/delete_forever:", use_container_width=True):
+            deleted = manager.delete_token_by_mr_id(mr_id)
+            if deleted:
+                st.success(f"{display_symbol} supprimé.")
+            else:
+                st.warning(f"{display_symbol} introuvable en base.")
+            _clear_checked_state()
+            del st.session_state["token_to_delete"]
+            if "token_to_delete_id" in st.session_state:
+                del st.session_state["token_to_delete_id"]
+            st.rerun()
+    with col2:
+        if st.button("Annuler", icon=":material/close:", use_container_width=True):
+            del st.session_state["token_to_delete"]
+            if "token_to_delete_id" in st.session_state:
+                del st.session_state["token_to_delete_id"]
+            st.rerun()
+
+
+# Ouvrir le dialog si des coins sont en attente de sélection
+if "pending_coins" in st.session_state:
+    _select_coin_dialog()
+
+# Ouvrir le dialog de confirmation de suppression si nécessaire
+if "token_to_delete" in st.session_state:
+    _delete_confirmation_dialog()
+
+
+def _clear_checked_state():
+    """Supprime les clés checked_* du session_state."""
+    for key in ("checked_token", "checked_mr_id", "checked_mr_name"):
+        st.session_state.pop(key, None)
+
+
 # Sidebar for adding/updating token metadata
 with st.sidebar:
     st.header("Add/Update Token")
 
-    with st.form("add_token_form"):
-        token_symbol = st.text_input(
-            "Token Symbol",
-            placeholder="BTC, ETH, etc.",
-            help="Enter the token symbol (case-sensitive)"
-        ).strip().upper()
+    # --- Partie 1 : Recherche token ---
+    token_symbol = st.text_input(
+        "Token Symbol",
+        placeholder="BTC, ETH, etc.",
+        help="Enter the token symbol (case-sensitive)"
+    ).strip().upper()
 
+    if st.button("Check", icon=":material/search:", use_container_width=True):
+        if not token_symbol:
+            st.warning("Veuillez saisir un symbole.")
+        else:
+            st.session_state["checked_token"] = token_symbol
+            # 1. Appel API MarketRaccoon en priorité
+            try:
+                api_market = tools._get_cached_api_market()
+                coins_df = api_market.get_coins(symbols=[token_symbol])
+
+                if coins_df is None or coins_df.empty:
+                    st.warning(f"Token {token_symbol} non trouvé sur MarketRaccoon.")
+                    st.session_state["checked_mr_id"] = None
+                    st.session_state["checked_mr_name"] = None
+                elif len(coins_df) == 1:
+                    row = coins_df.iloc[0]
+                    st.session_state["checked_mr_id"] = int(row["id"])
+                    st.session_state["checked_mr_name"] = row["name"]
+                    st.session_state["checked_token"] = row["symbol"]
+                else:
+                    # Plusieurs résultats → dialog de sélection
+                    st.session_state["checked_mr_id"] = None
+                    st.session_state["checked_mr_name"] = None
+                    st.session_state["pending_coins"] = coins_df
+                    st.session_state["pending_token_symbol"] = token_symbol
+                    st.rerun()
+            except Exception as e:
+                logger.warning("Could not fetch MarketRaccoon info for %s: %s", token_symbol, e)
+                # 2. Fallback : utiliser les infos existantes en DB
+                existing_mr_id = manager.get_mr_id(token_symbol)
+                if existing_mr_id is not None:
+                    info = manager.get_token_info_by_mr_id(existing_mr_id)
+                    st.session_state["checked_mr_id"] = existing_mr_id
+                    st.session_state["checked_mr_name"] = info.get("name") if info else None
+                    st.session_state["checked_token"] = info.get("token") if info else token_symbol
+                    st.info(f"API indisponible — infos chargées depuis la base de données.")
+                else:
+                    st.warning(f"API indisponible et token {token_symbol} absent de la base.")
+                    st.session_state["checked_mr_id"] = None
+                    st.session_state["checked_mr_name"] = None
+
+    checked_id = st.session_state.get("checked_mr_id")
+    has_checked = checked_id is not None
+
+    st.divider()
+
+    # --- Partie 2 : MarketRaccoon Info (lecture seule) ---
+    st.subheader("MarketRaccoon Info")
+    checked_id = st.session_state.get("checked_mr_id")
+
+    # Mettre à jour les clés widget avant le rendu
+    st.session_state["mr_name_display"] = st.session_state.get("checked_mr_name") or ""
+    st.session_state["mr_id_display"] = str(checked_id) if checked_id is not None else ""
+
+    st.text_input("Name", disabled=True, key="mr_name_display")
+    st.text_input("MarketRaccoon ID", disabled=True, key="mr_id_display")
+
+    submit_disabled = not has_checked or checked_id is None
+    if st.button("Submit", icon=":material/cloud_upload:", use_container_width=True, disabled=submit_disabled):
+        manager.upsert_token_info_by_mr_id(
+            st.session_state["checked_mr_id"],
+            st.session_state.get("checked_token", ""),
+            st.session_state.get("checked_mr_name", ""),
+        )
+        st.success(f"MR info saved for {st.session_state.get('checked_token', '')}")
+        _clear_checked_state()
+        st.rerun()
+
+    st.divider()
+
+    # --- Partie 3 : Métadonnées (formulaire éditable) ---
+    st.subheader("Metadata")
+
+    with st.form("metadata_form"):
         status = st.selectbox(
             "Status",
             options=[s.value for s in TokenStatus],
@@ -46,10 +221,9 @@ with st.sidebar:
                 value=None,
                 help="Date when token was delisted (optional)"
             )
-
         with col2:
             last_valid_price_date = st.date_input(
-                "Last Valid Price Date",
+                "Last Date",
                 value=None,
                 help="Date of last valid price (optional)"
             )
@@ -60,43 +234,59 @@ with st.sidebar:
             help="Notes about the token status"
         )
 
-        submitted = st.form_submit_button("Save Token Metadata", width='stretch')
+        submitted = st.form_submit_button(
+            "Save Metadata", icon=":material/save:", disabled=not has_checked, use_container_width=True
+        )
 
         if submitted:
-            if not token_symbol:
-                st.error("Token symbol is required!")
+            checked_mr_id = st.session_state.get("checked_mr_id")
+            checked_token = st.session_state.get("checked_token", "")
+            if checked_mr_id is None:
+                st.error("No MarketRaccoon ID checked!")
             else:
                 try:
-                    # Convert dates to datetime objects
                     delisting_dt = None
                     if delisting_date:
                         delisting_dt = datetime.combine(
-                            delisting_date,
-                            datetime.min.time()
+                            delisting_date, datetime.min.time()
                         ).replace(tzinfo=timezone.utc)
 
                     last_price_dt = None
                     if last_valid_price_date:
                         last_price_dt = datetime.combine(
-                            last_valid_price_date,
-                            datetime.min.time()
+                            last_valid_price_date, datetime.min.time()
                         ).replace(tzinfo=timezone.utc)
 
-                    # Save metadata
-                    manager.add_or_update_token(
-                        token=token_symbol,
+                    manager.add_or_update_token_by_mr_id(
+                        mr_id=checked_mr_id,
+                        token=checked_token,
                         status=TokenStatus(status),
                         delisting_date=delisting_dt,
                         last_valid_price_date=last_price_dt,
-                        notes=notes if notes else None
+                        notes=notes if notes else None,
                     )
-
-                    st.success(f"✅ Metadata saved for {token_symbol}")
+                    st.success(f"Metadata saved for {checked_token}")
+                    _clear_checked_state()
                     st.rerun()
-
                 except Exception as e:
                     logger.exception(f"Error saving token metadata: {e}")
                     st.error(f"Error saving metadata: {e}")
+
+    st.divider()
+
+    # --- Partie 4 : Danger Zone ---
+    if st.button(
+        "Danger Zone",
+        icon=":material/destruction:",
+        use_container_width=True,
+        disabled=not has_checked,
+        type="primary",
+    ):
+        checked_token = st.session_state.get("checked_token", "")
+        checked_mr_id = st.session_state.get("checked_mr_id")
+        st.session_state["token_to_delete"] = checked_token
+        st.session_state["token_to_delete_id"] = checked_mr_id
+        st.rerun()
 
 # Main content area
 tab1, tab2, tab3, tab4 = st.tabs(["📊 Overview", "✅ Active Tokens", "❌ Delisted Tokens", "📋 All Tokens"])
@@ -137,7 +327,7 @@ with tab1:
         st.subheader("Recent Updates")
         df_all = pd.DataFrame(all_metadata)
         df_all['updated_at'] = pd.to_datetime(df_all['updated_at'])
-        df_recent = df_all.nlargest(10, 'updated_at')[['token', 'status', 'updated_at', 'notes']]
+        df_recent = df_all.nlargest(10, 'updated_at')[['token', 'name', 'status', 'updated_at', 'notes']]
         df_recent['updated_at'] = df_recent['updated_at'].dt.strftime('%Y-%m-%d %H:%M')
 
         st.dataframe(
@@ -146,6 +336,7 @@ with tab1:
             hide_index=True,
             column_config={
                 "token": st.column_config.TextColumn("Token", width="small"),
+                "name": st.column_config.TextColumn("Name", width="medium"),
                 "status": st.column_config.TextColumn("Status", width="small"),
                 "updated_at": st.column_config.TextColumn("Last Updated", width="medium"),
                 "notes": st.column_config.TextColumn("Notes", width="large"),
@@ -164,7 +355,7 @@ with tab2:
         st.write(f"**{len(active_tokens)} active tokens**")
 
         df_active = pd.DataFrame(active_tokens)
-        df_active = df_active[['token', 'notes', 'created_at', 'updated_at']]
+        df_active = df_active[['token', 'name', 'notes', 'created_at', 'updated_at']]
 
         st.dataframe(
             df_active,
@@ -172,6 +363,7 @@ with tab2:
             hide_index=True,
             column_config={
                 "token": st.column_config.TextColumn("Token", width="small"),
+                "name": st.column_config.TextColumn("Name", width="medium"),
                 "notes": st.column_config.TextColumn("Notes", width="large"),
                 "created_at": st.column_config.TextColumn("Created", width="medium"),
                 "updated_at": st.column_config.TextColumn("Updated", width="medium"),
@@ -183,21 +375,29 @@ with tab2:
         col1, col2 = st.columns(2)
 
         with col1:
+            active_options = [
+                t for t in active_tokens
+                if t.get("mraccoon_id") is not None
+            ]
             token_to_delist = st.selectbox(
                 "Mark token as delisted",
-                options=[''] + [t['token'] for t in active_tokens],
+                options=[''] + active_options,
+                format_func=lambda t: (
+                    "" if t == '' else f"{t['token']} — {t.get('name', '')} (ID: {t['mraccoon_id']})"
+                ),
                 key="delist_token"
             )
 
             if st.button("Mark as Delisted", disabled=not token_to_delist):
                 try:
-                    manager.add_or_update_token(
-                        token=token_to_delist,
+                    manager.add_or_update_token_by_mr_id(
+                        mr_id=token_to_delist["mraccoon_id"],
+                        token=token_to_delist["token"],
                         status=TokenStatus.DELISTED,
                         delisting_date=datetime.now(timezone.utc),
                         notes="Marked as delisted via UI"
                     )
-                    st.success(f"✅ {token_to_delist} marked as delisted")
+                    st.success(f"✅ {token_to_delist['token']} marked as delisted")
                     st.rerun()
                 except Exception as e:
                     st.error(f"Error: {e}")
@@ -214,7 +414,7 @@ with tab3:
         st.write(f"**{len(delisted_tokens)} delisted tokens**")
 
         df_delisted = pd.DataFrame(delisted_tokens)
-        df_delisted = df_delisted[['token', 'delisting_date', 'last_valid_price_date', 'notes']]
+        df_delisted = df_delisted[['token', 'name', 'delisting_date', 'last_valid_price_date', 'notes']]
 
         st.dataframe(
             df_delisted,
@@ -222,6 +422,7 @@ with tab3:
             hide_index=True,
             column_config={
                 "token": st.column_config.TextColumn("Token", width="small"),
+                "name": st.column_config.TextColumn("Name", width="medium"),
                 "delisting_date": st.column_config.TextColumn("Delisted On", width="medium"),
                 "last_valid_price_date": st.column_config.TextColumn("Last Valid Price", width="medium"),
                 "notes": st.column_config.TextColumn("Notes", width="large"),
@@ -279,7 +480,7 @@ with tab4:
         if filtered_metadata:
             df_all = pd.DataFrame(filtered_metadata)
             df_display = df_all[[
-                'token', 'status', 'delisting_date',
+                'token', 'name', 'status', 'delisting_date',
                 'last_valid_price_date', 'notes', 'updated_at'
             ]]
 
@@ -289,6 +490,7 @@ with tab4:
                 hide_index=True,
                 column_config={
                     "token": st.column_config.TextColumn("Token", width="small"),
+                    "name": st.column_config.TextColumn("Name", width="medium"),
                     "status": st.column_config.TextColumn("Status", width="small"),
                     "delisting_date": st.column_config.TextColumn("Delisted On", width="medium"),
                     "last_valid_price_date": st.column_config.TextColumn("Last Valid Price", width="medium"),
