@@ -56,6 +56,7 @@ def _select_coin_dialog():
             st.session_state["checked_mr_id"] = int(row["id"])
             st.session_state["checked_mr_name"] = row["name"]
             st.session_state["checked_token"] = row["symbol"]
+            st.session_state["checked_cmc_id"] = row.get("cmc_id")
             del st.session_state["pending_coins"]
             del st.session_state["pending_token_symbol"]
             st.rerun()
@@ -119,7 +120,7 @@ if "token_to_delete" in st.session_state:
 
 def _clear_checked_state():
     """Supprime les clés checked_* du session_state."""
-    for key in ("checked_token", "checked_mr_id", "checked_mr_name"):
+    for key in ("checked_token", "checked_mr_id", "checked_mr_name", "checked_cmc_id"):
         st.session_state.pop(key, None)
 
 
@@ -153,6 +154,7 @@ with st.sidebar:
                     st.session_state["checked_mr_id"] = int(row["id"])
                     st.session_state["checked_mr_name"] = row["name"]
                     st.session_state["checked_token"] = row["symbol"]
+                    st.session_state["checked_cmc_id"] = row.get("cmc_id")
                 else:
                     # Plusieurs résultats → dialog de sélection
                     st.session_state["checked_mr_id"] = None
@@ -187,9 +189,15 @@ with st.sidebar:
     # Mettre à jour les clés widget avant le rendu
     st.session_state["mr_name_display"] = st.session_state.get("checked_mr_name") or ""
     st.session_state["mr_id_display"] = str(checked_id) if checked_id is not None else ""
+    cmc_id = st.session_state.get("checked_cmc_id")
+    st.session_state["mr_cmc_id_display"] = str(cmc_id) if cmc_id else ""
 
     st.text_input("Name", disabled=True, key="mr_name_display")
-    st.text_input("MarketRaccoon ID", disabled=True, key="mr_id_display")
+    col1, col2 = st.columns(2)
+    with col1:
+        st.text_input("MarketRaccoon ID", disabled=True, key="mr_id_display")
+    with col2:
+        st.text_input("UCID", disabled=True, key="mr_cmc_id_display")
 
     submit_disabled = not has_checked or checked_id is None
     if st.button("Submit", icon=":material/cloud_upload:", use_container_width=True, disabled=submit_disabled):
