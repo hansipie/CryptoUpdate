@@ -35,21 +35,23 @@ def plot_total_value(df: pd.DataFrame):
 
     # Create plotly figure
     fig = go.Figure()
-    fig.add_trace(go.Scatter(
-        x=df.index,
-        y=df['Sum'],
-        mode='lines',
-        name='Total Portfolio Value',
-        fill='tozeroy',
-        line=dict(width=2)
-    ))
+    fig.add_trace(
+        go.Scatter(
+            x=df.index,
+            y=df["Sum"],
+            mode="lines",
+            name="Total Portfolio Value",
+            fill="tozeroy",
+            line=dict(width=2),
+        )
+    )
 
     fig.update_layout(
         title="Total Portfolio Value Over Time",
         xaxis_title="Date",
         yaxis_title=f"Value ({currency_symbol})",
-        hovermode='x unified',
-        height=400
+        hovermode="x unified",
+        height=400,
     )
 
     st.plotly_chart(fig, width="stretch")
@@ -69,7 +71,7 @@ with st.sidebar:
         "Update prices",
         key="update_prices",
         icon=":material/update:",
-        width='stretch',
+        width="stretch",
     ):
         update()
     # display time since last update

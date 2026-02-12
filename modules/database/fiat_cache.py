@@ -93,7 +93,7 @@ class FiatCacheManager:
         cache_data[key] = {
             "timestamp": current_time,
             "expiry": current_time + ttl,
-            "data": value
+            "data": value,
         }
 
         logger.debug(f"Cache SET for key: {key} (TTL: {ttl}s)")
@@ -128,7 +128,7 @@ class FiatCacheManager:
         self,
         key: str,
         fetch_func: Callable[[], Optional[dict]],
-        allow_expired_fallback: bool = True
+        allow_expired_fallback: bool = True,
     ) -> Optional[dict]:
         """Get from cache or fetch from source with fallback to expired cache.
 
@@ -170,7 +170,9 @@ class FiatCacheManager:
         if allow_expired_fallback:
             expired_data = self._get_expired(key)
             if expired_data is not None:
-                logger.warning(f"Using EXPIRED cache for key: {key} due to fetch failure")
+                logger.warning(
+                    f"Using EXPIRED cache for key: {key} due to fetch failure"
+                )
                 return expired_data
 
         logger.error(f"All strategies failed for key: {key}")
@@ -220,7 +222,7 @@ class FiatCacheManager:
             return {}
 
         try:
-            with open(self.cache_file, 'r', encoding='utf-8') as f:
+            with open(self.cache_file, "r", encoding="utf-8") as f:
                 cache_data = json.load(f)
             logger.debug(f"Loaded cache with {len(cache_data)} entries")
             return cache_data
@@ -252,13 +254,11 @@ class FiatCacheManager:
         # Create temp file in same directory for atomic rename
         try:
             temp_fd, temp_path = tempfile.mkstemp(
-                dir=cache_dir,
-                prefix=".cache_tmp_",
-                suffix=".json"
+                dir=cache_dir, prefix=".cache_tmp_", suffix=".json"
             )
 
             # Write to temp file
-            with os.fdopen(temp_fd, 'w', encoding='utf-8') as f:
+            with os.fdopen(temp_fd, "w", encoding="utf-8") as f:
                 json.dump(cache_data, f, indent=2, ensure_ascii=False)
 
             # Atomic rename (OS-level atomic operation)
@@ -268,7 +268,7 @@ class FiatCacheManager:
         except Exception as e:
             logger.error(f"Failed to save cache: {e}")
             # Cleanup temp file if it exists
-            if 'temp_path' in locals() and os.path.exists(temp_path):
+            if "temp_path" in locals() and os.path.exists(temp_path):
                 try:
                     os.unlink(temp_path)
                 except Exception:
@@ -311,10 +311,7 @@ class FiatCacheManager:
             return cache_data
 
         # Sort by timestamp (oldest first)
-        sorted_items = sorted(
-            cache_data.items(),
-            key=lambda item: item[1]["timestamp"]
-        )
+        sorted_items = sorted(cache_data.items(), key=lambda item: item[1]["timestamp"])
 
         # Keep only the newest max_entries
         evict_count = len(cache_data) - self.max_entries

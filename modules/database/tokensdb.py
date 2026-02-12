@@ -1,6 +1,7 @@
-import sqlite3
-import pandas as pd
 import logging
+import sqlite3
+
+import pandas as pd
 import tzlocal
 
 logger = logging.getLogger(__name__)
@@ -36,9 +37,11 @@ class TokensDatabase:
             df_sum = pd.DataFrame(serie_sum, columns=["value"])
             df_sum.reset_index(inplace=True)
 
-            df_sum["timestamp"] = pd.to_datetime(
-                df_sum["timestamp"], unit="s", utc=True
-            ).dt.tz_convert(self.local_timezone).dt.tz_localize(None)
+            df_sum["timestamp"] = (
+                pd.to_datetime(df_sum["timestamp"], unit="s", utc=True)
+                .dt.tz_convert(self.local_timezone)
+                .dt.tz_localize(None)
+            )
             df_sum.rename(columns={"timestamp": "Date", "value": "Sum"}, inplace=True)
             df_sum.set_index("Date", inplace=True)
             df_sum.sort_index(inplace=True)
@@ -67,11 +70,11 @@ class TokensDatabase:
 
             # Use pivot_table instead of multiple merges (much more memory efficient)
             df_balance = df_all.pivot_table(
-                index='timestamp',
-                columns='token',
-                values='value',
-                aggfunc='first',  # In case of duplicates, take first value
-                fill_value=0
+                index="timestamp",
+                columns="token",
+                values="value",
+                aggfunc="first",  # In case of duplicates, take first value
+                fill_value=0,
             )
 
             # Reset index to make timestamp a column again
@@ -81,9 +84,11 @@ class TokensDatabase:
             df_balance["timestamp"] = pd.to_datetime(
                 df_balance["timestamp"], unit="s", utc=True
             )
-            df_balance["timestamp"] = df_balance["timestamp"].dt.tz_convert(
-                self.local_timezone
-            ).dt.tz_localize(None)
+            df_balance["timestamp"] = (
+                df_balance["timestamp"]
+                .dt.tz_convert(self.local_timezone)
+                .dt.tz_localize(None)
+            )
             df_balance.rename(columns={"timestamp": "Date"}, inplace=True)
             df_balance.set_index("Date", inplace=True)
             df_balance.sort_index(inplace=True)
@@ -134,7 +139,9 @@ class TokensDatabase:
                 logger.warning("No count data found for token %s in database", token)
                 return None
             df["Date"] = pd.to_datetime(df["Date"], unit="s", utc=True)
-            df["Date"] = df["Date"].dt.tz_convert(self.local_timezone).dt.tz_localize(None)
+            df["Date"] = (
+                df["Date"].dt.tz_convert(self.local_timezone).dt.tz_localize(None)
+            )
             df.set_index("Date", inplace=True)
             df.sort_index(inplace=True)
             logger.debug("Counts for token %s:\n%s", token, df)
@@ -170,7 +177,9 @@ class TokensDatabase:
                 logger.warning("No data found for token %s in database", token)
                 return None
             df["Date"] = pd.to_datetime(df["Date"], unit="s", utc=True)
-            df["Date"] = df["Date"].dt.tz_convert(self.local_timezone).dt.tz_localize(None)
+            df["Date"] = (
+                df["Date"].dt.tz_convert(self.local_timezone).dt.tz_localize(None)
+            )
             df.set_index("Date", inplace=True)
             df.sort_index(inplace=True)
             logger.debug("Balances for token %s:\n%s", token, df)

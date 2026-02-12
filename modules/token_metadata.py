@@ -12,6 +12,7 @@ import pandas as pd
 
 class TokenStatus(Enum):
     """Status des tokens"""
+
     ACTIVE = "active"
     DELISTED = "delisted"
     DEPRECATED = "deprecated"
@@ -42,7 +43,7 @@ class TokenMetadataManager:
                    WHERE token = ?
                    ORDER BY updated_at DESC
                    LIMIT 1""",
-                (token,)
+                (token,),
             )
             result = cursor.fetchone()
             if result:
@@ -87,7 +88,7 @@ class TokenMetadataManager:
             cursor = conn.cursor()
             cursor.execute(
                 "SELECT DISTINCT token FROM TokenMetadata WHERE status = ?",
-                (TokenStatus.DELISTED.value,)
+                (TokenStatus.DELISTED.value,),
             )
             return [row[0] for row in cursor.fetchall()]
 
@@ -102,7 +103,7 @@ class TokenMetadataManager:
             cursor = conn.cursor()
             cursor.execute(
                 "SELECT DISTINCT token FROM TokenMetadata WHERE status = ?",
-                (TokenStatus.ACTIVE.value,)
+                (TokenStatus.ACTIVE.value,),
             )
             return [row[0] for row in cursor.fetchall()]
 
@@ -131,7 +132,7 @@ class TokenMetadataManager:
                    WHERE token = ?
                    ORDER BY updated_at DESC
                    LIMIT 1""",
-                (token,)
+                (token,),
             )
             result = cursor.fetchone()
             if result:
@@ -144,7 +145,7 @@ class TokenMetadataManager:
         status: TokenStatus,
         delisting_date: Optional[datetime] = None,
         last_valid_price_date: Optional[datetime] = None,
-        notes: Optional[str] = None
+        notes: Optional[str] = None,
     ) -> None:
         """
         Ajoute ou met à jour les métadonnées d'un token.
@@ -160,7 +161,11 @@ class TokenMetadataManager:
             cursor = conn.cursor()
 
             delisting_ts = int(delisting_date.timestamp()) if delisting_date else None
-            last_price_ts = int(last_valid_price_date.timestamp()) if last_valid_price_date else None
+            last_price_ts = (
+                int(last_valid_price_date.timestamp())
+                if last_valid_price_date
+                else None
+            )
 
             cursor.execute(
                 """UPDATE TokenMetadata
@@ -206,7 +211,11 @@ class TokenMetadataManager:
             cursor = conn.cursor()
 
             delisting_ts = int(delisting_date.timestamp()) if delisting_date else None
-            last_price_ts = int(last_valid_price_date.timestamp()) if last_valid_price_date else None
+            last_price_ts = (
+                int(last_valid_price_date.timestamp())
+                if last_valid_price_date
+                else None
+            )
 
             cursor.execute(
                 """UPDATE TokenMetadata
@@ -306,7 +315,9 @@ class TokenMetadataManager:
                 )
             conn.commit()
 
-    def upsert_token_info_by_mr_id(self, mraccoon_id: int, token: str, name: str) -> None:
+    def upsert_token_info_by_mr_id(
+        self, mraccoon_id: int, token: str, name: str
+    ) -> None:
         """Insert or update MarketRaccoon ID and name using mraccoon_id.
 
         Preserves existing token symbol when mraccoon_id is already present.
@@ -401,7 +412,7 @@ class TokenMetadataManager:
                           mraccoon_id, name
                    FROM TokenMetadata
                    WHERE mraccoon_id = ?""",
-                (mr_id,)
+                (mr_id,),
             )
             result = cursor.fetchone()
             if result:
@@ -452,7 +463,9 @@ if __name__ == "__main__":
     manager = TokenMetadataManager()
 
     # Vérifier si un token est actif
-    print(f"BTC actif: {manager.is_token_active('BTC')}")  # True (pas dans métadonnées = actif par défaut)
+    print(
+        f"BTC actif: {manager.is_token_active('BTC')}"
+    )  # True (pas dans métadonnées = actif par défaut)
     print(f"KYROS actif: {manager.is_token_active('KYROS')}")  # False
     print(f"MATIC délisté: {manager.is_token_delisted('MATIC')}")  # True
 
@@ -461,13 +474,13 @@ if __name__ == "__main__":
     print(f"\nTokens délistés: {delisted}")
 
     # Récupérer les infos d'un token
-    info = manager.get_token_info('MATIC')
+    info = manager.get_token_info("MATIC")
     if info:
-        print(f"\nInfo MATIC:")
+        print("\nInfo MATIC:")
         for key, value in info.items():
             print(f"  {key}: {value}")
 
     # Filtrer une liste de tokens
-    all_tokens = ['BTC', 'ETH', 'MATIC', 'KYROS', 'SOL']
+    all_tokens = ["BTC", "ETH", "MATIC", "KYROS", "SOL"]
     active_only = manager.filter_active_tokens(all_tokens)
     print(f"\nTokens actifs parmi {all_tokens}: {active_only}")

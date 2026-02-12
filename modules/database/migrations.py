@@ -132,9 +132,7 @@ def _migrate_v2(conn: sqlite3.Connection) -> None:
 
 def _migrate_v3(conn: sqlite3.Connection) -> None:
     """Renommage mr_id → mraccoon_id dans TokenMetadata."""
-    conn.execute(
-        "ALTER TABLE TokenMetadata RENAME COLUMN mr_id TO mraccoon_id"
-    )
+    conn.execute("ALTER TABLE TokenMetadata RENAME COLUMN mr_id TO mraccoon_id")
 
 
 def _migrate_v4(conn: sqlite3.Connection) -> None:

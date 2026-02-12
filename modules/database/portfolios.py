@@ -50,10 +50,10 @@ class Portfolios:
             cursor = conn.cursor()
             cursor.execute("SELECT name FROM Portfolios")
             # return sorted list of portfolios
-            list = [row[0] for row in cursor.fetchall()]
-            logger.debug(f"Getting portfolios from database {list}")
-            list.sort()
-            return list
+            portfolio_names = [row[0] for row in cursor.fetchall()]
+            logger.debug(f"Getting portfolios from database {portfolio_names}")
+            portfolio_names.sort()
+            return portfolio_names
 
     def get_portfolio(self, name: str) -> dict:
         logger.debug(f"Getting portfolio {name} from database")

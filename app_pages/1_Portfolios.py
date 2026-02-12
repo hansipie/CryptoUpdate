@@ -12,7 +12,7 @@ from modules.tools import (
     create_portfolio_dataframe,
     update,
     parse_last_update,
-    get_currency_symbol
+    get_currency_symbol,
 )
 from modules.utils import dataframe_diff
 from modules.configuration import configuration
@@ -147,7 +147,7 @@ def portfolioUI(tabs: list):
                 logger.debug("Dataframe:\n%s", df)
                 updated_data = st.data_editor(
                     df,
-                    width='stretch',
+                    width="stretch",
                     height=height,
                     column_config={
                         "token": st.column_config.TextColumn(disabled=True),
@@ -174,7 +174,7 @@ def portfolioUI(tabs: list):
                 if st.button(
                     "Add Token",
                     key=f"addT_{i}",
-                    width='stretch',
+                    width="stretch",
                     icon=":material/add:",
                 ):
                     add_token(tabs[i])
@@ -182,7 +182,7 @@ def portfolioUI(tabs: list):
                 if st.button(
                     "Delete Token",
                     key=f"deleteT_{i}",
-                    width='stretch',
+                    width="stretch",
                     icon=":material/remove:",
                 ):
                     delete_token(tabs[i])
@@ -190,7 +190,7 @@ def portfolioUI(tabs: list):
                 if st.button(
                     "Rename Portfolio",
                     key=f"rename_{i}",
-                    width='stretch',
+                    width="stretch",
                     icon=":material/edit:",
                 ):
                     rename_portfolio(tabs[i])
@@ -198,7 +198,7 @@ def portfolioUI(tabs: list):
                 if st.button(
                     "Danger Zone",
                     key=f"dangerZ_{i}",
-                    width='stretch',
+                    width="stretch",
                     type="primary",
                     icon=":material/destruction:",
                 ):
@@ -242,10 +242,11 @@ def get_portfolio_history(portfolio_name: str, dbfile: str) -> pd.DataFrame:
 
     # Query all historical data for tokens in this portfolio
     import sqlite3
+
     with sqlite3.connect(dbfile) as con:
         # Get tokens list
         tokens_list = list(tokens_dict.keys())
-        tokens_placeholder = ','.join(['?' for _ in tokens_list])
+        tokens_placeholder = ",".join(["?" for _ in tokens_list])
 
         query = f"""
             SELECT timestamp, token, price
@@ -260,17 +261,19 @@ def get_portfolio_history(portfolio_name: str, dbfile: str) -> pd.DataFrame:
         return pd.DataFrame()
 
     # Convert timestamp to datetime
-    df['timestamp'] = pd.to_datetime(df['timestamp'], unit='s', utc=True)
-    df['timestamp'] = df['timestamp'].dt.tz_convert(tokensdb.local_timezone).dt.tz_localize(None)
+    df["timestamp"] = pd.to_datetime(df["timestamp"], unit="s", utc=True)
+    df["timestamp"] = (
+        df["timestamp"].dt.tz_convert(tokensdb.local_timezone).dt.tz_localize(None)
+    )
 
     # Calculate value for each token at each timestamp
-    df['amount'] = df['token'].map(lambda t: float(tokens_dict.get(t, 0)))
-    df['value'] = df['price'] * df['amount']
+    df["amount"] = df["token"].map(lambda t: float(tokens_dict.get(t, 0)))
+    df["value"] = df["price"] * df["amount"]
 
     # Group by timestamp and sum values
-    portfolio_value = df.groupby('timestamp')['value'].sum().reset_index()
-    portfolio_value.columns = ['Date', 'Value']
-    portfolio_value.set_index('Date', inplace=True)
+    portfolio_value = df.groupby("timestamp")["value"].sum().reset_index()
+    portfolio_value.columns = ["Date", "Value"]
+    portfolio_value.set_index("Date", inplace=True)
     portfolio_value.sort_index(inplace=True)
 
     logger.debug("Portfolio history shape: %s", portfolio_value.shape)
@@ -296,21 +299,23 @@ def plot_portfolio_history(portfolio_name: str, dbfile: str):
 
     # Create plotly figure
     fig = go.Figure()
-    fig.add_trace(go.Scatter(
-        x=df.index,
-        y=df['Value'],
-        mode='lines',
-        name=portfolio_name,
-        fill='tozeroy',
-        line=dict(width=2)
-    ))
+    fig.add_trace(
+        go.Scatter(
+            x=df.index,
+            y=df["Value"],
+            mode="lines",
+            name=portfolio_name,
+            fill="tozeroy",
+            line=dict(width=2),
+        )
+    )
 
     fig.update_layout(
         title=f"Historical Value - {portfolio_name}",
         xaxis_title="Date",
         yaxis_title=f"Value ({currency_symbol})",
-        hovermode='x unified',
-        height=400
+        hovermode="x unified",
+        height=400,
     )
 
     st.plotly_chart(fig, width="stretch")
@@ -330,7 +335,7 @@ def execute_search():
     )
     df_search.sort_index(inplace=True)
     logger.debug("Search result:\n%s", df_search)
-    st.dataframe(df_search, width='stretch')
+    st.dataframe(df_search, width="stretch")
 
 
 g_portfolios = load_portfolios(st.session_state.settings["dbfile"])
@@ -340,7 +345,9 @@ def save_toggle_preference():
     """Save toggle state to settings file when it changes."""
     logger.debug("Saving toggle preference: %s", st.session_state.show_empty_portfolios)
     # Update settings in session state
-    st.session_state.settings["show_empty_portfolios"] = st.session_state.show_empty_portfolios
+    st.session_state.settings["show_empty_portfolios"] = (
+        st.session_state.show_empty_portfolios
+    )
     # Save to file
     config = configuration()
     config.saveConfig(st.session_state.settings)
@@ -352,7 +359,7 @@ with st.sidebar:
         "Add new portfolio",
         key="add_new_portfolio",
         icon=":material/note_add:",
-        width='stretch',
+        width="stretch",
     ):
         add_new_portfolio()
 
@@ -361,7 +368,7 @@ with st.sidebar:
         "Update prices",
         key="update_prices",
         icon=":material/update:",
-        width='stretch',
+        width="stretch",
     ):
         update()
     # display time since last update
@@ -390,14 +397,16 @@ with st.sidebar:
 
     # Initialize toggle state from settings if not exists
     if "show_empty_portfolios" not in st.session_state:
-        st.session_state.show_empty_portfolios = st.session_state.settings.get("show_empty_portfolios", True)
+        st.session_state.show_empty_portfolios = st.session_state.settings.get(
+            "show_empty_portfolios", True
+        )
 
     # Toggle pour afficher/masquer les portefeuilles vides
     st.toggle(
         "Afficher les portefeuilles vides",
         key="show_empty_portfolios",
         help="Afficher ou masquer les portefeuilles sans token ou avec un solde nul.",
-        on_change=save_toggle_preference
+        on_change=save_toggle_preference,
     )
 
 
@@ -410,6 +419,7 @@ def is_portfolio_empty(pf_name):
     if (df["amount"].fillna(0) == 0).all():
         return True
     return False
+
 
 all_tabs = g_portfolios.get_portfolio_names()
 # Lecture robuste de l'état du toggle avec fallback

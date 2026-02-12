@@ -67,7 +67,7 @@ class swaps:
                     SELECT id, timestamp, token_from, amount_from, wallet_from, token_to, amount_to, wallet_to, tag
                     FROM Swaps WHERE tag = ? ORDER BY timestamp DESC
                     """,
-                    (tag,)
+                    (tag,),
                 )
             return cursor.fetchall()
 
@@ -121,9 +121,13 @@ class swaps:
             with sqlite3.connect(self.db_path) as conn:
                 cursor = conn.cursor()
                 if not tag:
-                    cursor.execute("UPDATE Swaps SET tag = NULL WHERE id = ?", (entry_id,))
+                    cursor.execute(
+                        "UPDATE Swaps SET tag = NULL WHERE id = ?", (entry_id,)
+                    )
                 else:
-                    cursor.execute("UPDATE Swaps SET tag = ? WHERE id = ?", (tag, entry_id))
+                    cursor.execute(
+                        "UPDATE Swaps SET tag = ? WHERE id = ?", (tag, entry_id)
+                    )
                 conn.commit()
                 logger.debug(f"Tag updated for entry with id {entry_id}")
         except Exception as e:

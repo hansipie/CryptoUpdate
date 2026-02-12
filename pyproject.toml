@@ -29,3 +29,34 @@ dev = [
     "pip-audit>=2.9.0",
     "pylint>=3.3.8",
 ]
+
+[tool.pylint.main]
+ignore-paths = ["^\\.venv"]
+
+[tool.pylint.format]
+max-line-length = 120
+
+[tool.pylint.basic]
+# Nommage Streamlit : fichiers préfixés par un chiffre ou lettre (0_Home, X_Tests…)
+module-rgx = "(([a-z_][a-z0-9_]*)|([0-9X][_a-zA-Z][_a-zA-Z0-9]*))"
+
+[tool.pylint."messages control"]
+disable = [
+    "missing-module-docstring",
+    "missing-class-docstring",
+    "missing-function-docstring",
+    "too-many-arguments",
+    "too-many-positional-arguments",
+    "too-many-locals",
+    "too-many-branches",
+    "too-many-statements",
+    "too-many-lines",
+    "too-many-return-statements",
+    "broad-exception-caught",
+    "logging-fstring-interpolation",
+    "duplicate-code",
+    "import-outside-toplevel",
+    "redefined-outer-name",
+    "no-else-return",
+    "use-dict-literal",
+]

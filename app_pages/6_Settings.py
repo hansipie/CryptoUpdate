@@ -14,7 +14,9 @@ if "settings" not in st.session_state:
 
 # Initialize fiat currency in session state if not already set
 if "fiat_currency" not in st.session_state:
-    st.session_state.fiat_currency = st.session_state.settings.get("fiat_currency", "EUR")
+    st.session_state.fiat_currency = st.session_state.settings.get(
+        "fiat_currency", "EUR"
+    )
 
 with st.form(key="settings_form"):
     st.subheader("MarketRaccoon")
@@ -34,7 +36,7 @@ with st.form(key="settings_form"):
         headers = {}
         if marketraccoon_token:
             headers["X-API-Key"] = marketraccoon_token
-        
+
         response = requests.get(
             f"{marketraccoon_url}/api/healthcheck",
             headers=headers,
@@ -80,13 +82,17 @@ with st.form(key="settings_form"):
         "Reference fiat currency",
         key="fiat_currency_select",
         options=fiat_currencies,
-        index=fiat_currencies.index(st.session_state.settings.get("fiat_currency", "EUR")) if st.session_state.settings.get("fiat_currency", "EUR") in fiat_currencies else 0,
-        help="Select the reference currency for price display and conversions"
+        index=fiat_currencies.index(
+            st.session_state.settings.get("fiat_currency", "EUR")
+        )
+        if st.session_state.settings.get("fiat_currency", "EUR") in fiat_currencies
+        else 0,
+        help="Select the reference currency for price display and conversions",
     )
 
     st.subheader("Operations Colors")
     st.write("Configure color thresholds for performance indicators in Operations tab:")
-    
+
     col1, col2, col3 = st.columns(3)
     with col1:
         operations_green_threshold = st.number_input(
@@ -96,17 +102,17 @@ with st.form(key="settings_form"):
             min_value=0,
             max_value=1000,
             step=1,
-            help="Performance >= this value will be colored green"
+            help="Performance >= this value will be colored green",
         )
     with col2:
         operations_orange_threshold = st.number_input(
             "Orange threshold (%)",
-            key="operations_orange_threshold", 
+            key="operations_orange_threshold",
             value=st.session_state.settings.get("operations_orange_threshold", 50),
             min_value=0,
             max_value=1000,
             step=1,
-            help="Performance >= this value will be colored orange"
+            help="Performance >= this value will be colored orange",
         )
     with col3:
         operations_red_threshold = st.number_input(
@@ -116,13 +122,13 @@ with st.form(key="settings_form"):
             min_value=-1000,
             max_value=1000,
             step=1,
-            help="Performance < this value will be colored red"
+            help="Performance < this value will be colored red",
         )
 
     submitted = st.form_submit_button(
         label="Save",
         help="Save settings.",
-        width='stretch',
+        width="stretch",
     )
 
     if submitted:
@@ -132,8 +138,12 @@ with st.form(key="settings_form"):
         st.session_state.settings["coinmarketcap_token"] = coinmarketcap_token
         st.session_state.settings["ai_apitoken"] = ai_apitoken
         st.session_state.settings["debug_flag"] = debug_flag
-        st.session_state.settings["operations_green_threshold"] = operations_green_threshold
-        st.session_state.settings["operations_orange_threshold"] = operations_orange_threshold
+        st.session_state.settings["operations_green_threshold"] = (
+            operations_green_threshold
+        )
+        st.session_state.settings["operations_orange_threshold"] = (
+            operations_orange_threshold
+        )
         st.session_state.settings["operations_red_threshold"] = operations_red_threshold
         st.session_state.settings["fiat_currency"] = fiat_currency
         st.session_state.fiat_currency = fiat_currency

@@ -28,10 +28,10 @@ class configuration:
             JSONDecodeError: If settings file is invalid JSON
         """
         if not os.path.exists(self.config_file):
-            logger.error("Settings file not found: " + self.config_file)
+            logger.error("Settings file not found: %s", self.config_file)
             raise FileNotFoundError
 
-        with open(self.config_file, "r") as f:
+        with open(self.config_file, "r", encoding="utf-8") as f:
             self.conf = json.load(f)
 
     def saveConfig(self, settings: dict):

@@ -33,7 +33,7 @@ def plot_as_pie(df: pd.DataFrame, column):
         logger.debug(f"Dataframe more than 1% sum with Others:\n{dffinal}")
 
     fig = px.pie(dffinal, dffinal.index, column, width=700, height=700)
-    st.plotly_chart(fig, width='stretch')
+    st.plotly_chart(fig, width="stretch")
 
 
 def plot_as_graph(df: pd.DataFrame):

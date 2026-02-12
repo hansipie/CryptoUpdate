@@ -179,7 +179,9 @@ def call_ai(messages: list, api_key: str, system_prompt: str = ""):
         logger.debug("Direct JSON parse failed, trying to extract from markdown")
 
         # Look for JSON in markdown code blocks
-        json_match = re.search(r'```(?:json)?\s*(\{.*?\})\s*```', content_text, re.DOTALL)
+        json_match = re.search(
+            r"```(?:json)?\s*(\{.*?\})\s*```", content_text, re.DOTALL
+        )
         if json_match:
             try:
                 parsed_json = json.loads(json_match.group(1))

@@ -17,11 +17,15 @@ from modules.database.operations import operations
 from modules.database.market import Market
 from modules.database.swaps import swaps
 from modules.tools import (
-    batch_convert_historical, batch_convert_historical_api,
-    calculate_crypto_rate, calculate_crypto_rate_api,
+    batch_convert_historical,
+    batch_convert_historical_api,
+    calculate_crypto_rate,
+    calculate_crypto_rate_api,
     calc_perf_api,
-    update, parse_last_update,
-    _get_api_latest_prices, _get_api_fiat_rate,
+    update,
+    parse_last_update,
+    _get_api_latest_prices,
+    _get_api_fiat_rate,
 )
 from modules.utils import get_file_hash, toTimestamp_A
 
@@ -159,7 +163,7 @@ def buy_add() -> None:
             label_visibility="hidden",
         )
     to_wallet = st.selectbox("Portfolio", g_wallets, key="to_wallet", index=None)
-    if st.button("Submit", width='stretch'):
+    if st.button("Submit", width="stretch"):
         timestamp = toTimestamp_A(date, time)
         submit_buy(
             timestamp, from_amount, form_currency, to_amount, to_token, to_wallet
@@ -199,7 +203,7 @@ def swap_add() -> None:
         swap_wallet_to = st.selectbox(
             "To Wallet", g_wallets, index=None, key="swap_wallet_to"
         )
-    if st.button("Submit", width='stretch'):
+    if st.button("Submit", width="stretch"):
         timestamp = toTimestamp_A(date, time)
         submit_swap(
             timestamp,
@@ -265,7 +269,7 @@ def buy_edit_dialog(data: dict) -> None:
     else:
         idx_wallet = None
     to_wallet = st.selectbox("Portfolio", g_wallets, key="to_wallet", index=idx_wallet)
-    if st.button("Submit", width='stretch'):
+    if st.button("Submit", width="stretch"):
         timestamp = toTimestamp_A(date, time)
         g_operation.delete(data["id"])
         submit_buy(
@@ -330,7 +334,7 @@ def swap_edit_dialog(data: dict):
         swap_wallet_to = st.selectbox(
             "To Wallet", g_wallets, index=idx_to, key="swap_wallet_to"
         )
-    if st.button("Submit", width='stretch'):
+    if st.button("Submit", width="stretch"):
         timestamp = toTimestamp_A(date, time)
         g_swaps.delete(data["id"])
         submit_swap(
@@ -356,7 +360,7 @@ def buy_delete_dialog(data: dict):
     On confirm, deletes the operation.
     """
     logger.debug("Dialog Delete row: %s", data["id"])
-    st.dataframe(data, width='stretch')
+    st.dataframe(data, width="stretch")
     st.write("Are you sure you want to delete this buy operation?")
     if st.button("Confirm"):
         logger.debug("Delete row: %s - %s", data, type(data["id"]))
@@ -413,6 +417,7 @@ def swap_archive_dialog(rows: list):
             g_swaps.update_tag(data["id"], "archived")
         st.rerun()
 
+
 @st.dialog("Unarchive Swap")
 def swap_unarchive_dialog(rows: list):
     """Display confirmation dialog for unarchiving a swap operation.
@@ -429,7 +434,9 @@ def swap_unarchive_dialog(rows: list):
         tounarchive.append(data)
 
     logger.debug("Dialog Unarchive row: %s", tounarchive)
-    st.write(f"{len(tounarchive)} swap(s) selected. Are you sure you want to unarchive?")
+    st.write(
+        f"{len(tounarchive)} swap(s) selected. Are you sure you want to unarchive?"
+    )
 
     if st.button("Confirm"):
         for data in tounarchive:
@@ -454,7 +461,9 @@ def swap_arch_delete_dialog(rows: list):
         todelete.append(data)
 
     logger.debug("Dialog Delete archived row: %s", todelete)
-    st.write(f"{len(todelete)} archived swap(s) selected. Are you sure you want to delete?")
+    st.write(
+        f"{len(todelete)} archived swap(s) selected. Are you sure you want to delete?"
+    )
 
     if st.button("Confirm"):
         for data in todelete:
@@ -488,7 +497,6 @@ def buy_delete():
         st.toast("Please select a row", icon=":material/warning:")
     else:
         buy_delete_dialog(df_buy.iloc[rowidx].to_dict())
-    pass
 
 
 def swap_edit():
@@ -534,6 +542,7 @@ def swap_archive():
     else:
         swap_archive_dialog(rowidx)
 
+
 def swap_unarchive():
     """Handle unarchiving of selected swap operation.
 
@@ -560,7 +569,6 @@ def swap_arch_delete():
         st.toast("Please select a row", icon=":material/warning:")
     else:
         swap_arch_delete_dialog(rowidx)
-        
 
 
 def calc_perf(df: pd.DataFrame, col_token: str, col_rate: str) -> pd.DataFrame:
@@ -641,11 +649,19 @@ def build_buy_dataframe(
         col_name = f"From ({convert_from})"
         if use_api:
             df[col_name] = batch_convert_historical_api(
-                df, "From", "Currency", convert_from, "timestamp",
+                df,
+                "From",
+                "Currency",
+                convert_from,
+                "timestamp",
             )
         else:
             df[col_name] = batch_convert_historical(
-                df, "From", "Currency", convert_from, "timestamp",
+                df,
+                "From",
+                "Currency",
+                convert_from,
+                "timestamp",
                 st.session_state.settings["dbfile"],
             )
 
@@ -654,11 +670,19 @@ def build_buy_dataframe(
         col_name = f"To ({convert_to})"
         if use_api:
             df[col_name] = batch_convert_historical_api(
-                df, "To", "Token", convert_to, "timestamp",
+                df,
+                "To",
+                "Token",
+                convert_to,
+                "timestamp",
             )
         else:
             df[col_name] = batch_convert_historical(
-                df, "To", "Token", convert_to, "timestamp",
+                df,
+                "To",
+                "Token",
+                convert_to,
+                "timestamp",
                 st.session_state.settings["dbfile"],
             )
 
@@ -687,14 +711,22 @@ def build_buy_dataframe(
                 lambda row: calculate_crypto_rate(
                     convert_to if convert_to else row["Token"],
                     convert_from if convert_from else row["Currency"],
-                    now_ts, dbfile,
+                    now_ts,
+                    dbfile,
                 ),
                 axis=1,
             )
         df["Perf."] = ((df["Current Rate"] * 100) / df["Converted Rate"]) - 100
     else:
         if use_api:
-            df = calc_perf_api(df, "Token", "Buy Rate", col_currency="Currency", prices_usd=prices_usd, usd_to_eur=usd_to_eur)
+            df = calc_perf_api(
+                df,
+                "Token",
+                "Buy Rate",
+                col_currency="Currency",
+                prices_usd=prices_usd,
+                usd_to_eur=usd_to_eur,
+            )
         else:
             df = calc_perf(df, "Token", "Buy Rate")
 
@@ -730,7 +762,9 @@ def build_buy_avg_table(use_api: bool = False):
     if use_api:
         prices_usd = _get_api_latest_prices()
         usd_to_eur = _get_api_fiat_rate()
-        df = calc_perf_api(df, "Token", "Avg. Rate", prices_usd=prices_usd, usd_to_eur=usd_to_eur)
+        df = calc_perf_api(
+            df, "Token", "Avg. Rate", prices_usd=prices_usd, usd_to_eur=usd_to_eur
+        )
     else:
         df = calc_perf(df, "Token", "Avg. Rate")
     logger.debug("Average table:\n%s", df)
@@ -825,11 +859,19 @@ def build_swap_dataframe(
         col_name = f"From Amount ({convert_from})"
         if use_api:
             df[col_name] = batch_convert_historical_api(
-                df, "From Amount", "From Token", convert_from, "timestamp",
+                df,
+                "From Amount",
+                "From Token",
+                convert_from,
+                "timestamp",
             )
         else:
             df[col_name] = batch_convert_historical(
-                df, "From Amount", "From Token", convert_from, "timestamp",
+                df,
+                "From Amount",
+                "From Token",
+                convert_from,
+                "timestamp",
                 st.session_state.settings["dbfile"],
             )
 
@@ -838,11 +880,19 @@ def build_swap_dataframe(
         col_name = f"To Amount ({convert_to})"
         if use_api:
             df[col_name] = batch_convert_historical_api(
-                df, "To Amount", "To Token", convert_to, "timestamp",
+                df,
+                "To Amount",
+                "To Token",
+                convert_to,
+                "timestamp",
             )
         else:
             df[col_name] = batch_convert_historical(
-                df, "To Amount", "To Token", convert_to, "timestamp",
+                df,
+                "To Amount",
+                "To Token",
+                convert_to,
+                "timestamp",
                 st.session_state.settings["dbfile"],
             )
 
@@ -855,27 +905,34 @@ def build_swap_dataframe(
     # Current Rate and Perf. — use converted units when active
     if use_api:
         df["Current Rate"] = df.apply(
-            lambda row: calculate_crypto_rate_api(
-                convert_from if convert_from else row["From Token"],
-                convert_to if convert_to else row["To Token"],
-                prices_usd=prices_usd,
-                usd_to_eur=usd_to_eur,
-            )
-            if (convert_from or row["From Token"]) != (convert_to or row["To Token"])
-            else 1.0,
+            lambda row: (
+                calculate_crypto_rate_api(
+                    convert_from if convert_from else row["From Token"],
+                    convert_to if convert_to else row["To Token"],
+                    prices_usd=prices_usd,
+                    usd_to_eur=usd_to_eur,
+                )
+                if (convert_from or row["From Token"])
+                != (convert_to or row["To Token"])
+                else 1.0
+            ),
             axis=1,
         )
     else:
         now_ts = int(pd.Timestamp.now(tz="UTC").timestamp())
         dbfile = st.session_state.settings["dbfile"]
         df["Current Rate"] = df.apply(
-            lambda row: calculate_crypto_rate(
-                convert_from if convert_from else row["From Token"],
-                convert_to if convert_to else row["To Token"],
-                now_ts, dbfile,
-            )
-            if (convert_from or row["From Token"]) != (convert_to or row["To Token"])
-            else 1.0,
+            lambda row: (
+                calculate_crypto_rate(
+                    convert_from if convert_from else row["From Token"],
+                    convert_to if convert_to else row["To Token"],
+                    now_ts,
+                    dbfile,
+                )
+                if (convert_from or row["From Token"])
+                != (convert_to or row["To Token"])
+                else 1.0
+            ),
             axis=1,
         )
 
@@ -890,26 +947,32 @@ def draw_swap(df: pd.DataFrame, convert_from: str = None, convert_to: str = None
         st.info("No swap operations")
     else:
         # Apply styling based on Perf. column values using configurable thresholds
-        green_threshold = st.session_state.settings.get("operations_green_threshold", 100)
-        orange_threshold = st.session_state.settings.get("operations_orange_threshold", 50)
+        green_threshold = st.session_state.settings.get(
+            "operations_green_threshold", 100
+        )
+        orange_threshold = st.session_state.settings.get(
+            "operations_orange_threshold", 50
+        )
         red_threshold = st.session_state.settings.get("operations_red_threshold", 0)
 
         def color_rows(row):
-            if pd.isna(row['Perf.']):
-                return [''] * len(row)
-            elif row['Perf.'] >= green_threshold:
-                return ['background-color: #90EE90'] * len(row)  # Light green
-            elif row['Perf.'] >= orange_threshold:
-                return ['background-color: #FFA500'] * len(row)  # Orange
-            elif row['Perf.'] < red_threshold:
-                return ['background-color: #FFB6C1'] * len(row)  # Light red
+            if pd.isna(row["Perf."]):
+                return [""] * len(row)
+            elif row["Perf."] >= green_threshold:
+                return ["background-color: #90EE90"] * len(row)  # Light green
+            elif row["Perf."] >= orange_threshold:
+                return ["background-color: #FFA500"] * len(row)  # Orange
+            elif row["Perf."] < red_threshold:
+                return ["background-color: #FFB6C1"] * len(row)  # Light red
             else:
-                return [''] * len(row)
+                return [""] * len(row)
 
         styled_df = df.style.apply(color_rows, axis=1)
 
         # Build dynamic column order and config
-        col_from_amount = f"From Amount ({convert_from})" if convert_from else "From Amount"
+        col_from_amount = (
+            f"From Amount ({convert_from})" if convert_from else "From Amount"
+        )
         col_to_amount = f"To Amount ({convert_to})" if convert_to else "To Amount"
         rate_col = "Swap Rate"
 
@@ -936,7 +999,7 @@ def draw_swap(df: pd.DataFrame, convert_from: str = None, convert_to: str = None
 
         st.dataframe(
             styled_df,
-            width='stretch',
+            width="stretch",
             hide_index=True,
             column_order=column_order,
             column_config=column_config,
@@ -951,26 +1014,32 @@ def draw_swap_arch(df: pd.DataFrame, convert_from: str = None, convert_to: str =
         st.info("No archived swaps")
     else:
         # Apply styling based on Perf. column values using configurable thresholds
-        green_threshold = st.session_state.settings.get("operations_green_threshold", 100)
-        orange_threshold = st.session_state.settings.get("operations_orange_threshold", 50)
+        green_threshold = st.session_state.settings.get(
+            "operations_green_threshold", 100
+        )
+        orange_threshold = st.session_state.settings.get(
+            "operations_orange_threshold", 50
+        )
         red_threshold = st.session_state.settings.get("operations_red_threshold", 0)
 
         def color_rows(row):
-            if pd.isna(row['Perf.']):
-                return [''] * len(row)
-            elif row['Perf.'] >= green_threshold:
-                return ['background-color: #90EE90'] * len(row)  # Light green
-            elif row['Perf.'] >= orange_threshold:
-                return ['background-color: #FFA500'] * len(row)  # Orange
-            elif row['Perf.'] < red_threshold:
-                return ['background-color: #FFB6C1'] * len(row)  # Light red
+            if pd.isna(row["Perf."]):
+                return [""] * len(row)
+            elif row["Perf."] >= green_threshold:
+                return ["background-color: #90EE90"] * len(row)  # Light green
+            elif row["Perf."] >= orange_threshold:
+                return ["background-color: #FFA500"] * len(row)  # Orange
+            elif row["Perf."] < red_threshold:
+                return ["background-color: #FFB6C1"] * len(row)  # Light red
             else:
-                return [''] * len(row)
+                return [""] * len(row)
 
         styled_df = df.style.apply(color_rows, axis=1)
 
         # Build dynamic column order and config
-        col_from_amount = f"From Amount ({convert_from})" if convert_from else "From Amount"
+        col_from_amount = (
+            f"From Amount ({convert_from})" if convert_from else "From Amount"
+        )
         col_to_amount = f"To Amount ({convert_to})" if convert_to else "To Amount"
         rate_col = "Swap Rate"
 
@@ -997,7 +1066,7 @@ def draw_swap_arch(df: pd.DataFrame, convert_from: str = None, convert_to: str =
 
         st.dataframe(
             styled_df,
-            width='stretch',
+            width="stretch",
             hide_index=True,
             column_order=column_order,
             column_config=column_config,
@@ -1019,7 +1088,7 @@ with st.sidebar:
         "Update prices",
         key="update_prices",
         icon=":material/update:",
-        width='stretch',
+        width="stretch",
     ):
         update()
     # display time since last update
@@ -1062,7 +1131,9 @@ with buy_tab:
     buy_ct = None if buy_convert_to_sel == "Original" else buy_convert_to_sel
 
     # build buy table with performance metrics
-    df_buy = build_buy_dataframe(convert_from=buy_cf, convert_to=buy_ct, use_api=use_api)
+    df_buy = build_buy_dataframe(
+        convert_from=buy_cf, convert_to=buy_ct, use_api=use_api
+    )
 
     col_buylist, col_buybtns = st.columns([8, 1])
     with col_buylist:
@@ -1096,7 +1167,7 @@ with buy_tab:
 
             st.dataframe(
                 df_buy,
-                width='stretch',
+                width="stretch",
                 height=600,
                 hide_index=True,
                 column_order=column_order,
@@ -1109,21 +1180,21 @@ with buy_tab:
         st.button(
             "New",
             on_click=buy_add,
-            width='stretch',
+            width="stretch",
             icon=":material/add:",
             key="buy_new",
         )
         st.button(
             "Edit",
             on_click=buy_edit,
-            width='stretch',
+            width="stretch",
             icon=":material/edit:",
             key="buy_edit",
         )
         st.button(
             "Delete",
             on_click=buy_delete,
-            width='stretch',
+            width="stretch",
             icon=":material/delete:",
             key="buy_delete",
         )
@@ -1136,21 +1207,21 @@ with buy_tab:
     else:
         # Apply styling based on Perf. column values (same logic as icons)
         def color_avg_rows(row):
-            if pd.isna(row['Perf.']):
-                return [''] * len(row)
-            elif row['Perf.'] > 0:
-                return ['background-color: #90EE90'] * len(row)  # Light green
-            elif row['Perf.'] < -50:
-                return ['background-color: #FFB6C1'] * len(row)  # Light red
+            if pd.isna(row["Perf."]):
+                return [""] * len(row)
+            elif row["Perf."] > 0:
+                return ["background-color: #90EE90"] * len(row)  # Light green
+            elif row["Perf."] < -50:
+                return ["background-color: #FFB6C1"] * len(row)  # Light red
             else:
-                return ['background-color: #FFFF99'] * len(row)  # Light yellow
-        
+                return ["background-color: #FFFF99"] * len(row)  # Light yellow
+
         styled_df_avg = df_avg.style.apply(color_avg_rows, axis=1)
-        
+
         height = (len(df_avg) * 35) + 38
         st.dataframe(
             styled_df_avg,
-            width='stretch',
+            width="stretch",
             hide_index=True,
             height=height,
             column_order=(
@@ -1199,28 +1270,28 @@ with swap_tab:
         st.button(
             "New",
             on_click=swap_add,
-            width='stretch',
+            width="stretch",
             icon=":material/add:",
             key="swap_new",
         )
         st.button(
             "Edit",
             on_click=swap_edit,
-            width='stretch',
+            width="stretch",
             icon=":material/edit:",
             key="swap_edit",
         )
         st.button(
             "Archive",
             on_click=swap_archive,
-            width='stretch',
+            width="stretch",
             icon=":material/archive:",
             key="swap_archive",
         )
         st.button(
             "Delete",
             on_click=swap_delete,
-            width='stretch',
+            width="stretch",
             icon=":material/delete:",
             key="swap_delete",
         )
@@ -1233,14 +1304,14 @@ with swap_tab:
         st.button(
             "Unarchive",
             on_click=swap_unarchive,
-            width='stretch',
+            width="stretch",
             icon=":material/unarchive:",
             key="swap_unarchive",
         )
         st.button(
             "Delete",
             on_click=swap_arch_delete,
-            width='stretch',
+            width="stretch",
             icon=":material/delete:",
             key="swap_arch_delete",
         )

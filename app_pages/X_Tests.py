@@ -35,15 +35,15 @@ def find_missing_dates(dbfile: str) -> list:
             return []
 
         # Convert to datetime
-        df_dates['date'] = pd.to_datetime(df_dates['date'])
-        existing_dates = set(df_dates['date'].dt.date)
+        df_dates["date"] = pd.to_datetime(df_dates["date"])
+        existing_dates = set(df_dates["date"].dt.date)
 
         # Get the first and last dates
-        first_date = df_dates['date'].min().date()
-        last_date = df_dates['date'].max().date()
+        first_date = df_dates["date"].min().date()
+        last_date = df_dates["date"].max().date()
 
         # Generate all dates between first and last
-        all_dates = pd.date_range(start=first_date, end=last_date, freq='D')
+        all_dates = pd.date_range(start=first_date, end=last_date, freq="D")
         all_dates_set = set(all_dates.date)
 
         # Find missing dates
@@ -71,8 +71,8 @@ def check_api_data_for_date(api_url: str, api_key: str, date) -> bool:
         end_dt = datetime.combine(date, datetime.max.time())
 
         # Convert to ISO 8601 format for API
-        startdate = start_dt.isoformat() + 'Z'
-        enddate = end_dt.isoformat() + 'Z'
+        startdate = start_dt.isoformat() + "Z"
+        enddate = end_dt.isoformat() + "Z"
 
         # Query the API for cryptocurrency data for the entire day
         # Use page_size=1 to minimize data transfer (we only need to know if data exists)
@@ -82,11 +82,7 @@ def check_api_data_for_date(api_url: str, api_key: str, date) -> bool:
 
         request = requests.get(
             api_url + "/api/v1/cryptocurrency",
-            params={
-                "startdate": startdate,
-                "enddate": enddate,
-                "page_size": 1
-            },
+            params={"startdate": startdate, "enddate": enddate, "page_size": 1},
             headers=headers,
             timeout=10,
         )
@@ -97,7 +93,11 @@ def check_api_data_for_date(api_url: str, api_key: str, date) -> bool:
 
             # If we have at least one result for this day, return True
             if results and len(results) > 0:
-                logger.debug("Found %d cryptocurrency data points for date %s", len(results), date)
+                logger.debug(
+                    "Found %d cryptocurrency data points for date %s",
+                    len(results),
+                    date,
+                )
                 return True
             else:
                 logger.debug("No cryptocurrency data points for date %s", date)
@@ -108,7 +108,9 @@ def check_api_data_for_date(api_url: str, api_key: str, date) -> bool:
             logger.debug("API returned 204 (no content) for date %s", date)
             return False
         else:
-            logger.warning("API returned status %s for date %s", request.status_code, date)
+            logger.warning(
+                "API returned status %s for date %s", request.status_code, date
+            )
             return False
 
     except Exception as e:
@@ -139,7 +141,7 @@ if missing_dates:
 
     # Convert to DataFrame for better display
     df_missing = pd.DataFrame(missing_dates, columns=["Date"])
-    df_missing['Day of Week'] = pd.to_datetime(df_missing['Date']).dt.day_name()
+    df_missing["Day of Week"] = pd.to_datetime(df_missing["Date"]).dt.day_name()
 
     # Add button to check API
     check_api = st.button("Check MarketRaccoon API", type="primary")
@@ -187,10 +189,10 @@ if missing_dates:
         api_status = [api_status_dict[date] for date in missing_dates]
 
         # Add API status column
-        df_missing['API Data'] = api_status
+        df_missing["API Data"] = api_status
 
         # Display with scrollable dataframe
-        st.dataframe(df_missing, height=400, width='stretch')
+        st.dataframe(df_missing, height=400, width="stretch")
 
         # Show summary
         api_has_data = sum(1 for status in api_status if status == "✅")
@@ -203,7 +205,7 @@ if missing_dates:
             st.metric("❌ API missing data", api_no_data)
     else:
         # Display dataframe without API check
-        st.dataframe(df_missing, height=400, width='stretch')
+        st.dataframe(df_missing, height=400, width="stretch")
 
     # Option to download the list
     csv = df_missing.to_csv(index=False)

@@ -42,7 +42,7 @@ class operations:
 
     def insert(
         self,
-        type,
+        op_type,
         source,
         destination,
         source_unit,
@@ -58,7 +58,7 @@ class operations:
                 VALUES (?, ?, ?, ?, ?, ?, ?)
             """,
                 (
-                    type,
+                    op_type,
                     source,
                     destination,
                     source_unit,

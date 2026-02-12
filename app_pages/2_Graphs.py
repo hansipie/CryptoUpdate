@@ -14,7 +14,7 @@ from modules.plotter import plot_as_pie
 from modules.tools import (
     create_portfolio_dataframe,
     get_currency_symbol,
-    convert_dataframe_prices_historical
+    convert_dataframe_prices_historical,
 )
 from modules.utils import toTimestamp_A, toTimestamp_B
 
@@ -23,7 +23,9 @@ logger = logging.getLogger(__name__)
 
 # Cached API wrappers for instant toggle responses
 @st.cache_data(ttl=3600, show_spinner=False)
-def fetch_api_coins(api_url: str, api_key: str, cache_file: str, symbols: tuple = None) -> pd.DataFrame:
+def fetch_api_coins(
+    api_url: str, api_key: str, cache_file: str, symbols: tuple = None
+) -> pd.DataFrame:
     """Fetch coins from API with Streamlit session cache.
 
     Args:
@@ -42,7 +44,12 @@ def fetch_api_coins(api_url: str, api_key: str, cache_file: str, symbols: tuple 
 
 @st.cache_data(ttl=3600, show_spinner=False)
 def fetch_api_crypto_market(
-    api_url: str, api_key: str, cache_file: str, token_symbol: str, from_ts: int, to_ts: int
+    api_url: str,
+    api_key: str,
+    cache_file: str,
+    token_symbol: str,
+    from_ts: int,
+    to_ts: int,
 ) -> pd.DataFrame:
     """Fetch cryptocurrency market data from API with Streamlit session cache.
 
@@ -59,9 +66,7 @@ def fetch_api_crypto_market(
     """
     api = ApiMarket(api_url, api_key=api_key, cache_file=cache_file)
     return api.get_cryptocurrency_market_cached(
-        token_symbol=token_symbol,
-        from_timestamp=from_ts,
-        to_timestamp=to_ts
+        token_symbol=token_symbol, from_timestamp=from_ts, to_timestamp=to_ts
     )
 
 
@@ -82,7 +87,12 @@ def fetch_api_fiat_rates(api_url: str, api_key: str, cache_file: str) -> pd.Data
     return api.get_currency()
 
 
-def plot_modern_graph(df: pd.DataFrame, title: str = None, y_label: str = None, optimize_y_range: bool = False):
+def plot_modern_graph(
+    df: pd.DataFrame,
+    title: str = None,
+    y_label: str = None,
+    optimize_y_range: bool = False,
+):
     """Plot data with modern style matching other pages.
 
     Args:
@@ -104,14 +114,16 @@ def plot_modern_graph(df: pd.DataFrame, title: str = None, y_label: str = None, 
 
     # Add traces for each column
     for col in df.columns:
-        fig.add_trace(go.Scatter(
-            x=df.index,
-            y=df[col],
-            mode='lines',
-            name=col,
-            fill='tozeroy' if len(df.columns) == 1 else None,
-            line=dict(width=2)
-        ))
+        fig.add_trace(
+            go.Scatter(
+                x=df.index,
+                y=df[col],
+                mode="lines",
+                name=col,
+                fill="tozeroy" if len(df.columns) == 1 else None,
+                line=dict(width=2),
+            )
+        )
 
     # Set default labels if not provided
     if y_label is None:
@@ -123,8 +135,8 @@ def plot_modern_graph(df: pd.DataFrame, title: str = None, y_label: str = None, 
         "title": title,
         "xaxis_title": "Date",
         "yaxis_title": y_label,
-        "hovermode": 'x unified',
-        "height": 400
+        "hovermode": "x unified",
+        "height": 400,
     }
 
     # Optimize y-axis range if requested
@@ -139,7 +151,7 @@ def plot_modern_graph(df: pd.DataFrame, title: str = None, y_label: str = None, 
 
         layout_config["yaxis"] = {
             "title": y_label,
-            "range": [y_min - margin, y_max + margin]
+            "range": [y_min - margin, y_max + margin],
         }
 
     fig.update_layout(**layout_config)
@@ -170,9 +182,9 @@ def plot_dual_axis_graph(df: pd.DataFrame, title: str = None, token: str = None)
     value_col = None
     count_col = None
     for col in df.columns:
-        if col.lower() == 'value':
+        if col.lower() == "value":
             value_col = col
-        elif col.lower() == 'count':
+        elif col.lower() == "count":
             count_col = col
 
     if value_col is None or count_col is None:
@@ -180,24 +192,28 @@ def plot_dual_axis_graph(df: pd.DataFrame, title: str = None, token: str = None)
         return
 
     # Add Value trace on primary y-axis (left)
-    fig.add_trace(go.Scatter(
-        x=df.index,
-        y=df[value_col],
-        mode='lines',
-        name=f'Value ({currency_symbol})',
-        line=dict(width=2, color='#1f77b4'),
-        yaxis='y1'
-    ))
+    fig.add_trace(
+        go.Scatter(
+            x=df.index,
+            y=df[value_col],
+            mode="lines",
+            name=f"Value ({currency_symbol})",
+            line=dict(width=2, color="#1f77b4"),
+            yaxis="y1",
+        )
+    )
 
     # Add Count trace on secondary y-axis (right)
-    fig.add_trace(go.Scatter(
-        x=df.index,
-        y=df[count_col],
-        mode='lines',
-        name='Count',
-        line=dict(width=2, color='#ff7f0e'),
-        yaxis='y2'
-    ))
+    fig.add_trace(
+        go.Scatter(
+            x=df.index,
+            y=df[count_col],
+            mode="lines",
+            name="Count",
+            line=dict(width=2, color="#ff7f0e"),
+            yaxis="y2",
+        )
+    )
 
     # Calculate optimized ranges for both axes
     value_min = df[value_col].min()
@@ -212,7 +228,11 @@ def plot_dual_axis_graph(df: pd.DataFrame, title: str = None, token: str = None)
 
     # Set title
     if title is None:
-        title = f"{token} - Assets Balance Over Time" if token else "Assets Balance Over Time"
+        title = (
+            f"{token} - Assets Balance Over Time"
+            if token
+            else "Assets Balance Over Time"
+        )
 
     # Configure layout with dual y-axes
     fig.update_layout(
@@ -221,23 +241,17 @@ def plot_dual_axis_graph(df: pd.DataFrame, title: str = None, token: str = None)
         yaxis=dict(
             title=f"Value ({currency_symbol})",
             range=[value_min - value_margin, value_max + value_margin],
-            side='left'
+            side="left",
         ),
         yaxis2=dict(
             title="Count",
             range=[count_min - count_margin, count_max + count_margin],
-            overlaying='y',
-            side='right'
+            overlaying="y",
+            side="right",
         ),
-        hovermode='x unified',
+        hovermode="x unified",
         height=400,
-        legend=dict(
-            orientation="h",
-            yanchor="bottom",
-            y=1.02,
-            xanchor="right",
-            x=1
-        )
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
     )
 
     st.plotly_chart(fig, width="stretch")
@@ -279,13 +293,18 @@ def aggregater_ui():
 
             df = df.groupby("token").agg({"amount": "sum", value_column: "sum"})
             df["Repartition(%)"] = (df[value_column] / df[value_column].sum()) * 100
-            df = df.rename(columns={"amount": "Amount", value_column: f"Value({target_currency})"})
+            df = df.rename(
+                columns={"amount": "Amount", value_column: f"Value({target_currency})"}
+            )
             df = df.sort_values(by="Repartition(%)", ascending=False)
-            st.dataframe(df, width='stretch', height=height)
+            st.dataframe(df, width="stretch", height=height)
 
             # Display total with appropriate currency symbol
             currency_symbol = get_currency_symbol(target_currency)
-            st.write(f"Total value: {currency_symbol}" + str(round(df[f"Value({target_currency})"].sum(), 2)))
+            st.write(
+                f"Total value: {currency_symbol}"
+                + str(round(df[f"Value({target_currency})"].sum(), 2))
+            )
         else:
             st.info("No data available")
     with col_pie:
@@ -300,14 +319,20 @@ def aggregater_ui():
 
 
 def draw_tab_content(
-    section: str, token: str, start_timestamp: int, end_timestamp: int, use_api: bool = False
+    section: str,
+    token: str,
+    start_timestamp: int,
+    end_timestamp: int,
+    use_api: bool = False,
 ):
     logger.debug("Draw tab content for token %s", token)
     if section == "Assets Balances":
         with st.spinner("Loading assets balances...", show_time=True):
             if use_api:
                 # Get counts from local database
-                df_counts = tokensdb.get_token_counts(token, start_timestamp, end_timestamp)
+                df_counts = tokensdb.get_token_counts(
+                    token, start_timestamp, end_timestamp
+                )
                 if df_counts is None:
                     st.warning(f"No balance data found for {token} in local database")
                     df_view = None
@@ -315,19 +340,34 @@ def draw_tab_content(
                     # Get prices from API (cached)
                     api_url = st.session_state.settings["marketraccoon_url"]
                     api_key = st.session_state.settings.get("marketraccoon_token")
-                    cache_file = os.path.join(st.session_state.settings["data_path"], "api_cache.json")
+                    cache_file = os.path.join(
+                        st.session_state.settings["data_path"], "api_cache.json"
+                    )
                     df_prices = fetch_api_crypto_market(
-                        api_url, api_key, cache_file, token, start_timestamp, end_timestamp
+                        api_url,
+                        api_key,
+                        cache_file,
+                        token,
+                        start_timestamp,
+                        end_timestamp,
                     )
                     if df_prices is None:
-                        st.warning(f"No price data found for {token} in API, falling back to local database")
-                        df_view = tokensdb.get_token_balances(token, start_timestamp, end_timestamp)
+                        st.warning(
+                            f"No price data found for {token} in API, falling back to local database"
+                        )
+                        df_view = tokensdb.get_token_balances(
+                            token, start_timestamp, end_timestamp
+                        )
 
                         # Fallback local (EUR) : convertir si nécessaire
-                        target_currency = st.session_state.settings.get("fiat_currency", "EUR")
+                        target_currency = st.session_state.settings.get(
+                            "fiat_currency", "EUR"
+                        )
                         if df_view is not None and target_currency != "EUR":
                             df_fiat = fetch_api_fiat_rates(api_url, api_key, cache_file)
-                            value_col = "Value" if "Value" in df_view.columns else "value"
+                            value_col = (
+                                "Value" if "Value" in df_view.columns else "value"
+                            )
                             df_view = convert_dataframe_prices_historical(
                                 df_view, value_col, "EUR", target_currency, df_fiat
                             )
@@ -335,34 +375,46 @@ def draw_tab_content(
                         # Conversion USD → devise cible avec taux historiques
                         if "source_currency" in df_prices.columns:
                             source_currency = df_prices["source_currency"].iloc[0]
-                            target_currency = st.session_state.settings.get("fiat_currency", "EUR")
+                            target_currency = st.session_state.settings.get(
+                                "fiat_currency", "EUR"
+                            )
 
                             if source_currency != target_currency:
-                                df_fiat = fetch_api_fiat_rates(api_url, api_key, cache_file)
+                                df_fiat = fetch_api_fiat_rates(
+                                    api_url, api_key, cache_file
+                                )
                                 df_prices = convert_dataframe_prices_historical(
-                                    df_prices, "Price", source_currency, target_currency, df_fiat
+                                    df_prices,
+                                    "Price",
+                                    source_currency,
+                                    target_currency,
+                                    df_fiat,
                                 )
 
                             df_prices = df_prices.drop(columns=["source_currency"])
 
                         # Merge counts with API prices (déjà converti)
-                        df_view = df_counts.join(df_prices, how='outer')
+                        df_view = df_counts.join(df_prices, how="outer")
                         df_view = df_view.ffill()  # Forward fill missing values
                         df_view = df_view.dropna()  # Remove rows with missing data
                         # Calculate Value = Price * Count
-                        df_view['Value'] = df_view['Price'] * df_view['Count']
+                        df_view["Value"] = df_view["Price"] * df_view["Count"]
                         # Keep only Value and Count columns
-                        df_view = df_view[['Value', 'Count']]
+                        df_view = df_view[["Value", "Count"]]
             else:
                 # Use local SQLite database (données en EUR)
-                df_view = tokensdb.get_token_balances(token, start_timestamp, end_timestamp)
+                df_view = tokensdb.get_token_balances(
+                    token, start_timestamp, end_timestamp
+                )
 
                 # Conversion EUR → devise cible si nécessaire
                 target_currency = st.session_state.settings.get("fiat_currency", "EUR")
                 if df_view is not None and target_currency != "EUR":
                     api_url = st.session_state.settings["marketraccoon_url"]
                     api_key = st.session_state.settings.get("marketraccoon_token")
-                    cache_file = os.path.join(st.session_state.settings["data_path"], "api_cache.json")
+                    cache_file = os.path.join(
+                        st.session_state.settings["data_path"], "api_cache.json"
+                    )
                     df_fiat = fetch_api_fiat_rates(api_url, api_key, cache_file)
                     # Value = price * count (en EUR), convertir la colonne Value
                     value_col = "Value" if "Value" in df_view.columns else "value"
@@ -375,7 +427,9 @@ def draw_tab_content(
                 # Use MarketRaccoon API (cached)
                 api_url = st.session_state.settings["marketraccoon_url"]
                 api_key = st.session_state.settings.get("marketraccoon_token")
-                cache_file = os.path.join(st.session_state.settings["data_path"], "api_cache.json")
+                cache_file = os.path.join(
+                    st.session_state.settings["data_path"], "api_cache.json"
+                )
                 df_view = fetch_api_crypto_market(
                     api_url, api_key, cache_file, token, start_timestamp, end_timestamp
                 )
@@ -383,7 +437,9 @@ def draw_tab_content(
                 # Conversion USD → devise cible avec taux historiques
                 if df_view is not None and "source_currency" in df_view.columns:
                     source_currency = df_view["source_currency"].iloc[0]
-                    target_currency = st.session_state.settings.get("fiat_currency", "EUR")
+                    target_currency = st.session_state.settings.get(
+                        "fiat_currency", "EUR"
+                    )
 
                     if source_currency != target_currency:
                         df_fiat = fetch_api_fiat_rates(api_url, api_key, cache_file)
@@ -395,14 +451,18 @@ def draw_tab_content(
                     df_view = df_view.drop(columns=["source_currency"])
             else:
                 # Use local SQLite database (données en EUR)
-                df_view = markgetdb.get_token_market(token, start_timestamp, end_timestamp)
+                df_view = markgetdb.get_token_market(
+                    token, start_timestamp, end_timestamp
+                )
 
                 # Conversion EUR → devise cible si nécessaire
                 target_currency = st.session_state.settings.get("fiat_currency", "EUR")
                 if df_view is not None and target_currency != "EUR":
                     api_url = st.session_state.settings["marketraccoon_url"]
                     api_key = st.session_state.settings.get("marketraccoon_token")
-                    cache_file = os.path.join(st.session_state.settings["data_path"], "api_cache.json")
+                    cache_file = os.path.join(
+                        st.session_state.settings["data_path"], "api_cache.json"
+                    )
                     df_fiat = fetch_api_fiat_rates(api_url, api_key, cache_file)
                     df_view = convert_dataframe_prices_historical(
                         df_view, "Price", "EUR", target_currency, df_fiat
@@ -486,7 +546,7 @@ def draw_tab_content(
                 chart_title = f"{token} - {label} Over Time"
                 plot_modern_graph(df_view, title=chart_title, optimize_y_range=True)
         with col2:
-            col2.dataframe(df_view, width='stretch')
+            col2.dataframe(df_view, width="stretch")
 
     else:
         st.info("No data available")
@@ -507,12 +567,16 @@ def build_tabs(section: str = "Assets Balances", use_api: bool = False):
             # Get tokens from API (cached)
             api_url = st.session_state.settings["marketraccoon_url"]
             api_key = st.session_state.settings.get("marketraccoon_token")
-            cache_file = os.path.join(st.session_state.settings["data_path"], "api_cache.json")
+            cache_file = os.path.join(
+                st.session_state.settings["data_path"], "api_cache.json"
+            )
             coins_df = fetch_api_coins(api_url, api_key, cache_file)
             if coins_df is not None and not coins_df.empty:
                 available_tokens = coins_df["symbol"].unique().tolist()
             else:
-                st.warning("Unable to fetch tokens from API, falling back to local database")
+                st.warning(
+                    "Unable to fetch tokens from API, falling back to local database"
+                )
                 available_tokens = markgetdb.getTokens()
         else:
             available_tokens = markgetdb.getTokens()
@@ -555,7 +619,9 @@ def build_tabs(section: str = "Assets Balances", use_api: bool = False):
             idx_token += 1
 
 
-def build_price_tab(df: pd.DataFrame, chart_title: str = None, chart_y_label: str = None):
+def build_price_tab(
+    df: pd.DataFrame, chart_title: str = None, chart_y_label: str = None
+):
     logger.debug("Build tabs")
     if df is None or df.empty:
         st.info("No data available")
@@ -591,9 +657,11 @@ def build_price_tab(df: pd.DataFrame, chart_title: str = None, chart_y_label: st
             # Use provided title and y_label, or defaults
             title = chart_title if chart_title else "USD/EUR Exchange Rate Over Time"
             y_label = chart_y_label if chart_y_label else "EUR"
-            plot_modern_graph(df_view, title=title, y_label=y_label, optimize_y_range=True)
+            plot_modern_graph(
+                df_view, title=title, y_label=y_label, optimize_y_range=True
+            )
         with col2:
-            col2.dataframe(df_view, width='stretch')
+            col2.dataframe(df_view, width="stretch")
 
     else:
         st.error("The end date must be after the start date")
@@ -647,7 +715,7 @@ with st.sidebar:
             "Use API",
             value=False,
             help="Use MarketRaccoon API instead of local SQLite database",
-            key="data_source_toggle"
+            key="data_source_toggle",
         )
         if use_api_sidebar:
             st.caption("📡 API MarketRaccoon")
@@ -667,7 +735,7 @@ with st.sidebar:
             "EUR/USD",
             value=True,
             help="EUR/USD (default) or USD/EUR",
-            key="currency_direction_toggle"
+            key="currency_direction_toggle",
         )
 
 tokensdb = TokensDatabase(st.session_state.settings["dbfile"])
@@ -681,12 +749,14 @@ cache_file = os.path.join(st.session_state.settings["data_path"], "api_cache.jso
 apimarket = ApiMarket(
     st.session_state.settings["marketraccoon_url"],
     api_key=st.session_state.settings.get("marketraccoon_token"),
-    cache_file=cache_file
+    cache_file=cache_file,
 )
 
 if "tokens" not in st.session_state:
     # Load saved token preferences from settings
-    st.session_state.tokens = st.session_state.settings.get("graphs_selected_tokens", [])
+    st.session_state.tokens = st.session_state.settings.get(
+        "graphs_selected_tokens", []
+    )
 
 if add_selectbox == "Global":
     logger.debug("Global")
@@ -706,7 +776,7 @@ if add_selectbox == "Market":
 if add_selectbox == "Currency":
     # Determine currency direction from toggle
     currency_inverted = st.session_state.get("currency_direction_toggle", True)
-    
+
     # Update title and labels based on direction
     if currency_inverted:
         title_text = "Currency (EUR/USD)"
@@ -716,7 +786,7 @@ if add_selectbox == "Currency":
         title_text = "Currency (USD/EUR)"
         chart_title = "USD/EUR Exchange Rate Over Time"
         chart_y_label = "EUR"
-    
+
     logger.debug(title_text)
     st.title(title_text)
 
@@ -725,12 +795,12 @@ if add_selectbox == "Currency":
     market = ApiMarket(
         st.session_state.settings["marketraccoon_url"],
         api_key=st.session_state.settings.get("marketraccoon_token"),
-        cache_file=cache_file
+        cache_file=cache_file,
     )
 
     # Fetch currency data (will use cache internally)
     currency_data = market.get_currency()
-    
+
     # Invert prices if EUR/USD is selected
     if currency_inverted and currency_data is not None and not currency_data.empty:
         currency_data = currency_data.copy()
@@ -749,7 +819,7 @@ if add_selectbox == "Currency":
         with col_time:
             time = st.time_input("Time", key="intertime")
         with col_btn:
-            submitted = st.form_submit_button("Submit", width='stretch')
+            submitted = st.form_submit_button("Submit", width="stretch")
 
         if submitted:
             timestamp = toTimestamp_B(date, time, utc=False)
@@ -757,16 +827,18 @@ if add_selectbox == "Currency":
 
             if df_result is not None and not df_result.empty:
                 value = df_result["price"].iloc[0]
-                is_interpolated = df_result.get("interpolated", pd.Series([False])).iloc[0]
-                
+                is_interpolated = df_result.get(
+                    "interpolated", pd.Series([False])
+                ).iloc[0]
+
                 # Invert value if EUR/USD is selected
                 if currency_inverted:
                     value = 1 / value
-                
+
                 st.session_state.interpolation_result = {
                     "value": value,
                     "is_interpolated": is_interpolated,
-                    "currency_inverted": currency_inverted
+                    "currency_inverted": currency_inverted,
                 }
             else:
                 st.session_state.interpolation_result = None
@@ -777,7 +849,7 @@ if add_selectbox == "Currency":
         value = result["value"]
         is_interpolated = result["is_interpolated"]
         result_currency_inverted = result.get("currency_inverted", True)
-        
+
         # Determine the currency unit to display
         unit = "USD" if result_currency_inverted else "EUR"
 
@@ -788,5 +860,8 @@ if add_selectbox == "Currency":
                 st.info(f"Exact value: {value:.6f} {unit}")
         else:
             st.warning("Value is 0.0")
-    elif st.session_state.interpolation_result is None and "interpolation_result" in st.session_state:
+    elif (
+        st.session_state.interpolation_result is None
+        and "interpolation_result" in st.session_state
+    ):
         st.info("No data available")

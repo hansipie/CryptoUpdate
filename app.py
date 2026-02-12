@@ -63,7 +63,9 @@ def setup_navigation():
         "graphs": st.Page(APP_PAGES["GRAPHS"], title="Graphs", icon="📊"),
         "operations": st.Page(APP_PAGES["OPERATIONS"], title="Operations", icon="💱"),
         "import": st.Page(APP_PAGES["IMPORT"], title="Import", icon="📥"),
-        "token_metadata": st.Page(APP_PAGES["TOKEN_METADATA"], title="Token Metadata", icon="🏷️"),
+        "token_metadata": st.Page(
+            APP_PAGES["TOKEN_METADATA"], title="Token Metadata", icon="🏷️"
+        ),
         "settings": st.Page(APP_PAGES["SETTINGS"], title="Settings", icon="⚙️"),
         "tests": st.Page(APP_PAGES["TEST"], title="Tests", icon="🧪"),
     }
@@ -94,6 +96,7 @@ def main():
     # Apply pending database migrations (once per session)
     if "db_migrations_applied" not in st.session_state:
         from modules.database.migrations import run_migrations
+
         run_migrations(st.session_state.settings["dbfile"])
         st.session_state["db_migrations_applied"] = True
 
@@ -106,13 +109,18 @@ def main():
         st.write("Debug mode is ON")
         # Filter out sensitive data from session state before displaying
         safe_session_state = {
-            k: v for k, v in st.session_state.items()
+            k: v
+            for k, v in st.session_state.items()
             if k not in ["settings"] and not k.endswith("_token")
         }
         # Add non-sensitive settings
         if "settings" in st.session_state:
             safe_session_state["settings"] = {
-                k: ("***REDACTED***" if "token" in k.lower() or "password" in k.lower() else v)
+                k: (
+                    "***REDACTED***"
+                    if "token" in k.lower() or "password" in k.lower()
+                    else v
+                )
                 for k, v in st.session_state.settings.items()
             }
         st.write(safe_session_state)

@@ -32,7 +32,6 @@ def _select_coin_dialog():
 
     if coins_df is None or coins_df.empty:
         st.rerun()
-        return
 
     st.write(f"Plusieurs tokens trouvés pour **{token_symbol}**. Sélectionnez le bon :")
 
@@ -40,18 +39,19 @@ def _select_coin_dialog():
     for _, row in coins_df.iterrows():
         ucid = row.get("cmc_id")
         ucid_part = f", UCID: {ucid}" if pd.notna(ucid) else ""
-        options.append(
-            f"{row['symbol']} — {row['name']} (ID: {row['id']}{ucid_part})"
-        )
+        options.append(f"{row['symbol']} — {row['name']} (ID: {row['id']}{ucid_part})")
     selected_idx = st.selectbox(
-        "Token",
-        range(len(options)),
-        format_func=lambda i: options[i]
+        "Token", range(len(options)), format_func=lambda i: options[i]
     )
 
     col1, col2 = st.columns(2)
     with col1:
-        if st.button("Confirmer", type="primary", icon=":material/check:", use_container_width=True):
+        if st.button(
+            "Confirmer",
+            type="primary",
+            icon=":material/check:",
+            use_container_width=True,
+        ):
             row = coins_df.iloc[selected_idx]
             st.session_state["checked_mr_id"] = int(row["id"])
             st.session_state["checked_mr_name"] = row["name"]
@@ -75,7 +75,6 @@ def _delete_confirmation_dialog():
 
     if not token_symbol or mr_id is None:
         st.rerun()
-        return
 
     # Récupérer les infos du token en utilisant le mraccoon_id
     token_info = manager.get_token_info_by_mr_id(mr_id)
@@ -83,14 +82,21 @@ def _delete_confirmation_dialog():
     display_symbol = token_info.get("token") if token_info else token_symbol
 
     if token_name:
-        st.warning(f"Êtes-vous sûr de vouloir supprimer **{display_symbol}** ({token_name}) ?")
+        st.warning(
+            f"Êtes-vous sûr de vouloir supprimer **{display_symbol}** ({token_name}) ?"
+        )
     else:
         st.warning(f"Êtes-vous sûr de vouloir supprimer **{display_symbol}** ?")
     st.write("Cette action supprimera toutes les métadonnées associées à ce token.")
 
     col1, col2 = st.columns(2)
     with col1:
-        if st.button("Supprimer", type="primary", icon=":material/delete_forever:", use_container_width=True):
+        if st.button(
+            "Supprimer",
+            type="primary",
+            icon=":material/delete_forever:",
+            use_container_width=True,
+        ):
             deleted = manager.delete_token_by_mr_id(mr_id)
             if deleted:
                 st.success(f"{display_symbol} supprimé.")
@@ -129,11 +135,15 @@ with st.sidebar:
     st.header("Add/Update Token")
 
     # --- Partie 1 : Recherche token ---
-    token_symbol = st.text_input(
-        "Token Symbol",
-        placeholder="BTC, ETH, etc.",
-        help="Enter the token symbol (case-sensitive)"
-    ).strip().upper()
+    token_symbol = (
+        st.text_input(
+            "Token Symbol",
+            placeholder="BTC, ETH, etc.",
+            help="Enter the token symbol (case-sensitive)",
+        )
+        .strip()
+        .upper()
+    )
 
     if st.button("Check", icon=":material/search:", use_container_width=True):
         if not token_symbol:
@@ -142,7 +152,7 @@ with st.sidebar:
             st.session_state["checked_token"] = token_symbol
             # 1. Appel API MarketRaccoon en priorité
             try:
-                api_market = tools._get_cached_api_market()
+                api_market = tools.get_cached_api_market()
                 coins_df = api_market.get_coins(symbols=[token_symbol])
 
                 if coins_df is None or coins_df.empty:
@@ -163,17 +173,27 @@ with st.sidebar:
                     st.session_state["pending_token_symbol"] = token_symbol
                     st.rerun()
             except Exception as e:
-                logger.warning("Could not fetch MarketRaccoon info for %s: %s", token_symbol, e)
+                logger.warning(
+                    "Could not fetch MarketRaccoon info for %s: %s", token_symbol, e
+                )
                 # 2. Fallback : utiliser les infos existantes en DB
                 existing_mr_id = manager.get_mr_id(token_symbol)
                 if existing_mr_id is not None:
                     info = manager.get_token_info_by_mr_id(existing_mr_id)
                     st.session_state["checked_mr_id"] = existing_mr_id
-                    st.session_state["checked_mr_name"] = info.get("name") if info else None
-                    st.session_state["checked_token"] = info.get("token") if info else token_symbol
-                    st.info(f"API indisponible — infos chargées depuis la base de données.")
+                    st.session_state["checked_mr_name"] = (
+                        info.get("name") if info else None
+                    )
+                    st.session_state["checked_token"] = (
+                        info.get("token") if info else token_symbol
+                    )
+                    st.info(
+                        "API indisponible — infos chargées depuis la base de données."
+                    )
                 else:
-                    st.warning(f"API indisponible et token {token_symbol} absent de la base.")
+                    st.warning(
+                        f"API indisponible et token {token_symbol} absent de la base."
+                    )
                     st.session_state["checked_mr_id"] = None
                     st.session_state["checked_mr_name"] = None
 
@@ -188,7 +208,9 @@ with st.sidebar:
 
     # Mettre à jour les clés widget avant le rendu
     st.session_state["mr_name_display"] = st.session_state.get("checked_mr_name") or ""
-    st.session_state["mr_id_display"] = str(checked_id) if checked_id is not None else ""
+    st.session_state["mr_id_display"] = (
+        str(checked_id) if checked_id is not None else ""
+    )
     cmc_id = st.session_state.get("checked_cmc_id")
     st.session_state["mr_cmc_id_display"] = str(cmc_id) if cmc_id else ""
 
@@ -200,7 +222,12 @@ with st.sidebar:
         st.text_input("UCID", disabled=True, key="mr_cmc_id_display")
 
     submit_disabled = not has_checked or checked_id is None
-    if st.button("Submit", icon=":material/cloud_upload:", use_container_width=True, disabled=submit_disabled):
+    if st.button(
+        "Submit",
+        icon=":material/cloud_upload:",
+        use_container_width=True,
+        disabled=submit_disabled,
+    ):
         manager.upsert_token_info_by_mr_id(
             st.session_state["checked_mr_id"],
             st.session_state.get("checked_token", ""),
@@ -217,9 +244,7 @@ with st.sidebar:
 
     with st.form("metadata_form"):
         status = st.selectbox(
-            "Status",
-            options=[s.value for s in TokenStatus],
-            help="Select token status"
+            "Status", options=[s.value for s in TokenStatus], help="Select token status"
         )
 
         col1, col2 = st.columns(2)
@@ -227,23 +252,24 @@ with st.sidebar:
             delisting_date = st.date_input(
                 "Delisting Date",
                 value=None,
-                help="Date when token was delisted (optional)"
+                help="Date when token was delisted (optional)",
             )
         with col2:
             last_valid_price_date = st.date_input(
-                "Last Date",
-                value=None,
-                help="Date of last valid price (optional)"
+                "Last Date", value=None, help="Date of last valid price (optional)"
             )
 
         notes = st.text_area(
             "Notes",
             placeholder="Additional information about this token...",
-            help="Notes about the token status"
+            help="Notes about the token status",
         )
 
         submitted = st.form_submit_button(
-            "Save Metadata", icon=":material/save:", disabled=not has_checked, use_container_width=True
+            "Save Metadata",
+            icon=":material/save:",
+            disabled=not has_checked,
+            use_container_width=True,
         )
 
         if submitted:
@@ -297,7 +323,9 @@ with st.sidebar:
         st.rerun()
 
 # Main content area
-tab1, tab2, tab3, tab4 = st.tabs(["📊 Overview", "✅ Active Tokens", "❌ Delisted Tokens", "📋 All Tokens"])
+tab1, tab2, tab3, tab4 = st.tabs(
+    ["📊 Overview", "✅ Active Tokens", "❌ Delisted Tokens", "📋 All Tokens"]
+)
 
 # Tab 1: Overview with statistics
 with tab1:
@@ -311,10 +339,10 @@ with tab1:
     else:
         # Statistics
         total_tokens = len(all_metadata)
-        active_count = sum(1 for t in all_metadata if t['status'] == 'active')
-        delisted_count = sum(1 for t in all_metadata if t['status'] == 'delisted')
-        deprecated_count = sum(1 for t in all_metadata if t['status'] == 'deprecated')
-        migrated_count = sum(1 for t in all_metadata if t['status'] == 'migrated')
+        active_count = sum(1 for t in all_metadata if t["status"] == "active")
+        delisted_count = sum(1 for t in all_metadata if t["status"] == "delisted")
+        deprecated_count = sum(1 for t in all_metadata if t["status"] == "deprecated")
+        migrated_count = sum(1 for t in all_metadata if t["status"] == "migrated")
 
         col1, col2, col3, col4, col5 = st.columns(5)
 
@@ -334,28 +362,32 @@ with tab1:
         # Recent changes
         st.subheader("Recent Updates")
         df_all = pd.DataFrame(all_metadata)
-        df_all['updated_at'] = pd.to_datetime(df_all['updated_at'])
-        df_recent = df_all.nlargest(10, 'updated_at')[['token', 'name', 'status', 'updated_at', 'notes']]
-        df_recent['updated_at'] = df_recent['updated_at'].dt.strftime('%Y-%m-%d %H:%M')
+        df_all["updated_at"] = pd.to_datetime(df_all["updated_at"])
+        df_recent = df_all.nlargest(10, "updated_at")[
+            ["token", "name", "status", "updated_at", "notes"]
+        ]
+        df_recent["updated_at"] = df_recent["updated_at"].dt.strftime("%Y-%m-%d %H:%M")
 
         st.dataframe(
             df_recent,
-            width='stretch',
+            width="stretch",
             hide_index=True,
             column_config={
                 "token": st.column_config.TextColumn("Token", width="small"),
                 "name": st.column_config.TextColumn("Name", width="medium"),
                 "status": st.column_config.TextColumn("Status", width="small"),
-                "updated_at": st.column_config.TextColumn("Last Updated", width="medium"),
+                "updated_at": st.column_config.TextColumn(
+                    "Last Updated", width="medium"
+                ),
                 "notes": st.column_config.TextColumn("Notes", width="large"),
-            }
+            },
         )
 
 # Tab 2: Active Tokens
 with tab2:
     st.header("Active Tokens")
 
-    active_tokens = [t for t in all_metadata if t['status'] == 'active']
+    active_tokens = [t for t in all_metadata if t["status"] == "active"]
 
     if not active_tokens:
         st.info("No active tokens found.")
@@ -363,11 +395,11 @@ with tab2:
         st.write(f"**{len(active_tokens)} active tokens**")
 
         df_active = pd.DataFrame(active_tokens)
-        df_active = df_active[['token', 'name', 'notes', 'created_at', 'updated_at']]
+        df_active = df_active[["token", "name", "notes", "created_at", "updated_at"]]
 
         st.dataframe(
             df_active,
-            width='stretch',
+            width="stretch",
             hide_index=True,
             column_config={
                 "token": st.column_config.TextColumn("Token", width="small"),
@@ -375,7 +407,7 @@ with tab2:
                 "notes": st.column_config.TextColumn("Notes", width="large"),
                 "created_at": st.column_config.TextColumn("Created", width="medium"),
                 "updated_at": st.column_config.TextColumn("Updated", width="medium"),
-            }
+            },
         )
 
         # Quick actions
@@ -384,16 +416,17 @@ with tab2:
 
         with col1:
             active_options = [
-                t for t in active_tokens
-                if t.get("mraccoon_id") is not None
+                t for t in active_tokens if t.get("mraccoon_id") is not None
             ]
             token_to_delist = st.selectbox(
                 "Mark token as delisted",
-                options=[''] + active_options,
+                options=[""] + active_options,
                 format_func=lambda t: (
-                    "" if t == '' else f"{t['token']} — {t.get('name', '')} (ID: {t['mraccoon_id']})"
+                    ""
+                    if t == ""
+                    else f"{t['token']} — {t.get('name', '')} (ID: {t['mraccoon_id']})"
                 ),
-                key="delist_token"
+                key="delist_token",
             )
 
             if st.button("Mark as Delisted", disabled=not token_to_delist):
@@ -403,7 +436,7 @@ with tab2:
                         token=token_to_delist["token"],
                         status=TokenStatus.DELISTED,
                         delisting_date=datetime.now(timezone.utc),
-                        notes="Marked as delisted via UI"
+                        notes="Marked as delisted via UI",
                     )
                     st.success(f"✅ {token_to_delist['token']} marked as delisted")
                     st.rerun()
@@ -414,7 +447,7 @@ with tab2:
 with tab3:
     st.header("Delisted Tokens")
 
-    delisted_tokens = [t for t in all_metadata if t['status'] == 'delisted']
+    delisted_tokens = [t for t in all_metadata if t["status"] == "delisted"]
 
     if not delisted_tokens:
         st.info("No delisted tokens found.")
@@ -422,19 +455,25 @@ with tab3:
         st.write(f"**{len(delisted_tokens)} delisted tokens**")
 
         df_delisted = pd.DataFrame(delisted_tokens)
-        df_delisted = df_delisted[['token', 'name', 'delisting_date', 'last_valid_price_date', 'notes']]
+        df_delisted = df_delisted[
+            ["token", "name", "delisting_date", "last_valid_price_date", "notes"]
+        ]
 
         st.dataframe(
             df_delisted,
-            width='stretch',
+            width="stretch",
             hide_index=True,
             column_config={
                 "token": st.column_config.TextColumn("Token", width="small"),
                 "name": st.column_config.TextColumn("Name", width="medium"),
-                "delisting_date": st.column_config.TextColumn("Delisted On", width="medium"),
-                "last_valid_price_date": st.column_config.TextColumn("Last Valid Price", width="medium"),
+                "delisting_date": st.column_config.TextColumn(
+                    "Delisted On", width="medium"
+                ),
+                "last_valid_price_date": st.column_config.TextColumn(
+                    "Last Valid Price", width="medium"
+                ),
                 "notes": st.column_config.TextColumn("Notes", width="large"),
-            }
+            },
         )
 
         # Warning about database cleanup
@@ -463,48 +502,63 @@ with tab4:
             search_term = st.text_input(
                 "Search tokens",
                 placeholder="Enter token symbol...",
-                help="Filter tokens by symbol"
+                help="Filter tokens by symbol",
             ).upper()
 
         with col2:
             status_filter = st.multiselect(
-                "Filter by status",
-                options=[s.value for s in TokenStatus],
-                default=None
+                "Filter by status", options=[s.value for s in TokenStatus], default=None
             )
 
         # Apply filters
         filtered_metadata = all_metadata
 
         if search_term:
-            filtered_metadata = [t for t in filtered_metadata if search_term in t['token']]
+            filtered_metadata = [
+                t for t in filtered_metadata if search_term in t["token"]
+            ]
 
         if status_filter:
-            filtered_metadata = [t for t in filtered_metadata if t['status'] in status_filter]
+            filtered_metadata = [
+                t for t in filtered_metadata if t["status"] in status_filter
+            ]
 
         st.write(f"**Showing {len(filtered_metadata)} of {len(all_metadata)} tokens**")
 
         # Display table
         if filtered_metadata:
             df_all = pd.DataFrame(filtered_metadata)
-            df_display = df_all[[
-                'token', 'name', 'status', 'delisting_date',
-                'last_valid_price_date', 'notes', 'updated_at'
-            ]]
+            df_display = df_all[
+                [
+                    "token",
+                    "name",
+                    "status",
+                    "delisting_date",
+                    "last_valid_price_date",
+                    "notes",
+                    "updated_at",
+                ]
+            ]
 
             st.dataframe(
                 df_display,
-                width='stretch',
+                width="stretch",
                 hide_index=True,
                 column_config={
                     "token": st.column_config.TextColumn("Token", width="small"),
                     "name": st.column_config.TextColumn("Name", width="medium"),
                     "status": st.column_config.TextColumn("Status", width="small"),
-                    "delisting_date": st.column_config.TextColumn("Delisted On", width="medium"),
-                    "last_valid_price_date": st.column_config.TextColumn("Last Valid Price", width="medium"),
+                    "delisting_date": st.column_config.TextColumn(
+                        "Delisted On", width="medium"
+                    ),
+                    "last_valid_price_date": st.column_config.TextColumn(
+                        "Last Valid Price", width="medium"
+                    ),
                     "notes": st.column_config.TextColumn("Notes", width="large"),
-                    "updated_at": st.column_config.TextColumn("Last Updated", width="medium"),
-                }
+                    "updated_at": st.column_config.TextColumn(
+                        "Last Updated", width="medium"
+                    ),
+                },
             )
         else:
             st.info("No tokens match your filters.")
@@ -512,7 +566,7 @@ with tab4:
         # Export functionality
         st.divider()
 
-        if st.button("📥 Export to CSV", width='stretch'):
+        if st.button("📥 Export to CSV", width="stretch"):
             df_export = pd.DataFrame(all_metadata)
             csv = df_export.to_csv(index=False)
             st.download_button(
@@ -520,7 +574,7 @@ with tab4:
                 data=csv,
                 file_name=f"token_metadata_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
                 mime="text/csv",
-                width='stretch'
+                width="stretch",
             )
 
 # Footer with help

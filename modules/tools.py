@@ -41,16 +41,12 @@ def get_currency_symbol(currency_code: str = None) -> str:
     if currency_code is None:
         currency_code = st.session_state.settings.get("fiat_currency", "EUR")
 
-    currency_symbols = {
-        "EUR": "€", "USD": "$"
-    }
+    currency_symbols = {"EUR": "€", "USD": "$"}
     return currency_symbols.get(currency_code, currency_code)
 
 
 def convert_price_to_target_currency(
-    value: float,
-    source_currency: str,
-    target_currency: str = None
+    value: float, source_currency: str, target_currency: str = None
 ) -> float:
     """Convertit un montant d'une devise source vers une devise cible (taux actuel).
 
@@ -78,13 +74,13 @@ def convert_price_to_target_currency(
         logger.warning(
             "Conversion %s→%s non supportée (seul EUR↔USD disponible)",
             source_currency,
-            target_currency
+            target_currency,
         )
         return value
 
     # Récupérer le taux USD→EUR depuis MarketRaccoon API
     try:
-        api_market = _get_cached_api_market()
+        api_market = get_cached_api_market()
         df_rate = api_market.get_fiat_latest_rate_cached()
 
         if df_rate is None or df_rate.empty:
@@ -117,7 +113,7 @@ def convert_dataframe_prices_historical(
     price_column: str,
     source_currency: str,
     target_currency: str = None,
-    fiat_rates_df: pd.DataFrame = None
+    fiat_rates_df: pd.DataFrame = None,
 ) -> pd.DataFrame:
     """Convertit les prix d'un DataFrame en utilisant les taux de change historiques.
 
@@ -147,16 +143,20 @@ def convert_dataframe_prices_historical(
         logger.warning(
             "Conversion historique %s→%s non supportée (seul EUR↔USD disponible)",
             source_currency,
-            target_currency
+            target_currency,
         )
         return df
 
     # Fallback sur taux actuel si pas de données historiques
     if fiat_rates_df is None or fiat_rates_df.empty:
-        logger.warning("Pas de taux historiques disponibles, utilisation du taux actuel")
+        logger.warning(
+            "Pas de taux historiques disponibles, utilisation du taux actuel"
+        )
         df = df.copy()
         df[price_column] = df[price_column].apply(
-            lambda x: convert_price_to_target_currency(x, source_currency, target_currency)
+            lambda x: convert_price_to_target_currency(
+                x, source_currency, target_currency
+            )
         )
         return df
 
@@ -174,7 +174,7 @@ def convert_dataframe_prices_historical(
         prices.sort_values("Date"),
         rates.sort_values("Date"),
         on="Date",
-        direction="nearest"
+        direction="nearest",
     )
 
     logger.info(
@@ -183,7 +183,7 @@ def convert_dataframe_prices_historical(
         target_currency,
         len(merged),
         merged["rate"].min(),
-        merged["rate"].max()
+        merged["rate"].max(),
     )
 
     # Appliquer la conversion selon la direction
@@ -198,7 +198,7 @@ def convert_dataframe_prices_historical(
     return df
 
 
-def _get_cached_api_market() -> ApiMarket:
+def get_cached_api_market() -> ApiMarket:
     """Get or create cached ApiMarket instance in session state.
 
     This singleton pattern prevents creating multiple ApiMarket instances
@@ -214,9 +214,11 @@ def _get_cached_api_market() -> ApiMarket:
         st.session_state.api_market_instance = ApiMarket(
             settings["marketraccoon_url"],
             api_key=settings.get("marketraccoon_token"),
-            cache_file=cache_file
+            cache_file=cache_file,
         )
-        logger.debug("Created cached ApiMarket instance with cache file: %s", cache_file)
+        logger.debug(
+            "Created cached ApiMarket instance with cache file: %s", cache_file
+        )
 
     return st.session_state.api_market_instance
 
@@ -250,12 +252,12 @@ def convert_fiat_to_settings_currency(
         logger.warning(
             "Conversion %s -> %s non supportée. Seules les conversions EUR<->USD sont disponibles.",
             input_currency,
-            target_currency
+            target_currency,
         )
         return value
 
     # Utiliser ApiMarket pour obtenir les taux de change EUR/USD avec cache
-    api_market = _get_cached_api_market()
+    api_market = get_cached_api_market()
 
     try:
         # Récupérer les derniers taux de change (avec cache)
@@ -299,7 +301,9 @@ def convert_fiat_to_settings_currency(
         return converted_value
 
     except (requests.RequestException, KeyError, ValueError) as e:
-        logger.error("Erreur conversion %s -> %s: %s", input_currency, target_currency, e)
+        logger.error(
+            "Erreur conversion %s -> %s: %s", input_currency, target_currency, e
+        )
         return None
 
 
@@ -347,7 +351,9 @@ def update_database(dbfile: str, cmc_apikey: str, debug: bool):
     TokensDatabase(dbfile).add_tokens(new_entries)
 
     custom = Customdata(dbfile)
-    custom.set("last_update", str(int(pd.Timestamp.now(tz="UTC").timestamp())), "integer")
+    custom.set(
+        "last_update", str(int(pd.Timestamp.now(tz="UTC").timestamp())), "integer"
+    )
 
 
 def parse_last_update(last_update_data: tuple) -> pd.Timestamp:
@@ -440,7 +446,9 @@ def load_settings(settings: dict):
     if "settings" not in st.session_state:
         st.session_state.settings = {}
     st.session_state.settings["marketraccoon_url"] = settings["MarketRaccoon"]["url"]
-    st.session_state.settings["marketraccoon_token"] = settings["MarketRaccoon"].get("token", "")
+    st.session_state.settings["marketraccoon_token"] = settings["MarketRaccoon"].get(
+        "token", ""
+    )
     st.session_state.settings["notion_token"] = settings["Notion"]["token"]
     st.session_state.settings["notion_database"] = settings["Notion"]["database"]
     st.session_state.settings["notion_parentpage"] = settings["Notion"]["parentpage"]
@@ -523,14 +531,12 @@ def load_settings(settings: dict):
             st.session_state.settings["dbfile"] = fallback_db
             logger.info("Falling back to dbfile: %s", fallback_db)
         except Exception as e2:
-            logger.critical(
-                "Unable to create fallback DB file %s: %s", fallback_db, e2
-            )
+            logger.critical("Unable to create fallback DB file %s: %s", fallback_db, e2)
 
     # Load fiat currency setting
-    st.session_state.settings["fiat_currency"] = settings.get(
-        "FiatCurrency", {}
-    ).get("currency", "EUR")
+    st.session_state.settings["fiat_currency"] = settings.get("FiatCurrency", {}).get(
+        "currency", "EUR"
+    )
 
     # Load UI preferences
     st.session_state.settings["show_empty_portfolios"] = settings.get(
@@ -691,22 +697,25 @@ def _get_api_latest_prices() -> dict:
     Returns:
         Dict mapping symbol to USD price, e.g. {"BTC": 97000.0, "ETH": 3200.0}
     """
-    api = _get_cached_api_market()
-    
+    api = get_cached_api_market()
+
     # Get list of tokens we actually use from the database
     try:
-        from modules.database.portfolios import Portfolios
         portfolios = Portfolios(st.session_state.settings["dbfile"])
-        portfolio_tokens = portfolios.getTokens()
+        portfolio_names = portfolios.get_portfolio_names()
+        portfolio_tokens = []
+        for pname in portfolio_names:
+            portfolio_tokens.extend(portfolios.get_tokens(pname).keys())
+        portfolio_tokens = list(set(portfolio_tokens))
         logger.debug("Portfolio tokens: %s", portfolio_tokens)
-        
+
         # Fetch prices with symbol filter to avoid duplicates
         # NOTE: Bypass cache to pass symbols parameter
         latest_df = api.get_cryptocurrency_latest(symbols=portfolio_tokens)
     except Exception as e:
         logger.warning("Could not get portfolio tokens, fetching all: %s", e)
         latest_df = api.get_cryptocurrency_latest()
-    
+
     if latest_df is None or latest_df.empty:
         logger.warning("No latest cryptocurrency data from API")
         return {}
@@ -718,7 +727,7 @@ def _get_api_latest_prices() -> dict:
 
     # Build id -> symbol mapping
     id_to_symbol = dict(zip(coins_df["id"], coins_df["symbol"]))
-    
+
     logger.debug("Latest df columns: %s", latest_df.columns.tolist())
     logger.debug("Latest df shape: %s", latest_df.shape)
 
@@ -735,10 +744,16 @@ def _get_api_latest_prices() -> dict:
         if symbol:
             # If symbol already exists, keep the one with better rank (lower is better)
             if symbol in prices:
-                logger.debug("Duplicate symbol %s found (coin_id=%d): keeping higher-ranked coin", symbol, coin_id)
+                logger.debug(
+                    "Duplicate symbol %s found (coin_id=%d): keeping higher-ranked coin",
+                    symbol,
+                    coin_id,
+                )
                 continue
             prices[symbol] = float(row["price"])
-            logger.info("API price: %s (coin_id=%d) = %.8f USD", symbol, coin_id, row["price"])
+            logger.info(
+                "API price: %s (coin_id=%d) = %.8f USD", symbol, coin_id, row["price"]
+            )
         else:
             logger.debug("No symbol found for coin_id=%s", coin_id)
 
@@ -752,13 +767,16 @@ def _get_api_fiat_rate() -> float:
     Returns:
         USD to EUR rate (e.g. 0.85 means 1 USD = 0.85 EUR), or None on error
     """
-    api = _get_cached_api_market()
+    api = get_cached_api_market()
     fiat_df = api.get_fiat_latest_rate()
     if fiat_df is not None and not fiat_df.empty:
         rate = fiat_df.iloc[-1]["price"]
         logger.info("API fiat rate USD→EUR: %s", rate)
         return rate
-    logger.error("API fiat rate unavailable - fiat_df is %s", "None" if fiat_df is None else "empty")
+    logger.error(
+        "API fiat rate unavailable - fiat_df is %s",
+        "None" if fiat_df is None else "empty",
+    )
     return None
 
 
@@ -848,7 +866,7 @@ def batch_convert_historical_api(
     if df.empty:
         return pd.Series(dtype=float)
 
-    api = _get_cached_api_market()
+    api = get_cached_api_market()
 
     # Collect all unique tokens (sources + target)
     all_tokens = set(df[source_token_column].unique())
@@ -949,8 +967,10 @@ def calc_perf_api(
     # If col_currency is provided, calculate Current Rate as token price in that currency
     # This matches the Buy Rate semantics: From/To where From is in col_currency
     if col_currency:
-        logger.debug("calc_perf_api with currency conversion - usd_to_eur=%s", usd_to_eur)
-        
+        logger.debug(
+            "calc_perf_api with currency conversion - usd_to_eur=%s", usd_to_eur
+        )
+
         def get_token_price_in_currency(token, currency):
             """Get token price expressed in the given currency."""
             # Get both prices in USD
@@ -958,24 +978,40 @@ def calc_perf_api(
             if token_price_usd is None:
                 logger.debug("No USD price for token %s", token)
                 return None
-            
-            logger.debug("Token %s: USD price = %f, converting to %s", token, token_price_usd, currency)
-            
+
+            logger.debug(
+                "Token %s: USD price = %f, converting to %s",
+                token,
+                token_price_usd,
+                currency,
+            )
+
             # Convert token USD price to target currency
             if currency == "USD":
                 return token_price_usd
             elif currency == "EUR":
                 if usd_to_eur is not None:
                     converted = token_price_usd * usd_to_eur
-                    logger.debug("Converted %f USD * %f = %f EUR", token_price_usd, usd_to_eur, converted)
+                    logger.debug(
+                        "Converted %f USD * %f = %f EUR",
+                        token_price_usd,
+                        usd_to_eur,
+                        converted,
+                    )
                     return converted
                 else:
-                    logger.warning("USD→EUR rate unavailable for %s, returning USD price", token)
-                    return token_price_usd  # Return USD price as fallback instead of None
+                    logger.warning(
+                        "USD→EUR rate unavailable for %s, returning USD price", token
+                    )
+                    return (
+                        token_price_usd  # Return USD price as fallback instead of None
+                    )
             else:
-                logger.warning("Unsupported currency: %s, returning USD price", currency)
+                logger.warning(
+                    "Unsupported currency: %s, returning USD price", currency
+                )
                 return token_price_usd  # Return USD price as fallback
-        
+
         df["Current Rate"] = df.apply(
             lambda row: get_token_price_in_currency(row[col_token], row[col_currency]),
             axis=1,
@@ -1001,10 +1037,8 @@ def calc_perf_api(
             usd_price = prices_usd.get(token)
             return convert_to_target(usd_price, token)
 
-        df["Current Rate"] = df[col_token].map(
-            lambda t: get_price_target(t)
-        )
-    
+        df["Current Rate"] = df[col_token].map(get_price_target)
+
     df["Perf."] = ((df["Current Rate"] * 100) / df[col_rate]) - 100
     return df
 

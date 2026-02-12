@@ -74,7 +74,9 @@ class cmc:
                     return None
             return fiat_prices
         else:
-            logger.error("API request failed with status code: %d", response.status_code)
+            logger.error(
+                "API request failed with status code: %d", response.status_code
+            )
             logger.debug("Error response: %s", response.text)
             return None
 
@@ -123,6 +125,8 @@ class cmc:
                     logger.debug("Data received: %s", content["data"][name])
             return crypto_prices
         else:
-            logger.error("API request failed with status code: %d", response.status_code)
+            logger.error(
+                "API request failed with status code: %d", response.status_code
+            )
             logger.debug("Error response: %s", response.text)
             return None
