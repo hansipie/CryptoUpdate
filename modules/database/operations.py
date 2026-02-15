@@ -17,7 +17,7 @@ import sqlite3
 logger = logging.getLogger(__name__)
 
 
-class operations:
+class Operations:
     def __init__(self, db_path: str):
         self.db_path = db_path
 
@@ -102,7 +102,10 @@ class operations:
     def get_averages(self) -> list:
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
-            cursor.execute(
-                "SELECT destination_unit, SUM(source), source_unit, SUM(destination) FROM Operations WHERE type = 'buy' GROUP BY destination_unit, source_unit"
+            query = (
+                "SELECT destination_unit, SUM(source), source_unit, SUM(destination) "
+                "FROM Operations WHERE type = 'buy' "
+                "GROUP BY destination_unit, source_unit"
             )
+            cursor.execute(query)
             return cursor.fetchall()

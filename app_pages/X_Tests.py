@@ -44,7 +44,7 @@ def find_missing_dates(dbfile: str) -> list:
 
         # Generate all dates between first and last
         all_dates = pd.date_range(start=first_date, end=last_date, freq="D")
-        all_dates_set = set(all_dates.date)
+        all_dates_set = set(d.date() for d in all_dates)
 
         # Find missing dates
         missing_dates = sorted(all_dates_set - existing_dates)

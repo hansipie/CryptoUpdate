@@ -336,7 +336,7 @@ def update_database(dbfile: str, cmc_apikey: str, debug: bool):
         traceback.print_exc()
         raise ValueError("Error updating market data") from e
 
-    tokens_prices = market.getLastMarket()
+    tokens_prices = market.get_last_market()
     if tokens_prices is None:
         logger.error("No Market data available")
         raise ValueError("No Market data available")

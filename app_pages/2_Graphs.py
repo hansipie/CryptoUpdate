@@ -5,7 +5,7 @@ import pandas as pd
 import streamlit as st
 import plotly.graph_objects as go
 
-from modules.configuration import configuration
+from modules.configuration import Configuration
 from modules.database.apimarket import ApiMarket
 from modules.database.market import Market
 from modules.database.portfolios import Portfolios
@@ -16,7 +16,7 @@ from modules.tools import (
     get_currency_symbol,
     convert_dataframe_prices_historical,
 )
-from modules.utils import toTimestamp_A, toTimestamp_B
+from modules.utils import to_timestamp_a as toTimestamp_A, to_timestamp_b as toTimestamp_B
 
 logger = logging.getLogger(__name__)
 
@@ -577,9 +577,9 @@ def build_tabs(section: str = "Assets Balances", use_api: bool = False):
                 st.warning(
                     "Unable to fetch tokens from API, falling back to local database"
                 )
-                available_tokens = markgetdb.getTokens()
+                available_tokens = markgetdb.get_tokens()
         else:
-            available_tokens = markgetdb.getTokens()
+            available_tokens = markgetdb.get_tokens()
     else:
         available_tokens = []
     if not available_tokens:
@@ -596,8 +596,8 @@ def build_tabs(section: str = "Assets Balances", use_api: bool = False):
 
         # Save token preferences to settings
         st.session_state.settings["graphs_selected_tokens"] = temp_tokens
-        config = configuration()
-        config.saveConfig(st.session_state.settings)
+        config = Configuration()
+        config.save_config(st.session_state.settings)
         logger.debug("Saved token preferences: %s", temp_tokens)
 
         st.rerun()
@@ -779,16 +779,16 @@ if add_selectbox == "Currency":
 
     # Update title and labels based on direction
     if currency_inverted:
-        title_text = "Currency (EUR/USD)"
-        chart_title = "EUR/USD Exchange Rate Over Time"
-        chart_y_label = "USD"
+        TITLE_TEXT = "Currency (EUR/USD)"
+        CHART_TITLE = "EUR/USD Exchange Rate Over Time"
+        CHART_Y_LABEL = "USD"
     else:
-        title_text = "Currency (USD/EUR)"
-        chart_title = "USD/EUR Exchange Rate Over Time"
-        chart_y_label = "EUR"
+        TITLE_TEXT = "Currency (USD/EUR)"
+        CHART_TITLE = "USD/EUR Exchange Rate Over Time"
+        CHART_Y_LABEL = "EUR"
 
-    logger.debug(title_text)
-    st.title(title_text)
+    logger.debug(TITLE_TEXT)
+    st.title(TITLE_TEXT)
 
     # Initialize ApiMarket with caching support
     cache_file = os.path.join(st.session_state.settings["data_path"], "api_cache.json")
@@ -806,7 +806,7 @@ if add_selectbox == "Currency":
         currency_data = currency_data.copy()
         currency_data["price"] = 1 / currency_data["price"]
 
-    build_price_tab(currency_data, chart_title=chart_title, chart_y_label=chart_y_label)
+    build_price_tab(currency_data, chart_title=CHART_TITLE, chart_y_label=CHART_Y_LABEL)
 
     # Initialize session state for interpolation results
     if "interpolation_result" not in st.session_state:
@@ -851,13 +851,13 @@ if add_selectbox == "Currency":
         result_currency_inverted = result.get("currency_inverted", True)
 
         # Determine the currency unit to display
-        unit = "USD" if result_currency_inverted else "EUR"
+        UNIT = "USD" if result_currency_inverted else "EUR"
 
         if value != 0.0:
             if is_interpolated:
-                st.info(f"Interpolated value: {value:.6f} {unit}")
+                st.info(f"Interpolated value: {value:.6f} {UNIT}")
             else:
-                st.info(f"Exact value: {value:.6f} {unit}")
+                st.info(f"Exact value: {value:.6f} {UNIT}")
         else:
             st.warning("Value is 0.0")
     elif (

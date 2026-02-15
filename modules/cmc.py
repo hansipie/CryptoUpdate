@@ -7,7 +7,7 @@ import requests
 logger = logging.getLogger(__name__)
 
 
-class cmc:
+class CMC:
     def __init__(self, coinmarketcap_token: str) -> dict:
         self.coinmarketcap_token = coinmarketcap_token
 

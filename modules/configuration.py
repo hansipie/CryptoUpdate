@@ -7,7 +7,7 @@ import os
 logger = logging.getLogger(__name__)
 
 
-class configuration:
+class Configuration:
     """Manages application configuration from JSON file."""
 
     def __init__(self, config_file: str = "./settings.json"):
@@ -20,7 +20,7 @@ class configuration:
         self.config_file = config_file
         self.conf = None
 
-    def readConfig(self):
+    def read_config(self):
         """Read configuration from JSON file.
 
         Raises:
@@ -34,7 +34,7 @@ class configuration:
         with open(self.config_file, "r", encoding="utf-8") as f:
             self.conf = json.load(f)
 
-    def saveConfig(self, settings: dict):
+    def save_config(self, settings: dict):
         """Save configuration to JSON file.
 
         Args:

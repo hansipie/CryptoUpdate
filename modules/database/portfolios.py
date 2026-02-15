@@ -169,7 +169,7 @@ class Portfolios:
                 )
             conn.commit()
 
-    def delete_token_A(self, name: str, token: str):
+    def delete_token_a(self, name: str, token: str):
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
             cursor.execute(
@@ -181,7 +181,7 @@ class Portfolios:
             )
             conn.commit()
 
-    def delete_token_B(self, portfolio_id: int, token: str):
+    def delete_token_b(self, portfolio_id: int, token: str):
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
             cursor.execute(

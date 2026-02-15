@@ -30,7 +30,7 @@ def interpolate(x1, y1, x2, y2, x):
     return a * x + b
 
 
-def toTimestamp_A(date, time):
+def to_timestamp_a(date, time):
     # date if formated as yyyy-mm-dd, time as hh:mm:00
     # merge them to a datetime object, convert to UTC and then to epoch timestamp
     logger.debug("toTimestamp: date=%s, time=%s", date, time)
@@ -48,7 +48,7 @@ def toTimestamp_A(date, time):
     return timestamp
 
 
-def toTimestamp_B(date: str, time: str = "", utc=False) -> float:
+def to_timestamp_b(date: str, time: str = "", utc=False) -> float:
     # date if formated as ISO 8601
     # convert to a datetime object, convert to UTC and then to epoch timestamp
     if time:
@@ -84,7 +84,7 @@ def toTimestamp_B(date: str, time: str = "", utc=False) -> float:
     return timestamp
 
 
-def fromTimestamp(timestamp: int) -> str:
+def from_timestamp(timestamp: int) -> str:
     # convert epoch timestamp to a datetime object in UTC
     datetime_utc = pd.Timestamp.fromtimestamp(timestamp, tz="UTC")
     return datetime_utc.strftime("%Y-%m-%dT%H:%M:%SZ")

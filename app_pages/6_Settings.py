@@ -3,7 +3,7 @@ import logging
 import requests
 import streamlit as st
 
-from modules.configuration import configuration as Configuration
+from modules.configuration import Configuration
 
 logger = logging.getLogger(__name__)
 
@@ -149,5 +149,5 @@ with st.form(key="settings_form"):
         st.session_state.fiat_currency = fiat_currency
 
         conf = Configuration()
-        conf.saveConfig(st.session_state.settings)
+        conf.save_config(st.session_state.settings)
         st.success("Settings saved successfully!")

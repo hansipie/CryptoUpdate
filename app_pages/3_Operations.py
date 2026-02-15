@@ -13,9 +13,9 @@ import tzlocal
 from modules.database.customdata import Customdata
 from modules.database.portfolios import Portfolios
 from modules.database.tokensdb import TokensDatabase
-from modules.database.operations import operations
+from modules.database.operations import Operations
 from modules.database.market import Market
-from modules.database.swaps import swaps
+from modules.database.swaps import Swaps
 from modules.tools import (
     batch_convert_historical,
     batch_convert_historical_api,
@@ -27,7 +27,7 @@ from modules.tools import (
     _get_api_latest_prices,
     _get_api_fiat_rate,
 )
-from modules.utils import get_file_hash, toTimestamp_A
+from modules.utils import get_file_hash, to_timestamp_a as toTimestamp_A
 
 logger = logging.getLogger(__name__)
 
@@ -95,7 +95,11 @@ def submit_swap(
         swap_wallet_to: Target wallet name
     """
     logger.debug(
-        "submitswap: timestamp=%d swap_token_from=%s, swap_amount_from=%f, swap_wallet_from=%s, swap_token_to=%s, swap_amount_to=%f, swap_wallet_to=%s",
+        (
+            "submitswap: timestamp=%d swap_token_from=%s, swap_amount_from=%f, "
+            "swap_wallet_from=%s, swap_token_to=%s, swap_amount_to=%f, "
+            "swap_wallet_to=%s"
+        ),
         timestamp,
         swap_token_from,
         swap_amount_from,
@@ -183,8 +187,8 @@ def swap_add() -> None:
         date = st.date_input("Date", key="swap_date")
     with col_time:
         time = st.time_input("Time", key="swap_time")
-    col_token, col_amount, col_portfolio = st.columns(3)
-    with col_token:
+    COL_TOken, col_amount, col_portfolio = st.columns(3)
+    with COL_TOken:
         swap_token_from = st.text_input("From Token", key="swap_token_from")
         swap_token_to = st.text_input("To Token", key="swap_token_to")
 
@@ -294,8 +298,8 @@ def swap_edit_dialog(data: dict):
         date = st.date_input("Date", key="swap_date", value=data["Date"])
     with col_time:
         time = st.time_input("Time", key="swap_time", value=data["Date"])
-    col_token, col_amount, col_portfolio = st.columns(3)
-    with col_token:
+    COL_TOken, col_amount, col_portfolio = st.columns(3)
+    with COL_TOken:
         swap_token_from = st.text_input(
             "From Token", key="swap_token_from", value=data["From Token"]
         )
@@ -571,12 +575,12 @@ def swap_arch_delete():
         swap_arch_delete_dialog(rowidx)
 
 
-def calc_perf(df: pd.DataFrame, col_token: str, col_rate: str) -> pd.DataFrame:
+def calc_perf(df: pd.DataFrame, COL_TOken: str, col_rate: str) -> pd.DataFrame:
     """Calculate current performance metrics for operations.
 
     Args:
         df: DataFrame containing operations data
-        col_token: Name of column containing token symbols
+        COL_TOken: Name of column containing token symbols
         col_rate: Name of column containing original rates
 
     Returns:
@@ -586,13 +590,13 @@ def calc_perf(df: pd.DataFrame, col_token: str, col_rate: str) -> pd.DataFrame:
         st.session_state.settings["dbfile"],
         st.session_state.settings["coinmarketcap_token"],
     )
-    market_df = market.getLastMarket()
+    market_df = market.get_last_market()
     if market_df is None:
         df["Current Rate"] = None
         df["Perf."] = None
     else:
         logger.debug("Market data:\n%s", market_df)
-        df["Current Rate"] = df[col_token].map(market_df["value"].to_dict())
+        df["Current Rate"] = df[COL_TOken].map(market_df["value"].to_dict())
         df["Perf."] = ((df["Current Rate"] * 100) / df[col_rate]) - 100
     return df
 
@@ -777,7 +781,7 @@ def build_buy_avg_table(use_api: bool = False):
     hash_funcs={str: lambda x: get_file_hash(x) if os.path.isfile(x) else hash(x)},
 )
 def build_swap_dataframes(
-    db_file: str,
+    _db_file: str,
     convert_from: str = None,
     convert_to: str = None,
     use_api: bool = False,
@@ -970,29 +974,29 @@ def draw_swap(df: pd.DataFrame, convert_from: str = None, convert_to: str = None
         styled_df = df.style.apply(color_rows, axis=1)
 
         # Build dynamic column order and config
-        col_from_amount = (
+        COL_FROM_amount = (
             f"From Amount ({convert_from})" if convert_from else "From Amount"
         )
-        col_to_amount = f"To Amount ({convert_to})" if convert_to else "To Amount"
-        rate_col = "Swap Rate"
+        COL_TO_amount = f"To Amount ({convert_to})" if convert_to else "To Amount"
+        RATE_COL = "Swap Rate"
 
         column_order = [
             "Date",
-            col_from_amount,
+            COL_FROM_amount,
             *(() if convert_from else ("From Token",)),
-            col_to_amount,
+            COL_TO_amount,
             *(() if convert_to else ("To Token",)),
             "From Wallet",
             "To Wallet",
-            rate_col,
+            RATE_COL,
             "Current Rate",
             "Perf.",
         ]
 
         column_config = {
-            col_from_amount: st.column_config.NumberColumn(format="%.8g"),
-            col_to_amount: st.column_config.NumberColumn(format="%.8g"),
-            rate_col: st.column_config.NumberColumn(format="%.8g"),
+            COL_FROM_amount: st.column_config.NumberColumn(format="%.8g"),
+            COL_TO_amount: st.column_config.NumberColumn(format="%.8g"),
+            RATE_COL: st.column_config.NumberColumn(format="%.8g"),
             "Current Rate": st.column_config.NumberColumn(format="%.8g"),
             "Perf.": st.column_config.NumberColumn(format="%.2f%%"),
         }
@@ -1037,29 +1041,29 @@ def draw_swap_arch(df: pd.DataFrame, convert_from: str = None, convert_to: str =
         styled_df = df.style.apply(color_rows, axis=1)
 
         # Build dynamic column order and config
-        col_from_amount = (
+        COL_FROM_amount = (
             f"From Amount ({convert_from})" if convert_from else "From Amount"
         )
-        col_to_amount = f"To Amount ({convert_to})" if convert_to else "To Amount"
-        rate_col = "Swap Rate"
+        COL_TO_amount = f"To Amount ({convert_to})" if convert_to else "To Amount"
+        RATE_COL = "Swap Rate"
 
         column_order = [
             "Date",
-            col_from_amount,
+            COL_FROM_amount,
             *(() if convert_from else ("From Token",)),
-            col_to_amount,
+            COL_TO_amount,
             *(() if convert_to else ("To Token",)),
             "From Wallet",
             "To Wallet",
-            rate_col,
+            RATE_COL,
             "Current Rate",
             "Perf.",
         ]
 
         column_config = {
-            col_from_amount: st.column_config.NumberColumn(format="%.8g"),
-            col_to_amount: st.column_config.NumberColumn(format="%.8g"),
-            rate_col: st.column_config.NumberColumn(format="%.8g"),
+            COL_FROM_amount: st.column_config.NumberColumn(format="%.8g"),
+            COL_TO_amount: st.column_config.NumberColumn(format="%.8g"),
+            RATE_COL: st.column_config.NumberColumn(format="%.8g"),
             "Current Rate": st.column_config.NumberColumn(format="%.8g"),
             "Perf.": st.column_config.NumberColumn(format="%.2f%%"),
         }
@@ -1079,8 +1083,8 @@ def draw_swap_arch(df: pd.DataFrame, convert_from: str = None, convert_to: str =
 g_wallets = Portfolios(st.session_state.settings["dbfile"]).get_portfolio_names()
 g_tokens = TokensDatabase(st.session_state.settings["dbfile"]).get_tokens()
 
-g_operation = operations(st.session_state.settings["dbfile"])
-g_swaps = swaps(st.session_state.settings["dbfile"])
+g_operation = Operations(st.session_state.settings["dbfile"])
+g_swaps = Swaps(st.session_state.settings["dbfile"])
 
 # Update prices
 with st.sidebar:
@@ -1141,26 +1145,26 @@ with buy_tab:
             st.info("No buy operations")
         else:
             # Build dynamic column order and config
-            col_from = f"From ({buy_cf})" if buy_cf else "From"
-            col_to = f"To ({buy_ct})" if buy_ct else "To"
-            rate_col = "Converted Rate" if (buy_cf or buy_ct) else "Buy Rate"
+            COL_FROM = f"From ({buy_cf})" if buy_cf else "From"
+            COL_TO = f"To ({buy_ct})" if buy_ct else "To"
+            RATE_COL = "Converted Rate" if (buy_cf or buy_ct) else "Buy Rate"
 
             column_order = [
                 "Date",
-                col_from,
+                COL_FROM,
                 *(() if buy_cf else ("Currency",)),
-                col_to,
+                COL_TO,
                 *(() if buy_ct else ("Token",)),
                 "Portfolio",
-                rate_col,
+                RATE_COL,
                 "Current Rate",
                 "Perf.",
             ]
 
             column_config = {
-                col_from: st.column_config.NumberColumn(format="%.8g"),
-                col_to: st.column_config.NumberColumn(format="%.8g"),
-                rate_col: st.column_config.NumberColumn(format="%.8g"),
+                COL_FROM: st.column_config.NumberColumn(format="%.8g"),
+                COL_TO: st.column_config.NumberColumn(format="%.8g"),
+                RATE_COL: st.column_config.NumberColumn(format="%.8g"),
                 "Current Rate": st.column_config.NumberColumn(format="%.8g"),
                 "Perf.": st.column_config.NumberColumn(format="%.2f%%"),
             }

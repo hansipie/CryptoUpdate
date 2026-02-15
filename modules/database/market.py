@@ -15,7 +15,7 @@ import pytz
 import requests
 import tzlocal
 
-from modules.cmc import cmc
+from modules.cmc import CMC
 
 logger = logging.getLogger(__name__)
 
@@ -51,7 +51,7 @@ class Market:
             )
             con.commit()
 
-    def getTokens(self) -> list:
+    def get_tokens(self) -> list:
         """Get list of all tokens in the database.
 
         Returns:
@@ -63,7 +63,7 @@ class Market:
             )
             return df["token"].to_list()
 
-    def getMarket(self) -> pd.DataFrame:
+    def get_market(self) -> pd.DataFrame:
         """Get historical market data for all tokens.
 
         Returns:
@@ -116,25 +116,32 @@ class Market:
         logger.debug("Get token market")
         with sqlite3.connect(self.db_path) as con:
             if from_timestamp and to_timestamp:
-                df = pd.read_sql_query(
-                    f"SELECT timestamp AS Date, price AS Price from Market WHERE token = '{token}' AND timestamp >= {from_timestamp} AND timestamp <= {to_timestamp} ORDER BY timestamp;",
-                    con,
+                query = (
+                    f"SELECT timestamp AS Date, price AS Price from Market "
+                    f"WHERE token = '{token}' AND timestamp >= {from_timestamp} "
+                    f"AND timestamp <= {to_timestamp} ORDER BY timestamp;"
                 )
+                df = pd.read_sql_query(query, con)
             elif from_timestamp:
-                df = pd.read_sql_query(
-                    f"SELECT timestamp AS Date, price AS Price from Market WHERE token = '{token}' AND timestamp >= {from_timestamp} ORDER BY timestamp;",
-                    con,
+                query = (
+                    f"SELECT timestamp AS Date, price AS Price from Market "
+                    f"WHERE token = '{token}' AND timestamp >= {from_timestamp} "
+                    f"ORDER BY timestamp;"
                 )
+                df = pd.read_sql_query(query, con)
             elif to_timestamp:
-                df = pd.read_sql_query(
-                    f"SELECT timestamp AS Date, price AS Price from Market WHERE token = '{token}' AND timestamp <= {to_timestamp} ORDER BY timestamp;",
-                    con,
+                query = (
+                    f"SELECT timestamp AS Date, price AS Price from Market "
+                    f"WHERE token = '{token}' AND timestamp <= {to_timestamp} "
+                    f"ORDER BY timestamp;"
                 )
+                df = pd.read_sql_query(query, con)
             else:
-                df = pd.read_sql_query(
-                    f"SELECT timestamp AS Date, price AS Price from Market WHERE token = '{token}' ORDER BY timestamp;",
-                    con,
+                query = (
+                    f"SELECT timestamp AS Date, price AS Price from Market "
+                    f"WHERE token = '{token}' ORDER BY timestamp;"
                 )
+                df = pd.read_sql_query(query, con)
             if df.empty:
                 return None
             df["Date"] = pd.to_datetime(df["Date"], unit="s", utc=True)
@@ -145,24 +152,25 @@ class Market:
             df.sort_index(inplace=True)
             return df
 
-    def getLastMarket(self) -> pd.DataFrame:
+    def get_last_market(self) -> pd.DataFrame:
         """Get most recent market data for all tokens.
 
         Returns:
             DataFrame with latest token prices or None if empty
         """
         logger.debug("Get last market")
-        tokens_list = self.getTokens()
+        tokens_list = self.get_tokens()
         if not tokens_list:
             logger.warning("No tokens available")
             return None
         with sqlite3.connect(self.db_path) as con:
             market_data = []
             for token in tokens_list:
-                df = pd.read_sql_query(
-                    f"SELECT timestamp, price AS '{token}' FROM Market WHERE token = '{token}' ORDER BY timestamp DESC LIMIT 1;",
-                    con,
+                query = (
+                    f"SELECT timestamp, price AS '{token}' FROM Market "
+                    f"WHERE token = '{token}' ORDER BY timestamp DESC LIMIT 1;"
                 )
+                df = pd.read_sql_query(query, con)
                 if df.empty:
                     continue
                 market_data.append(
@@ -186,12 +194,12 @@ class Market:
         """
         logger.debug("Add tokens")
 
-        known_tokens = self.getTokens()
+        known_tokens = self.get_tokens()
         tokens = list(set(tokens + known_tokens))
         logger.debug("tokens: %s", str(tokens))
 
         timestamp = int(pd.Timestamp.now(tz=pytz.UTC).timestamp())
-        cmc_prices = cmc(self.cmc_token)
+        cmc_prices = CMC(self.cmc_token)
         tokens_prices = cmc_prices.get_crypto_prices(tokens, debug=debug)
         if not tokens_prices:
             logger.info("No data available")
@@ -232,10 +240,11 @@ class Market:
         """
         with sqlite3.connect(self.db_path) as con:
             if timestamp:
-                df = pd.read_sql_query(
-                    f"SELECT price from Market WHERE token = '{token}' AND timestamp <= {timestamp} ORDER BY timestamp DESC LIMIT 1;",
-                    con,
+                query = (
+                    f"SELECT price from Market WHERE token = '{token}' "
+                    f"AND timestamp <= {timestamp} ORDER BY timestamp DESC LIMIT 1;"
                 )
+                df = pd.read_sql_query(query, con)
             else:
                 df = pd.read_sql_query(
                     f"SELECT price from Market WHERE token = '{token}' ORDER BY timestamp DESC LIMIT 1;",
@@ -369,7 +378,7 @@ class Market:
                 time.sleep(1)
 
         # add current rate to Currency from CMC
-        cmc_prices = cmc(self.cmc_token)
+        cmc_prices = CMC(self.cmc_token)
         price = cmc_prices.get_current_fiat_prices(debug=debug)
         logger.debug("Adding current rate to Currency: %s", price)
         for currency in price:
@@ -408,14 +417,16 @@ class Market:
             DataFrame with low and high values
         """
         with sqlite3.connect(self.db_path) as con:
-            df_low = pd.read_sql_query(
-                f"SELECT timestamp, price from Market WHERE token = '{token}' AND timestamp <= {timestamp} ORDER BY timestamp DESC LIMIT 1;",
-                con,
+            query_low = (
+                f"SELECT timestamp, price from Market WHERE token = '{token}' "
+                f"AND timestamp <= {timestamp} ORDER BY timestamp DESC LIMIT 1;"
             )
-            df_high = pd.read_sql_query(
-                f"SELECT timestamp, price from Market WHERE token = '{token}' AND timestamp >= {timestamp} ORDER BY timestamp ASC LIMIT 1;",
-                con,
+            df_low = pd.read_sql_query(query_low, con)
+            query_high = (
+                f"SELECT timestamp, price from Market WHERE token = '{token}' "
+                f"AND timestamp >= {timestamp} ORDER BY timestamp ASC LIMIT 1;"
             )
+            df_high = pd.read_sql_query(query_high, con)
             return df_low, df_high
 
     def get_currency_lowhigh(self, currency: str, timestamp: int) -> pd.DataFrame:
@@ -429,12 +440,14 @@ class Market:
             Tuple of (df_low, df_high) DataFrames with low and high values
         """
         with sqlite3.connect(self.db_path) as con:
-            df_low = pd.read_sql_query(
-                f"SELECT timestamp, price from Currency WHERE currency = '{currency}' AND timestamp <= {timestamp} ORDER BY timestamp DESC LIMIT 1;",
-                con,
+            query_low = (
+                f"SELECT timestamp, price from Currency WHERE currency = '{currency}' "
+                f"AND timestamp <= {timestamp} ORDER BY timestamp DESC LIMIT 1;"
             )
-            df_high = pd.read_sql_query(
-                f"SELECT timestamp, price from Currency WHERE currency = '{currency}' AND timestamp >= {timestamp} ORDER BY timestamp ASC LIMIT 1;",
-                con,
+            df_low = pd.read_sql_query(query_low, con)
+            query_high = (
+                f"SELECT timestamp, price from Currency WHERE currency = '{currency}' "
+                f"AND timestamp >= {timestamp} ORDER BY timestamp ASC LIMIT 1;"
             )
+            df_high = pd.read_sql_query(query_high, con)
             return df_low, df_high

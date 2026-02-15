@@ -116,7 +116,7 @@ def save_data(df: pd.DataFrame, portfolio: str = None, action: str = "Set"):
     st.toast("Data successfully saved", icon=":material/check:")
 
 
-def processImg(input_file) -> bytes:
+def process_img(input_file) -> bytes:
     """Process uploaded image file.
 
     Args:
@@ -132,7 +132,7 @@ def processImg(input_file) -> bytes:
 
 
 @st.cache_data
-def processCSV(input_file) -> pd.DataFrame:
+def process_csv(input_file) -> pd.DataFrame:
     """Process uploaded CSV file.
 
     Args:
@@ -145,7 +145,7 @@ def processCSV(input_file) -> pd.DataFrame:
     return pd.read_csv(input_file)
 
 
-def drawUI():
+def draw_ui():
     """Draw the import interface UI components.
 
     Shows input preview and extraction controls.
@@ -179,7 +179,7 @@ def drawUI():
             data_ui(st.session_state.import_page["output"])
 
 
-def cleanSessionState():
+def clean_session_state():
     """Reset the import page session state variables."""
     logger.debug("Cleaning session state")
     st.session_state.import_page["input"] = None
@@ -204,30 +204,30 @@ g_portfolio = pf.Portfolios(st.session_state.settings["dbfile"])
 st.title("Import")
 
 file = st.file_uploader(
-    "Upload a file", type=["png", "jpg", "jpeg", "csv"], on_change=cleanSessionState
+    "Upload a file", type=["png", "jpg", "jpeg", "csv"], on_change=clean_session_state
 )
 
 if file is None:
     if st.session_state.import_page["input"] is not None:
         logger.debug("Data already imported")
         if st.button("Clear Data", width="stretch", icon=":material/delete:"):
-            cleanSessionState()
+            clean_session_state()
         else:
-            drawUI()
+            draw_ui()
     else:
         logger.debug("No file uploaded")
-        cleanSessionState()
+        clean_session_state()
 else:
     logger.debug("File: %s - file type: %s", file.name, file.type)
 
     if file.type == "application/vnd.ms-excel":
         logger.debug("CSV file detectimport_pageed")
-        input_file = processCSV(file)
+        input_file = process_csv(file)
     else:
         logger.debug("Image file detected")
-        input_file = processImg(file)
+        input_file = process_img(file)
     st.session_state.import_page["type"] = file.type
     st.session_state.import_page["input"] = input_file
-    drawUI()
+    draw_ui()
 
 logger.debug("## ended ##")

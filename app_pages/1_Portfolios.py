@@ -15,7 +15,7 @@ from modules.tools import (
     get_currency_symbol,
 )
 from modules.utils import dataframe_diff
-from modules.configuration import configuration
+from modules.configuration import Configuration
 
 logger = logging.getLogger(__name__)
 
@@ -110,7 +110,7 @@ def delete_token(portfolio_name: str):
         st.rerun()
 
 
-def portfolioUI(tabs: list):
+def portfolio_ui(tabs: list):
     """Display portfolio management interface.
 
     Args:
@@ -119,15 +119,12 @@ def portfolioUI(tabs: list):
     Shows editable tables of token holdings and management buttons
     for each portfolio.
     """
-    logger.debug("portfolioUI - Tabs: %s", tabs)
+    logger.debug("portfolio_ui - Tabs: %s", tabs)
 
     tabs_widget = st.tabs(tabs)
 
     for i, tab in enumerate(tabs_widget):
         with tab:
-            # Display historical chart above the table
-            plot_portfolio_history(tabs[i], st.session_state.settings["dbfile"])
-            st.divider()
 
             pf = g_portfolios.get_portfolio(tabs[i])
             df = create_portfolio_dataframe(pf)
@@ -280,47 +277,6 @@ def get_portfolio_history(portfolio_name: str, dbfile: str) -> pd.DataFrame:
     return portfolio_value
 
 
-def plot_portfolio_history(portfolio_name: str, dbfile: str):
-    """Plot the historical value of a portfolio.
-
-    Args:
-        portfolio_name: Name of the portfolio
-        dbfile: Path to database file
-    """
-    df = get_portfolio_history(portfolio_name, dbfile)
-
-    if df.empty:
-        st.info("No historical data available for this portfolio")
-        return
-
-    # Get target currency from settings
-    target_currency = st.session_state.settings.get("fiat_currency", "EUR")
-    currency_symbol = get_currency_symbol(target_currency)
-
-    # Create plotly figure
-    fig = go.Figure()
-    fig.add_trace(
-        go.Scatter(
-            x=df.index,
-            y=df["Value"],
-            mode="lines",
-            name=portfolio_name,
-            fill="tozeroy",
-            line=dict(width=2),
-        )
-    )
-
-    fig.update_layout(
-        title=f"Historical Value - {portfolio_name}",
-        xaxis_title="Date",
-        yaxis_title=f"Value ({currency_symbol})",
-        hovermode="x unified",
-        height=400,
-    )
-
-    st.plotly_chart(fig, width="stretch")
-
-
 @st.fragment
 def execute_search():
     """Execute token search and display results.
@@ -349,8 +305,8 @@ def save_toggle_preference():
         st.session_state.show_empty_portfolios
     )
     # Save to file
-    config = configuration()
-    config.saveConfig(st.session_state.settings)
+    config = Configuration()
+    config.save_config(st.session_state.settings)
 
 
 with st.sidebar:
@@ -434,7 +390,7 @@ if not tabs:
     st.stop()
 else:
     try:
-        portfolioUI(tabs)
+        portfolio_ui(tabs)
     except Exception as e:
         st.error(f"UI Error: {str(e)}")
         traceback.print_exc()

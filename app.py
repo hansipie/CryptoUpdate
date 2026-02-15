@@ -15,7 +15,7 @@ import streamlit as st
 
 # Local imports
 from modules import tools
-from modules.configuration import configuration as cfg
+from modules.configuration import Configuration as cfg
 
 # Application constants
 APP_PAGES = {
@@ -46,7 +46,7 @@ def init_config():
     """Initialize application configuration."""
     config = cfg()
     try:
-        config.readConfig()
+        config.read_config()
     except FileNotFoundError:
         st.error(
             "Settings file not found. Please verify your configuration file exists and is accessible."

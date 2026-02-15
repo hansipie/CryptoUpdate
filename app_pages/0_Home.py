@@ -12,7 +12,7 @@ import streamlit as st
 import plotly.graph_objects as go
 
 from modules.database.customdata import Customdata
-from modules.database.operations import operations
+from modules.database.operations import Operations
 from modules.database.tokensdb import TokensDatabase
 from modules.tools import update, parse_last_update, get_currency_symbol
 
@@ -87,7 +87,7 @@ with st.sidebar:
 
 with st.container(border=True):
     col1, col2, col3 = st.columns(3)
-    total = operations(st.session_state.settings["dbfile"]).sum_buyoperations()
+    total = Operations(st.session_state.settings["dbfile"]).sum_buyoperations()
     currency_symbol = get_currency_symbol()
     with col1:
         st.metric("Invested", value=f"{total} {currency_symbol}")
