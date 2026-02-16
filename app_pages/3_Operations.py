@@ -82,6 +82,7 @@ def submit_swap(
     swap_token_to: str,
     swap_amount_to: float,
     swap_wallet_to: str,
+    note: str = None,
 ) -> None:
     """Submit a swap operation to the database.
 
@@ -93,6 +94,7 @@ def submit_swap(
         swap_token_to: Target token symbol
         swap_amount_to: Amount of target token
         swap_wallet_to: Target wallet name
+        note: Optional free-text annotation
     """
     logger.debug(
         (
@@ -116,6 +118,7 @@ def submit_swap(
         swap_token_to,
         swap_amount_to,
         swap_wallet_to,
+        note=note,
     )
 
 
@@ -207,6 +210,7 @@ def swap_add() -> None:
         swap_wallet_to = st.selectbox(
             "To Wallet", g_wallets, index=None, key="swap_wallet_to"
         )
+    swap_note = st.text_area("Note", key="swap_note", value="")
     if st.button("Submit", width="stretch"):
         timestamp = toTimestamp_A(date, time)
         submit_swap(
@@ -217,6 +221,7 @@ def swap_add() -> None:
             swap_token_to,
             swap_amount_to,
             swap_wallet_to,
+            note=swap_note,
         )
         st.rerun()
 
@@ -338,6 +343,7 @@ def swap_edit_dialog(data: dict):
         swap_wallet_to = st.selectbox(
             "To Wallet", g_wallets, index=idx_to, key="swap_wallet_to"
         )
+    swap_note = st.text_area("Note", key="swap_note", value=data.get("note") or "")
     if st.button("Submit", width="stretch"):
         timestamp = toTimestamp_A(date, time)
         g_swaps.delete(data["id"])
@@ -349,6 +355,7 @@ def swap_edit_dialog(data: dict):
             swap_token_to,
             swap_amount_to,
             swap_wallet_to,
+            note=swap_note,
         )
         st.rerun()
 
@@ -781,7 +788,7 @@ def build_buy_avg_table(use_api: bool = False):
     hash_funcs={str: lambda x: get_file_hash(x) if os.path.isfile(x) else hash(x)},
 )
 def build_swap_dataframes(
-    _db_file: str,
+    db_file: str,
     convert_from: str = None,
     convert_to: str = None,
     use_api: bool = False,
@@ -798,6 +805,7 @@ def build_swap_dataframes(
             "To Amount",
             "To Wallet",
             "tag",
+            "note",
         ],
     )
     if not df1.empty:
@@ -817,6 +825,7 @@ def build_swap_dataframes(
             "To Amount",
             "To Wallet",
             "tag",
+            "note",
         ],
     )
     if not df2.empty:
@@ -991,6 +1000,7 @@ def draw_swap(df: pd.DataFrame, convert_from: str = None, convert_to: str = None
             RATE_COL,
             "Current Rate",
             "Perf.",
+            "note",
         ]
 
         column_config = {
@@ -1058,6 +1068,7 @@ def draw_swap_arch(df: pd.DataFrame, convert_from: str = None, convert_to: str =
             RATE_COL,
             "Current Rate",
             "Perf.",
+            "note",
         ]
 
         column_config = {

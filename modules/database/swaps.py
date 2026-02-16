@@ -26,12 +26,13 @@ class Swaps:
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     timestamp INTEGER,
                     token_from TEXT,
-                    amount_from TEXT, 
+                    amount_from TEXT,
                     wallet_from TEXT,
                     token_to TEXT,
                     amount_to TEXT,
-                    wallet_to TEXT, 
-                    tag TEXT
+                    wallet_to TEXT,
+                    tag TEXT,
+                    note TEXT
                 )
             """
             )
@@ -43,7 +44,7 @@ class Swaps:
             cursor = conn.cursor()
             cursor.execute(
                 """
-                SELECT id, timestamp, token_from, amount_from, wallet_from, token_to, amount_to, wallet_to, tag
+                SELECT id, timestamp, token_from, amount_from, wallet_from, token_to, amount_to, wallet_to, tag, note
                 FROM Swaps ORDER BY timestamp DESC
             """
             )
@@ -57,14 +58,14 @@ class Swaps:
             if not tag:
                 cursor.execute(
                     """
-                    SELECT id, timestamp, token_from, amount_from, wallet_from, token_to, amount_to, wallet_to, tag
+                    SELECT id, timestamp, token_from, amount_from, wallet_from, token_to, amount_to, wallet_to, tag, note
                     FROM Swaps WHERE tag IS NULL ORDER BY timestamp DESC
                     """
                 )
             else:
                 cursor.execute(
                     """
-                    SELECT id, timestamp, token_from, amount_from, wallet_from, token_to, amount_to, wallet_to, tag
+                    SELECT id, timestamp, token_from, amount_from, wallet_from, token_to, amount_to, wallet_to, tag, note
                     FROM Swaps WHERE tag = ? ORDER BY timestamp DESC
                     """,
                     (tag,),
@@ -80,14 +81,15 @@ class Swaps:
         token_to,
         amount_to,
         wallet_to,
+        note: str = None,
     ):
         logger.debug("Inserting swap")
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
             cursor.execute(
                 """
-                INSERT INTO Swaps (timestamp, token_from, amount_from, wallet_from, token_to, amount_to, wallet_to, tag)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO Swaps (timestamp, token_from, amount_from, wallet_from, token_to, amount_to, wallet_to, tag, note)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
                 (
                     timestamp,
@@ -98,6 +100,7 @@ class Swaps:
                     amount_to,
                     wallet_to,
                     None,
+                    note or None,
                 ),
             )
             conn.commit()
@@ -113,6 +116,19 @@ class Swaps:
                 logger.debug(f"Entry with id {entry_id} deleted successfully.")
         except Exception as e:
             logger.error(f"Error deleting swap: {e}")
+            traceback.print_exc()
+
+    def update_note(self, entry_id: int, note: str):
+        logger.debug("Updating swap note")
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                conn.execute(
+                    "UPDATE Swaps SET note = ? WHERE id = ?", (note or None, entry_id)
+                )
+                conn.commit()
+                logger.debug(f"Note updated for entry with id {entry_id}")
+        except Exception as e:
+            logger.error(f"Error updating note: {e}")
             traceback.print_exc()
 
     def update_tag(self, entry_id: int, tag: str):

@@ -186,11 +186,20 @@ def _migrate_v4(conn: sqlite3.Connection) -> None:
     )
 
 
+def _migrate_v5(conn: sqlite3.Connection) -> None:
+    """Ajout de la colonne note dans Swaps."""
+    try:
+        conn.execute("ALTER TABLE Swaps ADD COLUMN note TEXT")
+    except sqlite3.OperationalError:
+        pass  # colonne déjà présente
+
+
 MIGRATIONS: dict = {
     1: _migrate_v1,
     2: _migrate_v2,
     3: _migrate_v3,
     4: _migrate_v4,
+    5: _migrate_v5,
 }
 
 
