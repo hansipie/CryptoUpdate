@@ -808,7 +808,7 @@ def batch_convert_historical_api(
             fiat_df = api.get_currency()
             if fiat_df is not None and not fiat_df.empty:
                 # price = usd_to_eur rate, we need price in USD: 1/rate
-                series_cache[token] = 1.0 / fiat_df["price"]
+                series_cache[token] = 1.0 / fiat_df["price"].replace(0, pd.NA)
             else:
                 series_cache[token] = None
         else:

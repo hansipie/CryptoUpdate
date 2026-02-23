@@ -304,7 +304,7 @@ class Market:
             df_ret = df_timestamps[
                 ~df_timestamps["timestamp"].isin(df_rate_timestamps["timestamp"])
             ]
-            logging.debug("Missing timestamps: %d", len(df_ret))
+            logger.debug("Missing timestamps: %d", len(df_ret))
             return df_ret
 
     def update_currencies(self, debug: bool = False):
@@ -339,7 +339,7 @@ class Market:
                 url = f"https://free.ratesdb.com/v1/rates?from=EUR&to=USD&date={date}"
                 response = requests.get(url, timeout=10)
                 if response.status_code != 200:
-                    logging.error(
+                    logger.error(
                         "Error updating currencies. Code: %d", response.status_code
                     )
                     time.sleep(1)

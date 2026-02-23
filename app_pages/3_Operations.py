@@ -317,14 +317,14 @@ def swap_edit_dialog(data: dict):
             "From Amount",
             min_value=0.0,
             format="%.8g",
-            key="swap_amount_to",
+            key="swap_edit_amount_from",
             value=float(data["From Amount"]),
         )
         swap_amount_to = st.number_input(
             "To Amount",
             min_value=0.0,
             format="%.8g",
-            key="swap_amount_from",
+            key="swap_edit_amount_to",
             value=float(data["To Amount"]),
         )
 
@@ -606,7 +606,7 @@ def calc_perf(df: pd.DataFrame, COL_TOken: str, col_rate: str) -> pd.DataFrame:
     else:
         logger.debug("Market data:\n%s", market_df)
         df["Current Rate"] = df[COL_TOken].map(market_df["value"].to_dict())
-        df["Perf."] = ((df["Current Rate"] * 100) / df[col_rate]) - 100
+        df["Perf."] = ((df["Current Rate"] * 100) / df[col_rate].replace(0, pd.NA)) - 100
     return df
 
 
@@ -773,7 +773,7 @@ def build_buy_avg_table(use_api: bool = False):
     if df.empty:
         return df
 
-    df["Avg. Rate"] = df["Total Bought"] / df["Tokens Obtained"]
+    df["Avg. Rate"] = df["Total Bought"] / df["Tokens Obtained"].replace(0, pd.NA)
     if use_api:
         prices_usd = _get_api_latest_prices()
         usd_to_eur = _get_api_fiat_rate()

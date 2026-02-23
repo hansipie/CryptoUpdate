@@ -522,7 +522,10 @@ def draw_tab_content(
                 "Timeframe Low",
                 value=f"{round(min_price, 2)} {currency_symbol}",
                 help=f"Date: {min_price_date[0]}",
-                delta=f"{round(((current_price - min_price) / min_price) * 100, 2)} %",
+                delta=(
+                    f"{round(((current_price - min_price) / min_price) * 100, 2)} %"
+                    if min_price != 0 else "∞ %"
+                ),
             )
         with mcol4:
             max_price = df_view[actual_column].max()
@@ -533,7 +536,10 @@ def draw_tab_content(
                 "Timeframe High",
                 value=f"{round(max_price, 2)} {currency_symbol}",
                 help=f"Date: {max_price_date[0]}",
-                delta=f"{round(((current_price - max_price) / max_price) * 100, 2)} %",
+                delta=(
+                    f"{round(((current_price - max_price) / max_price) * 100, 2)} %"
+                    if max_price != 0 else "∞ %"
+                ),
             )
 
         col1, col2 = st.columns([3, 1])
