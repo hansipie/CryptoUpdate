@@ -417,16 +417,16 @@ class Market:
             DataFrame with low and high values
         """
         with sqlite3.connect(self.db_path) as con:
-            query_low = (
-                f"SELECT timestamp, price from Market WHERE token = '{token}' "
-                f"AND timestamp <= {timestamp} ORDER BY timestamp DESC LIMIT 1;"
+            df_low = pd.read_sql_query(
+                "SELECT timestamp, price FROM Market WHERE token = ? AND timestamp <= ? ORDER BY timestamp DESC LIMIT 1",
+                con,
+                params=(token, timestamp),
             )
-            df_low = pd.read_sql_query(query_low, con)
-            query_high = (
-                f"SELECT timestamp, price from Market WHERE token = '{token}' "
-                f"AND timestamp >= {timestamp} ORDER BY timestamp ASC LIMIT 1;"
+            df_high = pd.read_sql_query(
+                "SELECT timestamp, price FROM Market WHERE token = ? AND timestamp >= ? ORDER BY timestamp ASC LIMIT 1",
+                con,
+                params=(token, timestamp),
             )
-            df_high = pd.read_sql_query(query_high, con)
             return df_low, df_high
 
     def get_currency_lowhigh(self, currency: str, timestamp: int) -> pd.DataFrame:
@@ -440,14 +440,14 @@ class Market:
             Tuple of (df_low, df_high) DataFrames with low and high values
         """
         with sqlite3.connect(self.db_path) as con:
-            query_low = (
-                f"SELECT timestamp, price from Currency WHERE currency = '{currency}' "
-                f"AND timestamp <= {timestamp} ORDER BY timestamp DESC LIMIT 1;"
+            df_low = pd.read_sql_query(
+                "SELECT timestamp, price FROM Currency WHERE currency = ? AND timestamp <= ? ORDER BY timestamp DESC LIMIT 1",
+                con,
+                params=(currency, timestamp),
             )
-            df_low = pd.read_sql_query(query_low, con)
-            query_high = (
-                f"SELECT timestamp, price from Currency WHERE currency = '{currency}' "
-                f"AND timestamp >= {timestamp} ORDER BY timestamp ASC LIMIT 1;"
+            df_high = pd.read_sql_query(
+                "SELECT timestamp, price FROM Currency WHERE currency = ? AND timestamp >= ? ORDER BY timestamp ASC LIMIT 1",
+                con,
+                params=(currency, timestamp),
             )
-            df_high = pd.read_sql_query(query_high, con)
             return df_low, df_high
