@@ -88,14 +88,16 @@ def convert_price_to_target_currency(
 
         usd_to_eur_rate = df_rate["price"].iloc[-1]  # Ex: 0.85 (1 USD = 0.85 EUR)
 
+        if not usd_to_eur_rate:
+            logger.warning("Taux USD/EUR invalide: %s, retour valeur originale", usd_to_eur_rate)
+            return value
+
         # Conversion USD → EUR
         if source_currency == "USD" and target_currency == "EUR":
             return value * usd_to_eur_rate
 
         # Conversion EUR → USD
         elif source_currency == "EUR" and target_currency == "USD":
-            if not usd_to_eur_rate:
-                return value
             return value / usd_to_eur_rate
 
         else:

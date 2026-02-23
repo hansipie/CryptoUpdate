@@ -519,13 +519,12 @@ def swap_edit():
     Otherwise displays a warning toast.
     """
     rowidx = rows_selected(st.session_state.swapselection)
-    if len(rowidx) > 1:
+    if rowidx is None:
+        st.toast("Please select a row", icon=":material/warning:")
+    elif len(rowidx) > 1:
         st.toast("Please select only one row", icon=":material/warning:")
     else:
-        if rowidx[0] is None:
-            st.toast("Please select a row", icon=":material/warning:")
-        else:
-            swap_edit_dialog(df_swap.iloc[rowidx[0]].to_dict())
+        swap_edit_dialog(df_swap.iloc[rowidx[0]].to_dict())
 
 
 def swap_delete():
