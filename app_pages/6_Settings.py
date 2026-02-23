@@ -38,14 +38,14 @@ with st.sidebar:
         st.session_state.settings.get("marketraccoon_token", ""),
     )
     if _status == "ok":
-        st.success("MarketRaccoon: up")
+        st.success("MarketRaccoon :material/check_circle:")
     elif _status == "down":
-        st.error("MarketRaccoon: down")
+        st.error("MarketRaccoon :material/cancel:")
     elif _status == "connection_error":
-        st.error("MarketRaccoon: unreachable")
+        st.error("MarketRaccoon :material/link_off:")
         logger.error("Connection error during API healthcheck.")
     elif _status == "timeout":
-        st.error("MarketRaccoon: timeout")
+        st.error("MarketRaccoon :material/timer_off:")
         logger.error("API request timed out.")
 
 with st.form(key="settings_form"):
