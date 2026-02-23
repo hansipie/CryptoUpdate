@@ -254,11 +254,16 @@ class Market:
             table: Table name
         """
         logger.debug("Drop duplicate from %s", table)
-        _ALLOWED_TABLES = {"TokensDatabase", "Market", "Currency", "Swaps"}
-        if table not in _ALLOWED_TABLES:
+        _TABLE_QUERIES = {
+            "TokensDatabase": "SELECT * FROM TokensDatabase;",
+            "Market": "SELECT * FROM Market;",
+            "Currency": "SELECT * FROM Currency;",
+            "Swaps": "SELECT * FROM Swaps;",
+        }
+        if table not in _TABLE_QUERIES:
             raise ValueError(f"Table non autorisée : {table}")
         with sqlite3.connect(self.db_path) as con:
-            df = pd.read_sql_query(f"SELECT * from {table};", con)
+            df = pd.read_sql_query(_TABLE_QUERIES[table], con)
             dupcount = df.duplicated().sum()
             logger.debug("Found %d rows with %d duplicated rows", len(df), dupcount)
             if dupcount > 0:

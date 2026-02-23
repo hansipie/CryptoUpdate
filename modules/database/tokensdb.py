@@ -123,7 +123,7 @@ class TokensDatabase:
             if to_timestamp is not None:
                 conditions += " AND timestamp <= ?"
                 params.append(to_timestamp)
-            query = f"SELECT timestamp AS Date, count AS Count FROM TokensDatabase {conditions}"
+            query = "SELECT timestamp AS Date, count AS Count FROM TokensDatabase " + conditions
             df = pd.read_sql_query(query, con, params=params)
             if df.empty:
                 logger.warning("No count data found for token %s in database", token)
@@ -152,8 +152,8 @@ class TokensDatabase:
                 conditions += " AND timestamp <= ?"
                 params.append(to_timestamp)
             query = (
-                f"SELECT timestamp AS Date, price*count AS Value, count AS Count "
-                f"FROM TokensDatabase {conditions}"
+                "SELECT timestamp AS Date, price*count AS Value, count AS Count "
+                "FROM TokensDatabase " + conditions
             )
             df = pd.read_sql_query(query, con, params=params)
             if df.empty:
