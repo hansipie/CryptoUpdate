@@ -16,6 +16,8 @@ logging.getLogger("httpcore").setLevel(logging.WARNING)
 
 logger = logging.getLogger(__name__)
 
+CLAUDE_MODEL = "claude-sonnet-4-20250514"
+
 
 def get_image_type(image: bytes):
     try:
@@ -142,7 +144,7 @@ def call_ai(messages: list, api_key: str, system_prompt: str = ""):
     try:
         logger.debug("Processing ...")
         response = client.messages.create(
-            model="claude-sonnet-4-20250514",
+            model=CLAUDE_MODEL,
             max_tokens=4096,
             system=system_prompt,
             messages=messages,

@@ -18,6 +18,36 @@ if "fiat_currency" not in st.session_state:
         "fiat_currency", "EUR"
     )
 
+@st.cache_data(ttl=30, show_spinner=False)
+def _check_marketraccoon(url: str, api_key: str) -> str:
+    """Vérifie la disponibilité de l'API MarketRaccoon (résultat mis en cache 30s)."""
+    try:
+        headers = {"X-API-Key": api_key} if api_key else {}
+        response = requests.get(f"{url}/api/healthcheck", headers=headers, timeout=5)
+        return "ok" if response.status_code == 200 else "down"
+    except requests.ConnectionError:
+        return "connection_error"
+    except requests.Timeout:
+        return "timeout"
+
+
+with st.sidebar:
+    st.subheader("Status")
+    _status = _check_marketraccoon(
+        st.session_state.settings.get("marketraccoon_url", ""),
+        st.session_state.settings.get("marketraccoon_token", ""),
+    )
+    if _status == "ok":
+        st.success("MarketRaccoon: up")
+    elif _status == "down":
+        st.error("MarketRaccoon: down")
+    elif _status == "connection_error":
+        st.error("MarketRaccoon: unreachable")
+        logger.error("Connection error during API healthcheck.")
+    elif _status == "timeout":
+        st.error("MarketRaccoon: timeout")
+        logger.error("API request timed out.")
+
 with st.form(key="settings_form"):
     st.subheader("MarketRaccoon")
     marketraccoon_url = st.text_input(
@@ -31,27 +61,6 @@ with st.form(key="settings_form"):
         type="password",
         value=st.session_state.settings.get("marketraccoon_token", ""),
     )
-
-    try:
-        headers = {}
-        if marketraccoon_token:
-            headers["X-API-Key"] = marketraccoon_token
-
-        response = requests.get(
-            f"{marketraccoon_url}/api/healthcheck",
-            headers=headers,
-            timeout=5,
-        )
-        if response.status_code == 200:
-            st.success("API is up and running.")
-        else:
-            st.error("API is down.")
-    except requests.ConnectionError:
-        st.error("Connection to MarketRaccoon failed.")
-        logger.error("Connection error during API healthcheck.")
-    except requests.Timeout:
-        st.error("API request timed out.")
-        logger.error("API request timed out.")
 
     st.subheader("Coinmarketcap")
     coinmarketcap_token = st.text_input(
@@ -151,3 +160,4 @@ with st.form(key="settings_form"):
         conf = Configuration()
         conf.save_config(st.session_state.settings)
         st.success("Settings saved successfully!")
+        _check_marketraccoon.clear()

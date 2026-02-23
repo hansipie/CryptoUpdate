@@ -77,11 +77,13 @@ class Market:
             df_market = pd.DataFrame()
             for token in df_tokens["token"]:
                 df = pd.read_sql_query(
-                    f"SELECT timestamp, price AS '{token}' FROM Market WHERE token = '{token}'",
+                    "SELECT timestamp, price FROM Market WHERE token = ?",
                     con,
+                    params=(token,),
                 )
                 if df.empty:
                     continue
+                df.rename(columns={"price": token}, inplace=True)
                 if df_market.empty:
                     df_market = df
                 else:
@@ -115,33 +117,16 @@ class Market:
         """
         logger.debug("Get token market")
         with sqlite3.connect(self.db_path) as con:
-            if from_timestamp and to_timestamp:
-                query = (
-                    f"SELECT timestamp AS Date, price AS Price from Market "
-                    f"WHERE token = '{token}' AND timestamp >= {from_timestamp} "
-                    f"AND timestamp <= {to_timestamp} ORDER BY timestamp;"
-                )
-                df = pd.read_sql_query(query, con)
-            elif from_timestamp:
-                query = (
-                    f"SELECT timestamp AS Date, price AS Price from Market "
-                    f"WHERE token = '{token}' AND timestamp >= {from_timestamp} "
-                    f"ORDER BY timestamp;"
-                )
-                df = pd.read_sql_query(query, con)
-            elif to_timestamp:
-                query = (
-                    f"SELECT timestamp AS Date, price AS Price from Market "
-                    f"WHERE token = '{token}' AND timestamp <= {to_timestamp} "
-                    f"ORDER BY timestamp;"
-                )
-                df = pd.read_sql_query(query, con)
-            else:
-                query = (
-                    f"SELECT timestamp AS Date, price AS Price from Market "
-                    f"WHERE token = '{token}' ORDER BY timestamp;"
-                )
-                df = pd.read_sql_query(query, con)
+            query = "SELECT timestamp AS Date, price AS Price FROM Market WHERE token = ?"
+            params = [token]
+            if from_timestamp:
+                query += " AND timestamp >= ?"
+                params.append(from_timestamp)
+            if to_timestamp:
+                query += " AND timestamp <= ?"
+                params.append(to_timestamp)
+            query += " ORDER BY timestamp"
+            df = pd.read_sql_query(query, con, params=params)
             if df.empty:
                 return None
             df["Date"] = pd.to_datetime(df["Date"], unit="s", utc=True)
@@ -166,18 +151,18 @@ class Market:
         with sqlite3.connect(self.db_path) as con:
             market_data = []
             for token in tokens_list:
-                query = (
-                    f"SELECT timestamp, price AS '{token}' FROM Market "
-                    f"WHERE token = '{token}' ORDER BY timestamp DESC LIMIT 1;"
+                df = pd.read_sql_query(
+                    "SELECT timestamp, price FROM Market WHERE token = ? ORDER BY timestamp DESC LIMIT 1",
+                    con,
+                    params=(token,),
                 )
-                df = pd.read_sql_query(query, con)
                 if df.empty:
                     continue
                 market_data.append(
                     {
                         "token": token,
                         "timestamp": df["timestamp"][0],
-                        "value": df[token][0],
+                        "value": df["price"][0],
                     }
                 )
             market_df = pd.DataFrame(market_data)
@@ -240,15 +225,16 @@ class Market:
         """
         with sqlite3.connect(self.db_path) as con:
             if timestamp:
-                query = (
-                    f"SELECT price from Market WHERE token = '{token}' "
-                    f"AND timestamp <= {timestamp} ORDER BY timestamp DESC LIMIT 1;"
+                df = pd.read_sql_query(
+                    "SELECT price FROM Market WHERE token = ? AND timestamp <= ? ORDER BY timestamp DESC LIMIT 1",
+                    con,
+                    params=(token, timestamp),
                 )
-                df = pd.read_sql_query(query, con)
             else:
                 df = pd.read_sql_query(
-                    f"SELECT price from Market WHERE token = '{token}' ORDER BY timestamp DESC LIMIT 1;",
+                    "SELECT price FROM Market WHERE token = ? ORDER BY timestamp DESC LIMIT 1",
                     con,
+                    params=(token,),
                 )
         logger.debug("Get price: %s", df)
         if df.empty:
@@ -266,8 +252,9 @@ class Market:
         """
         with sqlite3.connect(self.db_path) as con:
             df = pd.read_sql_query(
-                f"SELECT timestamp, price from Market WHERE token = '{token}' ORDER BY timestamp;",
+                "SELECT timestamp, price FROM Market WHERE token = ? ORDER BY timestamp",
                 con,
+                params=(token,),
             )
             return df
 

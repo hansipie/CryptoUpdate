@@ -19,31 +19,6 @@ class Portfolios:
     def __init__(self, db_path: str):
         self.db_path = db_path
 
-        # Créer les tables si elles n'existent pas
-        with sqlite3.connect(self.db_path) as conn:
-            cursor = conn.cursor()
-            cursor.execute(
-                """
-                CREATE TABLE IF NOT EXISTS Portfolios (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    name TEXT UNIQUE NOT NULL,
-                    bundle INTEGER NOT NULL DEFAULT 0
-                )
-            """
-            )
-            cursor.execute(
-                """
-                CREATE TABLE IF NOT EXISTS Portfolios_Tokens (
-                    portfolio_id INTEGER,
-                    token TEXT,
-                    amount TEXT,
-                    PRIMARY KEY (portfolio_id, token),
-                    FOREIGN KEY (portfolio_id) REFERENCES Portfolios(id)
-                )
-            """
-            )
-            conn.commit()
-
     def get_portfolio_names(self) -> list:
         logger.debug("Getting portfolios from database")
         with sqlite3.connect(self.db_path) as conn:
