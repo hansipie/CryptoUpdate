@@ -115,6 +115,7 @@ class TokensDatabase:
         """
         logger.debug("Get counts for token %s", token)
         with sqlite3.connect(self.db_path) as con:
+            # conditions contains only SQL structure (no user data); values are in params
             conditions = "WHERE token = ?"
             params: list = [token]
             if from_timestamp is not None:
@@ -143,6 +144,7 @@ class TokensDatabase:
         """Get the balances of a token through time"""
         logger.debug("Get balances for token %s", token)
         with sqlite3.connect(self.db_path) as con:
+            # conditions contains only SQL structure (no user data); values are in params
             conditions = "WHERE token = ?"
             params: list = [token]
             if from_timestamp is not None:

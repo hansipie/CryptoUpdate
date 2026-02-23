@@ -19,6 +19,13 @@ from modules.cmc import CMC
 
 logger = logging.getLogger(__name__)
 
+_DROP_DUPLICATE_QUERIES = {
+    "TokensDatabase": "SELECT * FROM TokensDatabase;",
+    "Market": "SELECT * FROM Market;",
+    "Currency": "SELECT * FROM Currency;",
+    "Swaps": "SELECT * FROM Swaps;",
+}
+
 
 class Market:
     """Class for managing cryptocurrency market data and currency rates."""
@@ -254,16 +261,10 @@ class Market:
             table: Table name
         """
         logger.debug("Drop duplicate from %s", table)
-        _TABLE_QUERIES = {
-            "TokensDatabase": "SELECT * FROM TokensDatabase;",
-            "Market": "SELECT * FROM Market;",
-            "Currency": "SELECT * FROM Currency;",
-            "Swaps": "SELECT * FROM Swaps;",
-        }
-        if table not in _TABLE_QUERIES:
+        if table not in _DROP_DUPLICATE_QUERIES:
             raise ValueError(f"Table non autorisée : {table}")
         with sqlite3.connect(self.db_path) as con:
-            df = pd.read_sql_query(_TABLE_QUERIES[table], con)
+            df = pd.read_sql_query(_DROP_DUPLICATE_QUERIES[table], con)
             dupcount = df.duplicated().sum()
             logger.debug("Found %d rows with %d duplicated rows", len(df), dupcount)
             if dupcount > 0:
