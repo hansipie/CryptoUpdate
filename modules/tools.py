@@ -94,6 +94,8 @@ def convert_price_to_target_currency(
 
         # Conversion EUR → USD
         elif source_currency == "EUR" and target_currency == "USD":
+            if not usd_to_eur_rate:
+                return value
             return value / usd_to_eur_rate
 
         else:
@@ -189,7 +191,7 @@ def convert_dataframe_prices_historical(
     if source_currency == "USD" and target_currency == "EUR":
         converted = merged["price_value"] * merged["rate"]
     else:  # EUR → USD
-        converted = merged["price_value"] / merged["rate"]
+        converted = merged["price_value"] / merged["rate"].replace(0, pd.NA)
 
     # Remettre les valeurs converties dans le DataFrame original (même ordre d'index)
     df[price_column] = converted.values
@@ -553,6 +555,8 @@ def calculate_crypto_rate(
     value_a = __interpolate_token(token_a, timestamp, dbfile)
     value_b = __interpolate_token(token_b, timestamp, dbfile)
     if value_a is None or value_b is None:
+        return None
+    if value_b == 0:
         return None
     rate = value_a / value_b
     logger.debug("Calculate crypto rate - 1 %s = %f %s", token_a, rate, token_b)

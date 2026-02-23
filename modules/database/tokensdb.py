@@ -115,31 +115,16 @@ class TokensDatabase:
         """
         logger.debug("Get counts for token %s", token)
         with sqlite3.connect(self.db_path) as con:
-            if from_timestamp is not None and to_timestamp is not None:
-                query = (
-                    f"SELECT timestamp AS Date, count AS Count FROM TokensDatabase "
-                    f"WHERE token = '{token}' AND timestamp >= {from_timestamp} "
-                    f"AND timestamp <= {to_timestamp}"
-                )
-                df = pd.read_sql_query(query, con)
-            elif from_timestamp is not None:
-                query = (
-                    f"SELECT timestamp AS Date, count AS Count FROM TokensDatabase "
-                    f"WHERE token = '{token}' AND timestamp >= {from_timestamp}"
-                )
-                df = pd.read_sql_query(query, con)
-            elif to_timestamp is not None:
-                query = (
-                    f"SELECT timestamp AS Date, count AS Count FROM TokensDatabase "
-                    f"WHERE token = '{token}' AND timestamp <= {to_timestamp}"
-                )
-                df = pd.read_sql_query(query, con)
-            else:
-                query = (
-                    f"SELECT timestamp AS Date, count AS Count FROM TokensDatabase "
-                    f"WHERE token = '{token}'"
-                )
-                df = pd.read_sql_query(query, con)
+            conditions = "WHERE token = ?"
+            params: list = [token]
+            if from_timestamp is not None:
+                conditions += " AND timestamp >= ?"
+                params.append(from_timestamp)
+            if to_timestamp is not None:
+                conditions += " AND timestamp <= ?"
+                params.append(to_timestamp)
+            query = f"SELECT timestamp AS Date, count AS Count FROM TokensDatabase {conditions}"
+            df = pd.read_sql_query(query, con, params=params)
             if df.empty:
                 logger.warning("No count data found for token %s in database", token)
                 return None
@@ -158,33 +143,19 @@ class TokensDatabase:
         """Get the balances of a token through time"""
         logger.debug("Get balances for token %s", token)
         with sqlite3.connect(self.db_path) as con:
-            if from_timestamp is not None and to_timestamp is not None:
-                query = (
-                    f"SELECT timestamp AS Date, price*count AS 'Value', count AS Count "
-                    f"FROM TokensDatabase WHERE token = '{token}' "
-                    f"AND timestamp >= {from_timestamp} AND timestamp <= {to_timestamp}"
-                )
-                df = pd.read_sql_query(query, con)
-            elif from_timestamp is not None:
-                query = (
-                    f"SELECT timestamp AS Date, price*count AS 'Value', count AS Count "
-                    f"FROM TokensDatabase WHERE token = '{token}' "
-                    f"AND timestamp >= {from_timestamp}"
-                )
-                df = pd.read_sql_query(query, con)
-            elif to_timestamp is not None:
-                query = (
-                    f"SELECT timestamp AS Date, price*count AS 'value', count AS Count "
-                    f"FROM TokensDatabase WHERE token = '{token}' "
-                    f"AND timestamp <= {to_timestamp}"
-                )
-                df = pd.read_sql_query(query, con)
-            else:
-                query = (
-                    f"SELECT timestamp AS Date, price*count AS 'value', count AS Count "
-                    f"FROM TokensDatabase WHERE token = '{token}'"
-                )
-                df = pd.read_sql_query(query, con)
+            conditions = "WHERE token = ?"
+            params: list = [token]
+            if from_timestamp is not None:
+                conditions += " AND timestamp >= ?"
+                params.append(from_timestamp)
+            if to_timestamp is not None:
+                conditions += " AND timestamp <= ?"
+                params.append(to_timestamp)
+            query = (
+                f"SELECT timestamp AS Date, price*count AS Value, count AS Count "
+                f"FROM TokensDatabase {conditions}"
+            )
+            df = pd.read_sql_query(query, con, params=params)
             if df.empty:
                 logger.warning("No data found for token %s in database", token)
                 return None
@@ -232,14 +203,19 @@ class TokensDatabase:
             df = pd.read_sql_query(
                 "SELECT MAX(timestamp) as timestamp from TokensDatabase;", con
             )
+            if df.empty:
+                return None
             return df["timestamp"][0]
 
     def get_last_timestamp_by_token(self, token: str) -> int:
         with sqlite3.connect(self.db_path) as con:
             df = pd.read_sql_query(
-                f"SELECT MAX(timestamp) as timestamp from TokensDatabase WHERE token = '{token}';",
+                "SELECT MAX(timestamp) as timestamp from TokensDatabase WHERE token = ?;",
                 con,
+                params=(token,),
             )
+            if df.empty:
+                return None
             return df["timestamp"][0]
 
     def drop_duplicate(self):

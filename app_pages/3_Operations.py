@@ -197,10 +197,10 @@ def swap_add() -> None:
 
     with col_amount:
         swap_amount_from = st.number_input(
-            "From Amount", min_value=0.0, format="%.8g", key="swap_amount_to"
+            "From Amount", min_value=0.0, format="%.8g", key="swap_amount_from"
         )
         swap_amount_to = st.number_input(
-            "To Amount", min_value=0.0, format="%.8g", key="swap_amount_from"
+            "To Amount", min_value=0.0, format="%.8g", key="swap_amount_to"
         )
 
     with col_portfolio:
@@ -489,7 +489,8 @@ def buy_edit():
     Shows edit dialog if a row is selected.
     Otherwise displays a warning toast.
     """
-    rowidx = rows_selected(st.session_state.buyselection)[0]
+    _sel = rows_selected(st.session_state.buyselection)
+    rowidx = _sel[0] if _sel is not None else None
     if rowidx is None:
         st.toast("Please select a row", icon=":material/warning:")
     else:
@@ -503,7 +504,8 @@ def buy_delete():
     Otherwise displays a warning toast.
     """
     logger.debug("Delete row")
-    rowidx = rows_selected(st.session_state.buyselection)[0]
+    _sel = rows_selected(st.session_state.buyselection)
+    rowidx = _sel[0] if _sel is not None else None
     if rowidx is None:
         st.toast("Please select a row", icon=":material/warning:")
     else:
@@ -611,6 +613,8 @@ def calc_perf(df: pd.DataFrame, COL_TOken: str, col_rate: str) -> pd.DataFrame:
 def swap_perf(rate_swap, rate_now) -> float:
     if rate_swap is None or rate_now is None:
         return None
+    if rate_now == 0:
+        return None
     return ((rate_swap * 100) / rate_now) - 100
 
 
@@ -653,7 +657,7 @@ def build_buy_dataframe(
     local_timezone = tzlocal.get_localzone()
     logger.debug("Timezone locale: %s", local_timezone)
     df["Date"] = df["Date"].dt.tz_convert(local_timezone).dt.tz_localize(None)
-    df["Buy Rate"] = df["From"] / df["To"]
+    df["Buy Rate"] = df["From"] / df["To"].replace(0, pd.NA)
 
     # Historical conversion of From column
     if convert_from and not df.empty:
@@ -701,7 +705,7 @@ def build_buy_dataframe(
     if (convert_from or convert_to) and not df.empty:
         from_col = f"From ({convert_from})" if convert_from else "From"
         to_col = f"To ({convert_to})" if convert_to else "To"
-        df["Converted Rate"] = df[from_col] / df[to_col]
+        df["Converted Rate"] = df[from_col] / df[to_col].replace(0, pd.NA)
 
     # Current Rate and Perf. — use converted units when active
     if (convert_from or convert_to) and not df.empty:
@@ -727,7 +731,7 @@ def build_buy_dataframe(
                 ),
                 axis=1,
             )
-        df["Perf."] = ((df["Current Rate"] * 100) / df["Converted Rate"]) - 100
+        df["Perf."] = ((df["Current Rate"] * 100) / df["Converted Rate"].replace(0, pd.NA)) - 100
     else:
         if use_api:
             df = calc_perf_api(
@@ -865,7 +869,7 @@ def build_swap_dataframe(
     logger.debug("Timezone locale: %s", local_timezone)
     df["Date"] = df["Date"].dt.tz_convert(local_timezone).dt.tz_localize(None)
 
-    df["Swap Rate"] = df["To Amount"] / df["From Amount"]
+    df["Swap Rate"] = df["To Amount"] / df["From Amount"].replace(0, pd.NA)
 
     # Historical conversion of From Amount column
     if convert_from and not df.empty:
@@ -913,7 +917,7 @@ def build_swap_dataframe(
     if (convert_from or convert_to) and not df.empty:
         from_col = f"From Amount ({convert_from})" if convert_from else "From Amount"
         to_col = f"To Amount ({convert_to})" if convert_to else "To Amount"
-        df["Swap Rate"] = df[to_col] / df[from_col]
+        df["Swap Rate"] = df[to_col] / df[from_col].replace(0, pd.NA)
 
     # Current Rate and Perf. — use converted units when active
     if use_api:

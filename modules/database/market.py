@@ -144,28 +144,17 @@ class Market:
             DataFrame with latest token prices or None if empty
         """
         logger.debug("Get last market")
-        tokens_list = self.get_tokens()
-        if not tokens_list:
-            logger.warning("No tokens available")
-            return None
         with sqlite3.connect(self.db_path) as con:
-            market_data = []
-            for token in tokens_list:
-                df = pd.read_sql_query(
-                    "SELECT timestamp, price FROM Market WHERE token = ? ORDER BY timestamp DESC LIMIT 1",
-                    con,
-                    params=(token,),
-                )
-                if df.empty:
-                    continue
-                market_data.append(
-                    {
-                        "token": token,
-                        "timestamp": df["timestamp"][0],
-                        "value": df["price"][0],
-                    }
-                )
-            market_df = pd.DataFrame(market_data)
+            market_df = pd.read_sql_query(
+                "SELECT m.token, m.timestamp, m.price AS value "
+                "FROM Market m "
+                "INNER JOIN (SELECT token, MAX(timestamp) AS ts FROM Market GROUP BY token) mx "
+                "    ON m.token = mx.token AND m.timestamp = mx.ts",
+                con,
+            )
+            if market_df.empty:
+                logger.warning("No tokens available")
+                return None
             market_df.set_index("token", inplace=True)
             logger.debug("Last Market get size: %d", len(market_df))
             logger.debug("Last Market get:\n%s", market_df)
@@ -265,10 +254,13 @@ class Market:
             table: Table name
         """
         logger.debug("Drop duplicate from %s", table)
+        _ALLOWED_TABLES = {"TokensDatabase", "Market", "Currency", "Swaps"}
+        if table not in _ALLOWED_TABLES:
+            raise ValueError(f"Table non autorisée : {table}")
         with sqlite3.connect(self.db_path) as con:
             df = pd.read_sql_query(f"SELECT * from {table};", con)
             dupcount = df.duplicated().sum()
-            logger.debug("Found %d rows with %f duplicated rows", len(df), dupcount)
+            logger.debug("Found %d rows with %d duplicated rows", len(df), dupcount)
             if dupcount > 0:
                 logger.debug("Found %d duplicated rows. Dropping...", dupcount)
                 df.drop_duplicates(inplace=True)
