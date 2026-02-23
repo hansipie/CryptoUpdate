@@ -8,6 +8,7 @@ cryptocurrency portfolios.
 
 # Standard library imports
 import logging
+import os
 import sys
 
 # Third-party imports
@@ -32,8 +33,9 @@ APP_PAGES = {
 
 def setup_logging():
     """Configure application logging."""
+    log_level = os.environ.get("LOG_LEVEL", "DEBUG").upper()
     logging.basicConfig(
-        level=logging.DEBUG,
+        level=getattr(logging, log_level, logging.DEBUG),
         format="%(asctime)s - %(levelname)s - %(name)s - %(pathname)s:%(lineno)d - %(message)s",
         handlers=[logging.StreamHandler(sys.stdout)],
     )

@@ -137,8 +137,10 @@ def _migrate_v3(conn: sqlite3.Connection) -> None:
 
 def _migrate_v4(conn: sqlite3.Connection) -> None:
     """Ajout d'une cle primaire id et suppression de l'unicite de token."""
-    cursor = conn.cursor()
-    cursor.executescript(
+    # Utiliser des execute() individuels (pas executescript) pour rester dans
+    # la transaction SQLite ouverte par le context manager — évite un COMMIT
+    # implicite partiel en cas d'erreur intermédiaire.
+    conn.execute(
         """
         CREATE TABLE IF NOT EXISTS TokenMetadata_new (
             id                   INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -151,37 +153,30 @@ def _migrate_v4(conn: sqlite3.Connection) -> None:
             updated_at           INTEGER DEFAULT (strftime('%s', 'now')),
             mraccoon_id          INTEGER,
             name                 TEXT
-        );
-
+        )
+        """
+    )
+    conn.execute(
+        """
         INSERT INTO TokenMetadata_new (
-            token,
-            status,
-            delisting_date,
-            last_valid_price_date,
-            notes,
-            created_at,
-            updated_at,
-            mraccoon_id,
-            name
+            token, status, delisting_date, last_valid_price_date,
+            notes, created_at, updated_at, mraccoon_id, name
         )
         SELECT
-            token,
-            status,
-            delisting_date,
-            last_valid_price_date,
-            notes,
-            created_at,
-            updated_at,
-            mraccoon_id,
-            name
-        FROM TokenMetadata;
-
-        DROP TABLE TokenMetadata;
-        ALTER TABLE TokenMetadata_new RENAME TO TokenMetadata;
-
-        CREATE INDEX IF NOT EXISTS idx_tokenmetadata_token ON TokenMetadata (token);
+            token, status, delisting_date, last_valid_price_date,
+            notes, created_at, updated_at, mraccoon_id, name
+        FROM TokenMetadata
+        """
+    )
+    conn.execute("DROP TABLE TokenMetadata")
+    conn.execute("ALTER TABLE TokenMetadata_new RENAME TO TokenMetadata")
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_tokenmetadata_token ON TokenMetadata (token)"
+    )
+    conn.execute(
+        """
         CREATE UNIQUE INDEX IF NOT EXISTS idx_tokenmetadata_mraccoon_id
-            ON TokenMetadata (mraccoon_id);
+            ON TokenMetadata (mraccoon_id)
         """
     )
 
@@ -194,12 +189,20 @@ def _migrate_v5(conn: sqlite3.Connection) -> None:
         pass  # colonne déjà présente
 
 
+def _migrate_v6(conn: sqlite3.Connection) -> None:
+    """Ajout d'un index composite sur TokensDatabase pour accélérer les requêtes par token/timestamp."""
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_tokensdb ON TokensDatabase (timestamp, token)"
+    )
+
+
 MIGRATIONS: dict = {
     1: _migrate_v1,
     2: _migrate_v2,
     3: _migrate_v3,
     4: _migrate_v4,
     5: _migrate_v5,
+    6: _migrate_v6,
 }
 
 

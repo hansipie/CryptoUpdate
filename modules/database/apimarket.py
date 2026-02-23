@@ -6,6 +6,7 @@ formatting, and timezone conversions for financial data.
 """
 
 import logging
+from datetime import datetime
 from typing import Optional
 
 import pandas as pd
@@ -170,8 +171,6 @@ class ApiMarket:
             logger.debug("Get fiat currency data for timestamp: %d", timestamp)
 
             # Convert Unix timestamp to ISO 8601 format
-            from datetime import datetime
-
             dt = datetime.fromtimestamp(timestamp, tz=self.local_timezone)
             date_str = dt.astimezone(pd.Timestamp.now(tz="UTC").tz).isoformat()
 
@@ -345,15 +344,11 @@ class ApiMarket:
         # Build query parameters
         params = {"coinid": coinid}
         if from_timestamp:
-            from datetime import datetime
-
             dt = datetime.fromtimestamp(from_timestamp, tz=self.local_timezone)
             params["startdate"] = dt.astimezone(
                 pd.Timestamp.now(tz="UTC").tz
             ).isoformat()
         if to_timestamp:
-            from datetime import datetime
-
             dt = datetime.fromtimestamp(to_timestamp, tz=self.local_timezone)
             params["enddate"] = dt.astimezone(pd.Timestamp.now(tz="UTC").tz).isoformat()
 
