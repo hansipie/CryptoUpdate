@@ -78,26 +78,16 @@ class Market:
         """
         logger.debug("Get market")
         with sqlite3.connect(self.db_path) as con:
-            df_tokens = pd.read_sql_query("select DISTINCT token from Market", con)
-            if df_tokens.empty:
+            df_all = pd.read_sql_query(
+                "SELECT timestamp, token, price FROM Market ORDER BY timestamp", con
+            )
+            if df_all.empty:
                 return None
-            df_market = pd.DataFrame()
-            for token in df_tokens["token"]:
-                df = pd.read_sql_query(
-                    "SELECT timestamp, price FROM Market WHERE token = ?",
-                    con,
-                    params=(token,),
-                )
-                if df.empty:
-                    continue
-                df.rename(columns={"price": token}, inplace=True)
-                if df_market.empty:
-                    df_market = df
-                else:
-                    df_market = df_market.merge(df, on="timestamp", how="outer")
-            if df_market.empty:
-                return None
-
+            df_market = df_all.pivot_table(
+                index="timestamp", columns="token", values="price", aggfunc="last"
+            )
+            df_market.columns.name = None
+            df_market.reset_index(inplace=True)
             df_market["timestamp"] = (
                 pd.to_datetime(df_market["timestamp"], unit="s", utc=True)
                 .dt.tz_convert(self.local_timezone)
@@ -126,10 +116,10 @@ class Market:
         with sqlite3.connect(self.db_path) as con:
             query = "SELECT timestamp AS Date, price AS Price FROM Market WHERE token = ?"
             params = [token]
-            if from_timestamp:
+            if from_timestamp is not None:
                 query += " AND timestamp >= ?"
                 params.append(from_timestamp)
-            if to_timestamp:
+            if to_timestamp is not None:
                 query += " AND timestamp <= ?"
                 params.append(to_timestamp)
             query += " ORDER BY timestamp"
@@ -349,8 +339,15 @@ class Market:
                         "Error updating currencies. Code: %d", response.status_code
                     )
                     time.sleep(1)
-                    raise ValueError("Error updating currencies")
-                resp = response.json()
+                    continue
+                try:
+                    resp = response.json()
+                except ValueError:
+                    logger.error(
+                        "Invalid JSON response from currency API for date %s", date
+                    )
+                    time.sleep(1)
+                    continue
 
                 logger.debug(
                     "Rate Timestamp: %d  - Rate: %f",

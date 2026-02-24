@@ -1,6 +1,5 @@
 import io
 import logging
-import traceback
 from json import loads
 
 import pandas as pd
@@ -82,7 +81,7 @@ def extract(input_data: any) -> pd.DataFrame:
                 raise ValueError("Invalid input type")
         except (ValueError, KeyError, TypeError) as e:
             st.error("Unexpected error: " + str(e))
-            traceback.print_exc()
+            logger.exception("Extraction failed")
             st.stop()
 
     output["select"] = False
@@ -220,8 +219,8 @@ if file is None:
 else:
     logger.debug("File: %s - file type: %s", file.name, file.type)
 
-    if file.type == "application/vnd.ms-excel":
-        logger.debug("CSV file detectimport_pageed")
+    if file.type in ("text/csv", "application/vnd.ms-excel") or file.name.endswith(".csv"):
+        logger.debug("CSV file detected")
         input_file = process_csv(file)
     else:
         logger.debug("Image file detected")

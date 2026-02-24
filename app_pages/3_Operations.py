@@ -190,8 +190,8 @@ def swap_add() -> None:
         date = st.date_input("Date", key="swap_date")
     with col_time:
         time = st.time_input("Time", key="swap_time")
-    COL_TOken, col_amount, col_portfolio = st.columns(3)
-    with COL_TOken:
+    col_token, col_amount, col_portfolio = st.columns(3)
+    with col_token:
         swap_token_from = st.text_input("From Token", key="swap_token_from")
         swap_token_to = st.text_input("To Token", key="swap_token_to")
 
@@ -303,8 +303,8 @@ def swap_edit_dialog(data: dict):
         date = st.date_input("Date", key="swap_date", value=data["Date"])
     with col_time:
         time = st.time_input("Time", key="swap_time", value=data["Date"])
-    COL_TOken, col_amount, col_portfolio = st.columns(3)
-    with COL_TOken:
+    col_token, col_amount, col_portfolio = st.columns(3)
+    with col_token:
         swap_token_from = st.text_input(
             "From Token", key="swap_token_from", value=data["From Token"]
         )
@@ -583,12 +583,12 @@ def swap_arch_delete():
         swap_arch_delete_dialog(rowidx)
 
 
-def calc_perf(df: pd.DataFrame, COL_TOken: str, col_rate: str) -> pd.DataFrame:
+def calc_perf(df: pd.DataFrame, col_token: str, col_rate: str) -> pd.DataFrame:
     """Calculate current performance metrics for operations.
 
     Args:
         df: DataFrame containing operations data
-        COL_TOken: Name of column containing token symbols
+        col_token: Name of column containing token symbols
         col_rate: Name of column containing original rates
 
     Returns:
@@ -604,7 +604,7 @@ def calc_perf(df: pd.DataFrame, COL_TOken: str, col_rate: str) -> pd.DataFrame:
         df["Perf."] = None
     else:
         logger.debug("Market data:\n%s", market_df)
-        df["Current Rate"] = df[COL_TOken].map(market_df["value"].to_dict())
+        df["Current Rate"] = df[col_token].map(market_df["value"].to_dict())
         df["Perf."] = ((df["Current Rate"] * 100) / df[col_rate].replace(0, pd.NA)) - 100
     return df
 
@@ -796,52 +796,38 @@ def build_swap_dataframes(
     convert_to: str = None,
     use_api: bool = False,
 ) -> pd.DataFrame:
-    df1 = pd.DataFrame(
-        g_swaps.get_by_tag(""),
-        columns=[
-            "id",
-            "timestamp",
-            "From Token",
-            "From Amount",
-            "From Wallet",
-            "To Token",
-            "To Amount",
-            "To Wallet",
-            "tag",
-            "note",
-        ],
-    )
+    swaps = Swaps(db_file)
+    columns = [
+        "id",
+        "timestamp",
+        "From Token",
+        "From Amount",
+        "From Wallet",
+        "To Token",
+        "To Amount",
+        "To Wallet",
+        "tag",
+        "note",
+    ]
+    df1 = pd.DataFrame(swaps.get_by_tag(""), columns=columns)
     if not df1.empty:
-        df1 = build_swap_dataframe(df1, convert_from, convert_to, use_api)
+        df1 = build_swap_dataframe(df1, db_file, convert_from, convert_to, use_api)
     else:
         st.info("No swap operations")
 
-    df2 = pd.DataFrame(
-        g_swaps.get_by_tag("archived"),
-        columns=[
-            "id",
-            "timestamp",
-            "From Token",
-            "From Amount",
-            "From Wallet",
-            "To Token",
-            "To Amount",
-            "To Wallet",
-            "tag",
-            "note",
-        ],
-    )
+    df2 = pd.DataFrame(swaps.get_by_tag("archived"), columns=columns)
     if not df2.empty:
-        df2 = build_swap_dataframe(df2, convert_from, convert_to, use_api)
+        df2 = build_swap_dataframe(df2, db_file, convert_from, convert_to, use_api)
     else:
         st.info("No archived swaps")
 
     return df1, df2
 
 
-@st.cache_data()
+@st.cache_data(ttl=3600)
 def build_swap_dataframe(
     df: pd.DataFrame,
+    db_file: str,
     convert_from: str = None,
     convert_to: str = None,
     use_api: bool = False,
@@ -888,7 +874,7 @@ def build_swap_dataframe(
                 "From Token",
                 convert_from,
                 "timestamp",
-                st.session_state.settings["dbfile"],
+                db_file,
             )
 
     # Historical conversion of To Amount column
@@ -909,7 +895,7 @@ def build_swap_dataframe(
                 "To Token",
                 convert_to,
                 "timestamp",
-                st.session_state.settings["dbfile"],
+                db_file,
             )
 
     # Recalculate Swap Rate if conversions are active
@@ -936,14 +922,13 @@ def build_swap_dataframe(
         )
     else:
         now_ts = int(pd.Timestamp.now(tz="UTC").timestamp())
-        dbfile = st.session_state.settings["dbfile"]
         df["Current Rate"] = df.apply(
             lambda row: (
                 calculate_crypto_rate(
                     convert_from if convert_from else row["From Token"],
                     convert_to if convert_to else row["To Token"],
                     now_ts,
-                    dbfile,
+                    db_file,
                 )
                 if (convert_from or row["From Token"])
                 != (convert_to or row["To Token"])
@@ -953,14 +938,20 @@ def build_swap_dataframe(
         )
 
     # Calculate performance for each swap
-    df["Perf."] = swap_perf(df["Swap Rate"], df["Current Rate"])
+    df["Perf."] = ((df["Swap Rate"] * 100) / df["Current Rate"].replace(0, pd.NA)) - 100
 
     return df
 
 
-def draw_swap(df: pd.DataFrame, convert_from: str = None, convert_to: str = None):
+def _draw_swap_table(
+    df: pd.DataFrame,
+    selection_key: str,
+    empty_message: str,
+    convert_from: str = None,
+    convert_to: str = None,
+):
     if df.empty:
-        st.info("No swap operations")
+        st.info(empty_message)
     else:
         # Apply styling based on Perf. column values using configurable thresholds
         green_threshold = st.session_state.settings.get(
@@ -1022,76 +1013,16 @@ def draw_swap(df: pd.DataFrame, convert_from: str = None, convert_to: str = None
             column_config=column_config,
             on_select="rerun",
             selection_mode="multi-row",
-            key="swapselection",
+            key=selection_key,
         )
+
+
+def draw_swap(df: pd.DataFrame, convert_from: str = None, convert_to: str = None):
+    _draw_swap_table(df, "swapselection", "No swap operations", convert_from, convert_to)
 
 
 def draw_swap_arch(df: pd.DataFrame, convert_from: str = None, convert_to: str = None):
-    if df.empty:
-        st.info("No archived swaps")
-    else:
-        # Apply styling based on Perf. column values using configurable thresholds
-        green_threshold = st.session_state.settings.get(
-            "operations_green_threshold", 100
-        )
-        orange_threshold = st.session_state.settings.get(
-            "operations_orange_threshold", 50
-        )
-        red_threshold = st.session_state.settings.get("operations_red_threshold", 0)
-
-        def color_rows(row):
-            if pd.isna(row["Perf."]):
-                return [""] * len(row)
-            elif row["Perf."] >= green_threshold:
-                return ["background-color: #90EE90"] * len(row)  # Light green
-            elif row["Perf."] >= orange_threshold:
-                return ["background-color: #FFA500"] * len(row)  # Orange
-            elif row["Perf."] < red_threshold:
-                return ["background-color: #FFB6C1"] * len(row)  # Light red
-            else:
-                return [""] * len(row)
-
-        styled_df = df.style.apply(color_rows, axis=1)
-
-        # Build dynamic column order and config
-        COL_FROM_amount = (
-            f"From Amount ({convert_from})" if convert_from else "From Amount"
-        )
-        COL_TO_amount = f"To Amount ({convert_to})" if convert_to else "To Amount"
-        RATE_COL = "Swap Rate"
-
-        column_order = [
-            "Date",
-            COL_FROM_amount,
-            *(() if convert_from else ("From Token",)),
-            COL_TO_amount,
-            *(() if convert_to else ("To Token",)),
-            "From Wallet",
-            "To Wallet",
-            RATE_COL,
-            "Current Rate",
-            "Perf.",
-            "note",
-        ]
-
-        column_config = {
-            COL_FROM_amount: st.column_config.NumberColumn(format="%.8g"),
-            COL_TO_amount: st.column_config.NumberColumn(format="%.8g"),
-            RATE_COL: st.column_config.NumberColumn(format="%.8g"),
-            "Current Rate": st.column_config.NumberColumn(format="%.8g"),
-            "Perf.": st.column_config.NumberColumn(format="%.2f%%"),
-        }
-
-        st.dataframe(
-            styled_df,
-            width="stretch",
-            hide_index=True,
-            column_order=column_order,
-            column_config=column_config,
-            on_select="rerun",
-            selection_mode="multi-row",
-            key="swapachselection",
-        )
+    _draw_swap_table(df, "swapachselection", "No archived swaps", convert_from, convert_to)
 
 
 g_wallets = Portfolios(st.session_state.settings["dbfile"]).get_portfolio_names()

@@ -12,12 +12,6 @@ st.title("Settings")
 if "settings" not in st.session_state:
     st.session_state.settings = {}
 
-# Initialize fiat currency in session state if not already set
-if "fiat_currency" not in st.session_state:
-    st.session_state.fiat_currency = st.session_state.settings.get(
-        "fiat_currency", "EUR"
-    )
-
 @st.cache_data(ttl=30, show_spinner=False)
 def _check_marketraccoon(url: str, api_key: str) -> str:
     """Vérifie la disponibilité de l'API MarketRaccoon (résultat mis en cache 30s)."""
@@ -29,6 +23,8 @@ def _check_marketraccoon(url: str, api_key: str) -> str:
         return "connection_error"
     except requests.Timeout:
         return "timeout"
+    except requests.exceptions.MissingSchema:
+        return "invalid_url"
 
 
 with st.sidebar:
@@ -155,7 +151,6 @@ with st.form(key="settings_form"):
         )
         st.session_state.settings["operations_red_threshold"] = operations_red_threshold
         st.session_state.settings["fiat_currency"] = fiat_currency
-        st.session_state.fiat_currency = fiat_currency
 
         conf = Configuration()
         conf.save_config(st.session_state.settings)

@@ -750,14 +750,6 @@ markgetdb = Market(
     st.session_state.settings["coinmarketcap_token"],
 )
 
-# Initialize ApiMarket for MarketRaccoon API access
-cache_file = os.path.join(st.session_state.settings["data_path"], "api_cache.json")
-apimarket = ApiMarket(
-    st.session_state.settings["marketraccoon_url"],
-    api_key=st.session_state.settings.get("marketraccoon_token"),
-    cache_file=cache_file,
-)
-
 if "tokens" not in st.session_state:
     # Load saved token preferences from settings
     st.session_state.tokens = st.session_state.settings.get(
@@ -769,17 +761,17 @@ if add_selectbox == "Global":
     st.title("Global")
     aggregater_ui()
 
-if add_selectbox == "Assets Balances":
+elif add_selectbox == "Assets Balances":
     logger.debug("Assets Balances")
     st.title("Assets Balances")
     build_tabs(use_api=use_api_sidebar)
 
-if add_selectbox == "Market":
+elif add_selectbox == "Market":
     logger.debug("Market")
     st.title("Market")
     build_tabs("Market", use_api=use_api_sidebar)
 
-if add_selectbox == "Currency":
+elif add_selectbox == "Currency":
     # Determine currency direction from toggle
     currency_inverted = st.session_state.get("currency_direction_toggle", True)
 
@@ -810,7 +802,7 @@ if add_selectbox == "Currency":
     # Invert prices if EUR/USD is selected
     if currency_inverted and currency_data is not None and not currency_data.empty:
         currency_data = currency_data.copy()
-        currency_data["price"] = 1 / currency_data["price"]
+        currency_data["price"] = 1 / currency_data["price"].replace(0, pd.NA)
 
     build_price_tab(currency_data, chart_title=CHART_TITLE, chart_y_label=CHART_Y_LABEL)
 
@@ -866,8 +858,5 @@ if add_selectbox == "Currency":
                 st.info(f"Exact value: {value:.6f} {UNIT}")
         else:
             st.warning("Value is 0.0")
-    elif (
-        st.session_state.interpolation_result is None
-        and "interpolation_result" in st.session_state
-    ):
+    else:
         st.info("No data available")

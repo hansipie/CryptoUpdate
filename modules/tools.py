@@ -11,10 +11,12 @@ from datetime import datetime
 import logging
 import os
 import shutil
+import sqlite3
 import traceback
 
 import numpy as np
 import pandas as pd
+import requests
 import streamlit as st
 
 from modules.database.customdata import Customdata
@@ -106,7 +108,7 @@ def convert_price_to_target_currency(
             )
             return value
 
-    except Exception as e:
+    except (requests.exceptions.RequestException, ValueError, KeyError) as e:
         logger.error("Erreur conversion devise: %s", e)
         return value
 
@@ -436,10 +438,8 @@ def load_settings(settings: dict):
             logger.error("Unable to create db directory %s: %s", db_dir, e)
 
     try:
-        import sqlite3 as _sqlite
-
         # Attempt to open/create the database file
-        with _sqlite.connect(st.session_state.settings["dbfile"]) as _conn:
+        with sqlite3.connect(st.session_state.settings["dbfile"]) as _conn:
             pass
     except Exception as e:
         logger.error(
@@ -449,7 +449,7 @@ def load_settings(settings: dict):
         )
         fallback_db = os.path.join(os.getcwd(), "db.sqlite3")
         try:
-            with _sqlite.connect(fallback_db) as _conn:
+            with sqlite3.connect(fallback_db) as _conn:
                 pass
             st.session_state.settings["dbfile"] = fallback_db
             logger.info("Falling back to dbfile: %s", fallback_db)
@@ -964,7 +964,7 @@ def calc_perf_api(
 
         df["Current Rate"] = df[col_token].map(get_price_target)
 
-    df["Perf."] = ((df["Current Rate"] * 100) / df[col_rate]) - 100
+    df["Perf."] = ((df["Current Rate"] * 100) / df[col_rate].replace(0, pd.NA)) - 100
     return df
 
 
