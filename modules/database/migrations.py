@@ -222,5 +222,8 @@ def run_migrations(db_path: str) -> None:
         logger.info("Application de la migration v%d…", version)
         with sqlite3.connect(db_path) as conn:
             MIGRATIONS[version](conn)
-        _set_db_version(db_path, version)
+            conn.execute(
+                "INSERT OR REPLACE INTO Customdata (name, value, type) VALUES ('db_version', ?, 'int')",
+                (str(version),),
+            )
         logger.info("Migration v%d appliquée — db_version = %d", version, version)

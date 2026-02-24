@@ -357,16 +357,16 @@ class ApiMarket:
         if self.api_key:
             headers["X-API-Key"] = self.api_key
 
+        first_page = True
         while next_url:
             logger.debug("Fetching page: %s", next_url)
             request = requests.get(
                 next_url,
-                params=params
-                if next_url == self.url + "/api/v1/cryptocurrency"
-                else None,
+                params=params if first_page else None,
                 headers=headers,
                 timeout=10,
             )
+            first_page = False
 
             if request.status_code == 200:
                 data = request.json()
