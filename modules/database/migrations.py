@@ -16,33 +16,51 @@ def _ensure_customdata(db_path: str) -> None:
 
     Doit être appelé avant toute lecture de db_version.
     """
-    with sqlite3.connect(db_path) as conn:
-        conn.execute(
-            """CREATE TABLE IF NOT EXISTS Customdata (
-                id    INTEGER PRIMARY KEY AUTOINCREMENT,
-                name  TEXT NOT NULL UNIQUE,
-                value TEXT NOT NULL,
-                type  TEXT NOT NULL
-            )"""
-        )
+    try:
+        with sqlite3.connect(db_path) as conn:
+            conn.execute(
+                """CREATE TABLE IF NOT EXISTS Customdata (
+                    id    INTEGER PRIMARY KEY AUTOINCREMENT,
+                    name  TEXT NOT NULL UNIQUE,
+                    value TEXT NOT NULL,
+                    type  TEXT NOT NULL
+                )"""
+            )
+    except sqlite3.Error as e:
+        logger.error("Erreur lors de la création de Customdata : %s", e)
+        raise
 
 
 def _get_db_version(db_path: str) -> int:
     """Retourne la version courante de la base (0 si absente)."""
-    with sqlite3.connect(db_path) as conn:
-        row = conn.execute(
-            "SELECT value FROM Customdata WHERE name = 'db_version'"
-        ).fetchone()
-    return int(row[0]) if row else 0
+    try:
+        with sqlite3.connect(db_path) as conn:
+            row = conn.execute(
+                "SELECT value FROM Customdata WHERE name = 'db_version'"
+            ).fetchone()
+    except sqlite3.Error as e:
+        logger.error("Erreur lors de la lecture de db_version : %s", e)
+        raise
+    if not row:
+        return 0
+    try:
+        return int(row[0])
+    except ValueError:
+        logger.warning("db_version invalide : %s, reset à 0", row[0])
+        return 0
 
 
 def _set_db_version(db_path: str, version: int) -> None:
     """Enregistre la version courante dans Customdata."""
-    with sqlite3.connect(db_path) as conn:
-        conn.execute(
-            "INSERT OR REPLACE INTO Customdata (name, value, type) VALUES ('db_version', ?, 'int')",
-            (str(version),),
-        )
+    try:
+        with sqlite3.connect(db_path) as conn:
+            conn.execute(
+                "INSERT OR REPLACE INTO Customdata (name, value, type) VALUES ('db_version', ?, 'int')",
+                (str(version),),
+            )
+    except sqlite3.Error as e:
+        logger.error("Erreur lors de l'écriture de db_version : %s", e)
+        raise
 
 
 def _migrate_v1(conn: sqlite3.Connection) -> None:
@@ -120,14 +138,20 @@ def _migrate_v1(conn: sqlite3.Connection) -> None:
     )
 
 
+_V2_COLUMNS: dict = {
+    "mr_id": "INTEGER",
+    "name": "TEXT",
+}
+
+
 def _migrate_v2(conn: sqlite3.Connection) -> None:
     """Ajout des colonnes MarketRaccoon : mr_id et name dans TokenMetadata."""
     cursor = conn.cursor()
-    for col, typedef in [("mr_id", "INTEGER"), ("name", "TEXT")]:
+    for col, typedef in _V2_COLUMNS.items():
         try:
             cursor.execute(f"ALTER TABLE TokenMetadata ADD COLUMN {col} {typedef}")
         except sqlite3.OperationalError:
-            pass  # colonne déjà présente
+            logger.debug("Colonne %s déjà présente, skip", col)
 
 
 def _migrate_v3(conn: sqlite3.Connection) -> None:
@@ -186,7 +210,7 @@ def _migrate_v5(conn: sqlite3.Connection) -> None:
     try:
         conn.execute("ALTER TABLE Swaps ADD COLUMN note TEXT")
     except sqlite3.OperationalError:
-        pass  # colonne déjà présente
+        logger.debug("Colonne note déjà présente dans Swaps, skip")
 
 
 def _migrate_v6(conn: sqlite3.Connection) -> None:
