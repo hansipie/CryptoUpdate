@@ -11,6 +11,7 @@ from modules.database.market import Market
 from modules.database.portfolios import Portfolios
 from modules.database.tokensdb import TokensDatabase
 from modules.plotter import plot_as_pie
+from modules.token_metadata import TokenMetadataManager
 from modules.tools import (
     create_portfolio_dataframe,
     get_currency_symbol,
@@ -50,6 +51,7 @@ def fetch_api_crypto_market(
     token_symbol: str,
     from_ts: int,
     to_ts: int,
+    coinid: int = None,
 ) -> pd.DataFrame:
     """Fetch cryptocurrency market data from API with Streamlit session cache.
 
@@ -60,13 +62,14 @@ def fetch_api_crypto_market(
         token_symbol: Token symbol to fetch
         from_ts: Unix timestamp for start date
         to_ts: Unix timestamp for end date
+        coinid: Optional MarketRaccoon coin ID (prioritaire sur token_symbol)
 
     Returns:
         DataFrame with columns: Date (index), Price or None if empty
     """
     api = ApiMarket(api_url, api_key=api_key, cache_file=cache_file)
     return api.get_cryptocurrency_market_cached(
-        token_symbol=token_symbol, from_timestamp=from_ts, to_timestamp=to_ts
+        coinid=coinid, token_symbol=token_symbol, from_timestamp=from_ts, to_timestamp=to_ts
     )
 
 
@@ -343,6 +346,8 @@ def draw_tab_content(
                     cache_file = os.path.join(
                         st.session_state.settings["data_path"], "api_cache.json"
                     )
+                    metadata_manager = TokenMetadataManager(st.session_state.settings["dbfile"])
+                    mr_id = metadata_manager.get_mr_id(token)
                     df_prices = fetch_api_crypto_market(
                         api_url,
                         api_key,
@@ -350,6 +355,7 @@ def draw_tab_content(
                         token,
                         start_timestamp,
                         end_timestamp,
+                        coinid=mr_id,
                     )
                     if df_prices is None:
                         st.warning(
@@ -430,8 +436,11 @@ def draw_tab_content(
                 cache_file = os.path.join(
                     st.session_state.settings["data_path"], "api_cache.json"
                 )
+                metadata_manager = TokenMetadataManager(st.session_state.settings["dbfile"])
+                mr_id = metadata_manager.get_mr_id(token)
                 df_view = fetch_api_crypto_market(
-                    api_url, api_key, cache_file, token, start_timestamp, end_timestamp
+                    api_url, api_key, cache_file, token, start_timestamp, end_timestamp,
+                    coinid=mr_id,
                 )
 
                 # Conversion USD → devise cible avec taux historiques
