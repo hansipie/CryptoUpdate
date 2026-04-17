@@ -16,7 +16,21 @@ logging.getLogger("httpcore").setLevel(logging.WARNING)
 
 logger = logging.getLogger(__name__)
 
-CLAUDE_MODEL = "claude-sonnet-4-20250514"
+# Default model — can be overridden by settings.json key "AI.model"
+_DEFAULT_CLAUDE_MODEL = "claude-sonnet-4-20250514"
+
+# Module-level singleton; rebuilt only when the API key changes.
+_anthropic_client: Anthropic | None = None
+_anthropic_client_key: str | None = None
+
+
+def _get_client(api_key: str) -> Anthropic:
+    """Return a cached Anthropic client, rebuilding only when the key changes."""
+    global _anthropic_client, _anthropic_client_key
+    if _anthropic_client is None or _anthropic_client_key != api_key:
+        _anthropic_client = Anthropic(api_key=api_key)
+        _anthropic_client_key = api_key
+    return _anthropic_client
 
 
 def get_image_type(image: bytes):
@@ -29,7 +43,7 @@ def get_image_type(image: bytes):
         return None
 
 
-def extract_from_df(df: pd.DataFrame, api_key: str):
+def extract_from_df(df: pd.DataFrame, api_key: str, model: str | None = None):
     system_prompt = (
         "You are a data extraction model. You must return ONLY valid JSON, "
         "with no markdown formatting, no code blocks, and no explanatory text. "
@@ -69,10 +83,10 @@ def extract_from_df(df: pd.DataFrame, api_key: str):
             ),
         },
     ]
-    return call_ai(messages, api_key, system_prompt)
+    return call_ai(messages, api_key, system_prompt, model=model)
 
 
-def extract_from_img(bytes_data: bytes, api_key: str):
+def extract_from_img(bytes_data: bytes, api_key: str, model: str | None = None):
     type_image = get_image_type(bytes_data)
     if type_image is None:
         logger.debug("Invalid image.")
@@ -133,18 +147,18 @@ def extract_from_img(bytes_data: bytes, api_key: str):
             ],
         },
     ]
-    return call_ai(messages, api_key, system_prompt)
+    return call_ai(messages, api_key, system_prompt, model=model)
 
 
-def call_ai(messages: list, api_key: str, system_prompt: str = ""):
-    # Create an Anthropic client
-    client = Anthropic(api_key=api_key)
+def call_ai(messages: list, api_key: str, system_prompt: str = "", model: str | None = None):
+    client = _get_client(api_key)
+    claude_model = model or _DEFAULT_CLAUDE_MODEL
     total_tokens = 0
 
     try:
         logger.debug("Processing ...")
         response = client.messages.create(
-            model=CLAUDE_MODEL,
+            model=claude_model,
             max_tokens=4096,
             system=system_prompt,
             messages=messages,

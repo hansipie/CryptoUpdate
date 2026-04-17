@@ -380,7 +380,7 @@ def buy_delete_dialog(data: dict):
 
 
 @st.dialog("Delete Swap")
-def swap_delete_dialog(rows: list):
+def swap_delete_dialog(rows: list, df_swaps_active: pd.DataFrame):
     """Display confirmation dialog for deleting a swap operation.
 
     Args:
@@ -391,7 +391,7 @@ def swap_delete_dialog(rows: list):
     """
     todelete = []
     for rowidx in rows:
-        data = df_swap.iloc[rowidx].to_dict()
+        data = df_swaps_active.iloc[rowidx].to_dict()
         todelete.append(data)
 
     logger.debug("Dialog Delete row: %s", todelete)
@@ -405,7 +405,7 @@ def swap_delete_dialog(rows: list):
 
 
 @st.dialog("Archive Swap")
-def swap_archive_dialog(rows: list):
+def swap_archive_dialog(rows: list, df_swaps_active: pd.DataFrame):
     """Display confirmation dialog for archiving a swap operation.
 
     Args:
@@ -416,7 +416,7 @@ def swap_archive_dialog(rows: list):
     """
     toarchive = []
     for rowidx in rows:
-        data = df_swap.iloc[rowidx].to_dict()
+        data = df_swaps_active.iloc[rowidx].to_dict()
         toarchive.append(data)
 
     logger.debug("Dialog Archive row: %s", toarchive)
@@ -430,7 +430,7 @@ def swap_archive_dialog(rows: list):
 
 
 @st.dialog("Unarchive Swap")
-def swap_unarchive_dialog(rows: list):
+def swap_unarchive_dialog(rows: list, df_swaps_archived: pd.DataFrame):
     """Display confirmation dialog for unarchiving a swap operation.
 
     Args:
@@ -441,7 +441,7 @@ def swap_unarchive_dialog(rows: list):
     """
     tounarchive = []
     for rowidx in rows:
-        data = df_swap_arch.iloc[rowidx].to_dict()
+        data = df_swaps_archived.iloc[rowidx].to_dict()
         tounarchive.append(data)
 
     logger.debug("Dialog Unarchive row: %s", tounarchive)
@@ -457,7 +457,7 @@ def swap_unarchive_dialog(rows: list):
 
 
 @st.dialog("Delete Archived Swap")
-def swap_arch_delete_dialog(rows: list):
+def swap_arch_delete_dialog(rows: list, df_swaps_archived: pd.DataFrame):
     """Display confirmation dialog for deleting an archived swap operation.
 
     Args:
@@ -468,7 +468,7 @@ def swap_arch_delete_dialog(rows: list):
     """
     todelete = []
     for rowidx in rows:
-        data = df_swap_arch.iloc[rowidx].to_dict()
+        data = df_swaps_archived.iloc[rowidx].to_dict()
         todelete.append(data)
 
     logger.debug("Dialog Delete archived row: %s", todelete)
@@ -512,7 +512,7 @@ def buy_delete():
         buy_delete_dialog(df_buy.iloc[rowidx].to_dict())
 
 
-def swap_edit():
+def swap_edit(df_swaps_active: pd.DataFrame):
     """Handle editing of selected swap operation.
 
     Shows edit dialog if a row is selected.
@@ -524,10 +524,10 @@ def swap_edit():
     elif len(rowidx) > 1:
         st.toast("Please select only one row", icon=":material/warning:")
     else:
-        swap_edit_dialog(df_swap.iloc[rowidx[0]].to_dict())
+        swap_edit_dialog(df_swaps_active.iloc[rowidx[0]].to_dict())
 
 
-def swap_delete():
+def swap_delete(df_swaps_active: pd.DataFrame):
     """Handle deletion of selected swap operation.
 
     Shows confirmation dialog if a row is selected.
@@ -538,10 +538,10 @@ def swap_delete():
     if rowidx is None:
         st.toast("Please select a row", icon=":material/warning:")
     else:
-        swap_delete_dialog(rowidx)
+        swap_delete_dialog(rowidx, df_swaps_active)
 
 
-def swap_archive():
+def swap_archive(df_swaps_active: pd.DataFrame):
     """Handle archiving of selected swap operation.
 
     Shows confirmation dialog if a row is selected.
@@ -552,10 +552,10 @@ def swap_archive():
     if rowidx is None:
         st.toast("Please select a row", icon=":material/warning:")
     else:
-        swap_archive_dialog(rowidx)
+        swap_archive_dialog(rowidx, df_swaps_active)
 
 
-def swap_unarchive():
+def swap_unarchive(df_swaps_archived: pd.DataFrame):
     """Handle unarchiving of selected swap operation.
 
     Shows confirmation dialog if a row is selected.
@@ -566,10 +566,10 @@ def swap_unarchive():
     if rowidx is None:
         st.toast("Please select a row", icon=":material/warning:")
     else:
-        swap_unarchive_dialog(rowidx)
+        swap_unarchive_dialog(rowidx, df_swaps_archived)
 
 
-def swap_arch_delete():
+def swap_arch_delete(df_swaps_archived: pd.DataFrame):
     """Handle deletion of selected archived swap operation.
 
     Shows confirmation dialog if a row is selected.
@@ -580,7 +580,7 @@ def swap_arch_delete():
     if rowidx is None:
         st.toast("Please select a row", icon=":material/warning:")
     else:
-        swap_arch_delete_dialog(rowidx)
+        swap_arch_delete_dialog(rowidx, df_swaps_archived)
 
 
 def calc_perf(df: pd.DataFrame, col_token: str, col_rate: str) -> pd.DataFrame:
@@ -812,14 +812,10 @@ def build_swap_dataframes(
     df1 = pd.DataFrame(swaps.get_by_tag(""), columns=columns)
     if not df1.empty:
         df1 = build_swap_dataframe(df1, db_file, convert_from, convert_to, use_api)
-    else:
-        st.info("No swap operations")
 
     df2 = pd.DataFrame(swaps.get_by_tag("archived"), columns=columns)
     if not df2.empty:
         df2 = build_swap_dataframe(df2, db_file, convert_from, convert_to, use_api)
-    else:
-        st.info("No archived swaps")
 
     return df1, df2
 
@@ -1205,7 +1201,7 @@ with swap_tab:
     swap_ct = None if swap_convert_to_sel == "Original" else swap_convert_to_sel
 
     # build swap table with performance metrics
-    df_swap, df_swap_arch = build_swap_dataframes(
+    df_swaps_active, df_swaps_archived = build_swap_dataframes(
         st.session_state.settings["dbfile"],
         convert_from=swap_cf,
         convert_to=swap_ct,
@@ -1214,7 +1210,7 @@ with swap_tab:
 
     col_swaplist, col_swapbtns = st.columns([8, 1])
     with col_swaplist:
-        draw_swap(df_swap, convert_from=swap_cf, convert_to=swap_ct)
+        draw_swap(df_swaps_active, convert_from=swap_cf, convert_to=swap_ct)
     with col_swapbtns:
         st.button(
             "New",
@@ -1226,6 +1222,7 @@ with swap_tab:
         st.button(
             "Edit",
             on_click=swap_edit,
+            args=(df_swaps_active,),
             width="stretch",
             icon=":material/edit:",
             key="swap_edit",
@@ -1233,6 +1230,7 @@ with swap_tab:
         st.button(
             "Archive",
             on_click=swap_archive,
+            args=(df_swaps_active,),
             width="stretch",
             icon=":material/archive:",
             key="swap_archive",
@@ -1240,6 +1238,7 @@ with swap_tab:
         st.button(
             "Delete",
             on_click=swap_delete,
+            args=(df_swaps_active,),
             width="stretch",
             icon=":material/delete:",
             key="swap_delete",
@@ -1248,11 +1247,12 @@ with swap_tab:
     st.title("Archived Swaps")
     col_archlist, col_archbtns = st.columns([8, 1])
     with col_archlist:
-        draw_swap_arch(df_swap_arch, convert_from=swap_cf, convert_to=swap_ct)
+        draw_swap_arch(df_swaps_archived, convert_from=swap_cf, convert_to=swap_ct)
     with col_archbtns:
         st.button(
             "Unarchive",
             on_click=swap_unarchive,
+            args=(df_swaps_archived,),
             width="stretch",
             icon=":material/unarchive:",
             key="swap_unarchive",
@@ -1260,6 +1260,7 @@ with swap_tab:
         st.button(
             "Delete",
             on_click=swap_arch_delete,
+            args=(df_swaps_archived,),
             width="stretch",
             icon=":material/delete:",
             key="swap_arch_delete",

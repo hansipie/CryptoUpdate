@@ -8,6 +8,7 @@ This module provides various utility functions for:
 """
 
 from datetime import datetime
+import glob
 import logging
 import os
 import shutil
@@ -987,24 +988,47 @@ def update():
         traceback.print_exc()
 
 
-def backup_database(dbfile: str) -> str:
+def backup_database(dbfile: str, max_backups: int = 10) -> str:
     """Crée une sauvegarde du fichier de base de données en ajoutant un timestamp dans le nom.
 
     Args:
         dbfile: Chemin vers le fichier de base de données
+        max_backups: Nombre maximum de sauvegardes à conserver (défaut: 10)
 
     Returns:
         Chemin vers le fichier de sauvegarde créé
 
     Raises:
         FileNotFoundError: Si le fichier source n'existe pas
+        OSError: Si l'espace disque est insuffisant
     """
     if not os.path.exists(dbfile):
         raise FileNotFoundError(f"Fichier de base de données introuvable : {dbfile}")
+
+    db_size = os.path.getsize(dbfile)
+    disk_usage = shutil.disk_usage(os.path.dirname(os.path.abspath(dbfile)))
+    if disk_usage.free < db_size * 2:
+        raise OSError(
+            f"Espace disque insuffisant pour la sauvegarde : "
+            f"{disk_usage.free // (1024**2)} Mo disponibles, "
+            f"{db_size * 2 // (1024**2)} Mo requis"
+        )
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     backup_file = f"{dbfile}_{timestamp}.bak"
 
     shutil.copy2(dbfile, backup_file)
     logger.info("Base de données sauvegardée dans : %s", backup_file)
+
+    # Rotation : conserver uniquement les max_backups sauvegardes les plus récentes
+    pattern = f"{dbfile}_*.bak"
+    existing_backups = sorted(glob.glob(pattern))
+    while len(existing_backups) > max_backups:
+        oldest = existing_backups.pop(0)
+        try:
+            os.remove(oldest)
+            logger.info("Ancienne sauvegarde supprimée : %s", oldest)
+        except OSError as e:
+            logger.warning("Impossible de supprimer l'ancienne sauvegarde %s : %s", oldest, e)
+
     return backup_file

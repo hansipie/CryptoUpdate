@@ -69,12 +69,16 @@ def extract(input_data: any) -> pd.DataFrame:
         try:
             if isinstance(input_data, bytes):
                 message_json, _ = aiprocessing.extract_from_img(
-                    input_data, st.session_state.settings["ai_apitoken"]
+                    input_data,
+                    st.session_state.settings["ai_apitoken"],
+                    model=st.session_state.settings.get("ai_model"),
                 )
                 output = pd.DataFrame.from_dict(loads(message_json).get("assets"))
             elif isinstance(input_data, pd.DataFrame):
                 message_json, _ = aiprocessing.extract_from_df(
-                    input_data, st.session_state.settings["ai_apitoken"]
+                    input_data,
+                    st.session_state.settings["ai_apitoken"],
+                    model=st.session_state.settings.get("ai_model"),
                 )
                 output = pd.DataFrame.from_dict(loads(message_json).get("assets"))
             else:

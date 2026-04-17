@@ -326,6 +326,8 @@ def draw_tab_content(
     token: str,
     start_timestamp: int,
     end_timestamp: int,
+    tokensdb: TokensDatabase,
+    marketdb: Market,
     use_api: bool = False,
 ):
     logger.debug("Draw tab content for token %s", token)
@@ -460,7 +462,7 @@ def draw_tab_content(
                     df_view = df_view.drop(columns=["source_currency"])
             else:
                 # Use local SQLite database (données en EUR)
-                df_view = markgetdb.get_token_market(
+                df_view = marketdb.get_token_market(
                     token, start_timestamp, end_timestamp
                 )
 
@@ -574,6 +576,11 @@ def build_tabs(section: str = "Assets Balances", use_api: bool = False):
     end_timestamp = toTimestamp_A(
         st.session_state.enddate, pd.to_datetime("23:59:59").time()
     )
+    tokensdb = TokensDatabase(st.session_state.settings["dbfile"])
+    marketdb = Market(
+        st.session_state.settings["dbfile"],
+        st.session_state.settings["coinmarketcap_token"],
+    )
     if section == "Assets Balances":
         # For Assets Balances, always use local tokens since we need count data
         available_tokens = tokensdb.get_tokens()
@@ -592,9 +599,9 @@ def build_tabs(section: str = "Assets Balances", use_api: bool = False):
                 st.warning(
                     "Unable to fetch tokens from API, falling back to local database"
                 )
-                available_tokens = markgetdb.get_tokens()
+                available_tokens = marketdb.get_tokens()
         else:
-            available_tokens = markgetdb.get_tokens()
+            available_tokens = marketdb.get_tokens()
     else:
         available_tokens = []
     if not available_tokens:
@@ -629,6 +636,8 @@ def build_tabs(section: str = "Assets Balances", use_api: bool = False):
                     st.session_state.tokens[idx_token],
                     start_timestamp,
                     end_timestamp,
+                    tokensdb,
+                    marketdb,
                     use_api,
                 )
             idx_token += 1
@@ -738,6 +747,7 @@ with st.sidebar:
             if st.button("Clear API Cache", help="Clear cached API responses"):
                 fetch_api_coins.clear()
                 fetch_api_crypto_market.clear()
+                fetch_api_fiat_rates.clear()
                 st.success("Cache cleared!")
                 st.rerun()
         else:
@@ -752,12 +762,6 @@ with st.sidebar:
             help="EUR/USD (default) or USD/EUR",
             key="currency_direction_toggle",
         )
-
-tokensdb = TokensDatabase(st.session_state.settings["dbfile"])
-markgetdb = Market(
-    st.session_state.settings["dbfile"],
-    st.session_state.settings["coinmarketcap_token"],
-)
 
 if "tokens" not in st.session_state:
     # Load saved token preferences from settings

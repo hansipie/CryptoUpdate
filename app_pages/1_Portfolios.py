@@ -103,7 +103,7 @@ def delete_token(portfolio_name: str):
     )
     if st.button("Submit"):
         for token in tokens:
-            g_portfolios.delete_token_a(portfolio_name, token)
+            g_portfolios.delete_token_by_name(portfolio_name, token)
         # Close dialog
         st.rerun()
 

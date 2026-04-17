@@ -124,7 +124,65 @@ def debug_prefix(input_str: str, flag=False) -> str:
 
 def dataframe_diff(df1, df2):
     """Find rows that are different between two DataFrames"""
-    comparison_df = df1.merge(df2, indicator=True, how="outer")
+    left_df = df1.copy()
+    right_df = df2.copy()
+
+    if list(left_df.columns) != list(right_df.columns):
+        all_columns = sorted(set(left_df.columns).union(right_df.columns))
+        left_df = left_df.reindex(columns=all_columns)
+        right_df = right_df.reindex(columns=all_columns)
+
+    left_df["_source"] = "left"
+    right_df["_source"] = "right"
+    combined_df = pd.concat([left_df, right_df], ignore_index=True)
+
+    row_columns = [col for col in combined_df.columns if col != "_source"]
+    combined_df["_count"] = 1
+
+    # Compare row multiplicities by source without using outer merge.
+    comparison_df = (
+        combined_df.pivot_table(
+            index=row_columns,
+            columns="_source",
+            values="_count",
+            aggfunc="sum",
+            fill_value=0,
+        )
+        .reset_index()
+        .rename_axis(columns=None)
+    )
+
+    if "left" not in comparison_df.columns:
+        comparison_df["left"] = 0
+    if "right" not in comparison_df.columns:
+        comparison_df["right"] = 0
+
+    comparison_df["left"] = comparison_df["left"].astype(int)
+    comparison_df["right"] = comparison_df["right"].astype(int)
+
+    left_only_repeats = (comparison_df["left"] - comparison_df["right"]).clip(lower=0)
+    right_only_repeats = (comparison_df["right"] - comparison_df["left"]).clip(lower=0)
+
+    diff_parts = []
+
+    if left_only_repeats.sum() > 0:
+        left_only_df = comparison_df.loc[
+            comparison_df.index.repeat(left_only_repeats), row_columns
+        ].copy()
+        left_only_df["_merge"] = "left_only"
+        diff_parts.append(left_only_df)
+
+    if right_only_repeats.sum() > 0:
+        right_only_df = comparison_df.loc[
+            comparison_df.index.repeat(right_only_repeats), row_columns
+        ].copy()
+        right_only_df["_merge"] = "right_only"
+        diff_parts.append(right_only_df)
+
+    if not diff_parts:
+        return pd.DataFrame(columns=row_columns + ["_merge"])
+
+    diff_df = pd.concat(diff_parts, ignore_index=True)
     logger.debug("comparison_df:\n%s", comparison_df)
-    diff_df = comparison_df[comparison_df["_merge"] != "both"]
+    logger.debug("diff_df:\n%s", diff_df)
     return diff_df

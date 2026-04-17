@@ -8,7 +8,6 @@ This module handles cryptocurrency swap operations including:
 
 import logging
 import sqlite3
-import traceback
 
 logger = logging.getLogger(__name__)
 
@@ -115,8 +114,7 @@ class Swaps:
                 conn.commit()
                 logger.debug(f"Entry with id {entry_id} deleted successfully.")
         except Exception as e:
-            logger.error(f"Error deleting swap: {e}")
-            traceback.print_exc()
+            logger.exception("Error deleting swap: %s", e)
 
     def update_note(self, entry_id: int, note: str):
         logger.debug("Updating swap note")
@@ -128,8 +126,7 @@ class Swaps:
                 conn.commit()
                 logger.debug(f"Note updated for entry with id {entry_id}")
         except Exception as e:
-            logger.error(f"Error updating note: {e}")
-            traceback.print_exc()
+            logger.exception("Error updating note: %s", e)
 
     def update_tag(self, entry_id: int, tag: str):
         logger.debug("Updating swap tag")
@@ -147,5 +144,4 @@ class Swaps:
                 conn.commit()
                 logger.debug(f"Tag updated for entry with id {entry_id}")
         except Exception as e:
-            logger.error(f"Error updating tag: {e}")
-            traceback.print_exc()
+            logger.exception("Error updating tag: %s", e)

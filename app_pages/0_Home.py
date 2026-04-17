@@ -54,7 +54,7 @@ def plot_total_value(df: pd.DataFrame):
         height=400,
     )
 
-    st.plotly_chart(fig, width="stretch")
+    st.plotly_chart(fig, use_container_width=True)
 
 
 st.title("Crypto Update")

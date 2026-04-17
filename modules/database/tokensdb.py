@@ -183,19 +183,16 @@ class TokensDatabase:
         logger.debug("Adding data to database:\n%s", tokens)
         timestamp = int(pd.Timestamp.now(tz="UTC").timestamp())
 
-        df: pd.DataFrame = pd.DataFrame(
-            columns=["timestamp", "token", "price", "count"]
-        )
-        for token, data in tokens.items():
-            if "timestamp" in data:
-                df.loc[len(df)] = [
-                    data["timestamp"],
-                    token,
-                    data["price"],
-                    data["amount"],
-                ]
-            else:
-                df.loc[len(df)] = [timestamp, token, data["price"], data["amount"]]
+        rows = [
+            {
+                "timestamp": data.get("timestamp", timestamp),
+                "token": token,
+                "price": data["price"],
+                "count": data["amount"],
+            }
+            for token, data in tokens.items()
+        ]
+        df = pd.DataFrame(rows, columns=["timestamp", "token", "price", "count"])
         logger.debug("Dataframe to add:\n%s", df)
         with sqlite3.connect(self.db_path) as con:
             df.to_sql("TokensDatabase", con, if_exists="append", index=False)
