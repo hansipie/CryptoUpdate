@@ -12,12 +12,6 @@ st.title("Settings")
 if "settings" not in st.session_state:
     st.session_state.settings = {}
 
-# Initialize fiat currency in session state if not already set
-if "fiat_currency" not in st.session_state:
-    st.session_state.fiat_currency = st.session_state.settings.get(
-        "fiat_currency", "EUR"
-    )
-
 @st.cache_data(ttl=30, show_spinner=False)
 def _check_marketraccoon(url: str, api_key: str) -> str:
     """Vérifie la disponibilité de l'API MarketRaccoon (résultat mis en cache 30s)."""
@@ -29,11 +23,15 @@ def _check_marketraccoon(url: str, api_key: str) -> str:
         return "connection_error"
     except requests.Timeout:
         return "timeout"
+    except requests.exceptions.MissingSchema:
+        return "invalid_url"
+    except requests.exceptions.RequestException:
+        return "request_error"
 
 
 with st.sidebar:
     st.subheader("Status")
-    _status = _check_marketraccoon(
+    _status = _check_marketraccoon(  # pylint: disable=invalid-name
         st.session_state.settings.get("marketraccoon_url", ""),
         st.session_state.settings.get("marketraccoon_token", ""),
     )
@@ -47,6 +45,12 @@ with st.sidebar:
     elif _status == "timeout":
         st.error("MarketRaccoon :material/timer_off:")
         logger.error("API request timed out.")
+    elif _status == "invalid_url":
+        st.error("MarketRaccoon :material/error:")
+        logger.error("Invalid MarketRaccoon URL format.")
+    elif _status == "request_error":
+        st.error("MarketRaccoon :material/warning:")
+        logger.error("Unhandled request error during API healthcheck.")
 
 with st.form(key="settings_form"):
     st.subheader("MarketRaccoon")
@@ -60,6 +64,15 @@ with st.form(key="settings_form"):
         key="marketraccoon_token",
         type="password",
         value=st.session_state.settings.get("marketraccoon_token", ""),
+    )
+
+    ratesdb_url = st.text_input(
+        "RatesDB URL",
+        key="ratesdb_url",
+        value=st.session_state.settings.get(
+            "ratesdb_url", "https://free.ratesdb.com/v1/rates"
+        ),
+        help="Fallback API URL for historical EUR/USD rates",
     )
 
     st.subheader("Coinmarketcap")
@@ -144,6 +157,7 @@ with st.form(key="settings_form"):
         logger.debug("Submitted")
         st.session_state.settings["marketraccoon_url"] = marketraccoon_url
         st.session_state.settings["marketraccoon_token"] = marketraccoon_token
+        st.session_state.settings["ratesdb_url"] = ratesdb_url
         st.session_state.settings["coinmarketcap_token"] = coinmarketcap_token
         st.session_state.settings["ai_apitoken"] = ai_apitoken
         st.session_state.settings["debug_flag"] = debug_flag
@@ -155,7 +169,6 @@ with st.form(key="settings_form"):
         )
         st.session_state.settings["operations_red_threshold"] = operations_red_threshold
         st.session_state.settings["fiat_currency"] = fiat_currency
-        st.session_state.fiat_currency = fiat_currency
 
         conf = Configuration()
         conf.save_config(st.session_state.settings)

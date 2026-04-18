@@ -11,6 +11,7 @@ from modules.database.market import Market
 from modules.database.portfolios import Portfolios
 from modules.database.tokensdb import TokensDatabase
 from modules.plotter import plot_as_pie
+from modules.token_metadata import TokenMetadataManager
 from modules.tools import (
     create_portfolio_dataframe,
     get_currency_symbol,
@@ -50,6 +51,7 @@ def fetch_api_crypto_market(
     token_symbol: str,
     from_ts: int,
     to_ts: int,
+    coinid: int = None,
 ) -> pd.DataFrame:
     """Fetch cryptocurrency market data from API with Streamlit session cache.
 
@@ -60,13 +62,14 @@ def fetch_api_crypto_market(
         token_symbol: Token symbol to fetch
         from_ts: Unix timestamp for start date
         to_ts: Unix timestamp for end date
+        coinid: Optional MarketRaccoon coin ID (prioritaire sur token_symbol)
 
     Returns:
         DataFrame with columns: Date (index), Price or None if empty
     """
     api = ApiMarket(api_url, api_key=api_key, cache_file=cache_file)
     return api.get_cryptocurrency_market_cached(
-        token_symbol=token_symbol, from_timestamp=from_ts, to_timestamp=to_ts
+        coinid=coinid, token_symbol=token_symbol, from_timestamp=from_ts, to_timestamp=to_ts
     )
 
 
@@ -156,7 +159,7 @@ def plot_modern_graph(
 
     fig.update_layout(**layout_config)
 
-    st.plotly_chart(fig, width="stretch")
+    st.plotly_chart(fig, use_container_width=True)
 
 
 def plot_dual_axis_graph(df: pd.DataFrame, title: str = None, token: str = None):
@@ -254,7 +257,7 @@ def plot_dual_axis_graph(df: pd.DataFrame, title: str = None, token: str = None)
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
     )
 
-    st.plotly_chart(fig, width="stretch")
+    st.plotly_chart(fig, use_container_width=True)
 
 
 def load_portfolios(dbfile: str) -> Portfolios:
@@ -323,6 +326,8 @@ def draw_tab_content(
     token: str,
     start_timestamp: int,
     end_timestamp: int,
+    tokensdb: TokensDatabase,
+    marketdb: Market,
     use_api: bool = False,
 ):
     logger.debug("Draw tab content for token %s", token)
@@ -343,6 +348,8 @@ def draw_tab_content(
                     cache_file = os.path.join(
                         st.session_state.settings["data_path"], "api_cache.json"
                     )
+                    metadata_manager = TokenMetadataManager(st.session_state.settings["dbfile"])
+                    mr_id = metadata_manager.get_mr_id(token)
                     df_prices = fetch_api_crypto_market(
                         api_url,
                         api_key,
@@ -350,6 +357,7 @@ def draw_tab_content(
                         token,
                         start_timestamp,
                         end_timestamp,
+                        coinid=mr_id,
                     )
                     if df_prices is None:
                         st.warning(
@@ -430,8 +438,11 @@ def draw_tab_content(
                 cache_file = os.path.join(
                     st.session_state.settings["data_path"], "api_cache.json"
                 )
+                metadata_manager = TokenMetadataManager(st.session_state.settings["dbfile"])
+                mr_id = metadata_manager.get_mr_id(token)
                 df_view = fetch_api_crypto_market(
-                    api_url, api_key, cache_file, token, start_timestamp, end_timestamp
+                    api_url, api_key, cache_file, token, start_timestamp, end_timestamp,
+                    coinid=mr_id,
                 )
 
                 # Conversion USD → devise cible avec taux historiques
@@ -451,7 +462,7 @@ def draw_tab_content(
                     df_view = df_view.drop(columns=["source_currency"])
             else:
                 # Use local SQLite database (données en EUR)
-                df_view = markgetdb.get_token_market(
+                df_view = marketdb.get_token_market(
                     token, start_timestamp, end_timestamp
                 )
 
@@ -522,7 +533,10 @@ def draw_tab_content(
                 "Timeframe Low",
                 value=f"{round(min_price, 2)} {currency_symbol}",
                 help=f"Date: {min_price_date[0]}",
-                delta=f"{round(((current_price - min_price) / min_price) * 100, 2)} %",
+                delta=(
+                    f"{round(((current_price - min_price) / min_price) * 100, 2)} %"
+                    if min_price != 0 else "∞ %"
+                ),
             )
         with mcol4:
             max_price = df_view[actual_column].max()
@@ -533,7 +547,10 @@ def draw_tab_content(
                 "Timeframe High",
                 value=f"{round(max_price, 2)} {currency_symbol}",
                 help=f"Date: {max_price_date[0]}",
-                delta=f"{round(((current_price - max_price) / max_price) * 100, 2)} %",
+                delta=(
+                    f"{round(((current_price - max_price) / max_price) * 100, 2)} %"
+                    if max_price != 0 else "∞ %"
+                ),
             )
 
         col1, col2 = st.columns([3, 1])
@@ -559,6 +576,11 @@ def build_tabs(section: str = "Assets Balances", use_api: bool = False):
     end_timestamp = toTimestamp_A(
         st.session_state.enddate, pd.to_datetime("23:59:59").time()
     )
+    tokensdb = TokensDatabase(st.session_state.settings["dbfile"])
+    marketdb = Market(
+        st.session_state.settings["dbfile"],
+        st.session_state.settings["coinmarketcap_token"],
+    )
     if section == "Assets Balances":
         # For Assets Balances, always use local tokens since we need count data
         available_tokens = tokensdb.get_tokens()
@@ -577,9 +599,9 @@ def build_tabs(section: str = "Assets Balances", use_api: bool = False):
                 st.warning(
                     "Unable to fetch tokens from API, falling back to local database"
                 )
-                available_tokens = markgetdb.get_tokens()
+                available_tokens = marketdb.get_tokens()
         else:
-            available_tokens = markgetdb.get_tokens()
+            available_tokens = marketdb.get_tokens()
     else:
         available_tokens = []
     if not available_tokens:
@@ -614,6 +636,8 @@ def build_tabs(section: str = "Assets Balances", use_api: bool = False):
                     st.session_state.tokens[idx_token],
                     start_timestamp,
                     end_timestamp,
+                    tokensdb,
+                    marketdb,
                     use_api,
                 )
             idx_token += 1
@@ -627,9 +651,9 @@ def build_price_tab(
         st.info("No data available")
         return
     if st.session_state.startdate < st.session_state.enddate:
-        df_view = df.loc[df.index > str(st.session_state.startdate)]
+        df_view = df.loc[df.index > pd.Timestamp(st.session_state.startdate)]
         df_view = df_view.loc[
-            df_view.index < str(st.session_state.enddate + pd.to_timedelta(1, unit="d"))
+            df_view.index < pd.Timestamp(st.session_state.enddate) + pd.to_timedelta(1, unit="d")
         ]
         df_view = df_view.loc[:, ["price"]]
         df_view = df_view.dropna()
@@ -723,6 +747,7 @@ with st.sidebar:
             if st.button("Clear API Cache", help="Clear cached API responses"):
                 fetch_api_coins.clear()
                 fetch_api_crypto_market.clear()
+                fetch_api_fiat_rates.clear()
                 st.success("Cache cleared!")
                 st.rerun()
         else:
@@ -738,20 +763,6 @@ with st.sidebar:
             key="currency_direction_toggle",
         )
 
-tokensdb = TokensDatabase(st.session_state.settings["dbfile"])
-markgetdb = Market(
-    st.session_state.settings["dbfile"],
-    st.session_state.settings["coinmarketcap_token"],
-)
-
-# Initialize ApiMarket for MarketRaccoon API access
-cache_file = os.path.join(st.session_state.settings["data_path"], "api_cache.json")
-apimarket = ApiMarket(
-    st.session_state.settings["marketraccoon_url"],
-    api_key=st.session_state.settings.get("marketraccoon_token"),
-    cache_file=cache_file,
-)
-
 if "tokens" not in st.session_state:
     # Load saved token preferences from settings
     st.session_state.tokens = st.session_state.settings.get(
@@ -763,17 +774,17 @@ if add_selectbox == "Global":
     st.title("Global")
     aggregater_ui()
 
-if add_selectbox == "Assets Balances":
+elif add_selectbox == "Assets Balances":
     logger.debug("Assets Balances")
     st.title("Assets Balances")
     build_tabs(use_api=use_api_sidebar)
 
-if add_selectbox == "Market":
+elif add_selectbox == "Market":
     logger.debug("Market")
     st.title("Market")
     build_tabs("Market", use_api=use_api_sidebar)
 
-if add_selectbox == "Currency":
+elif add_selectbox == "Currency":
     # Determine currency direction from toggle
     currency_inverted = st.session_state.get("currency_direction_toggle", True)
 
@@ -804,7 +815,7 @@ if add_selectbox == "Currency":
     # Invert prices if EUR/USD is selected
     if currency_inverted and currency_data is not None and not currency_data.empty:
         currency_data = currency_data.copy()
-        currency_data["price"] = 1 / currency_data["price"]
+        currency_data["price"] = 1 / currency_data["price"].replace(0, pd.NA)
 
     build_price_tab(currency_data, chart_title=CHART_TITLE, chart_y_label=CHART_Y_LABEL)
 
@@ -860,8 +871,5 @@ if add_selectbox == "Currency":
                 st.info(f"Exact value: {value:.6f} {UNIT}")
         else:
             st.warning("Value is 0.0")
-    elif (
-        st.session_state.interpolation_result is None
-        and "interpolation_result" in st.session_state
-    ):
+    else:
         st.info("No data available")

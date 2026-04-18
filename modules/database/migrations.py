@@ -16,61 +16,68 @@ def _ensure_customdata(db_path: str) -> None:
 
     Doit être appelé avant toute lecture de db_version.
     """
-    with sqlite3.connect(db_path) as conn:
-        conn.execute(
-            """CREATE TABLE IF NOT EXISTS Customdata (
-                id    INTEGER PRIMARY KEY AUTOINCREMENT,
-                name  TEXT NOT NULL UNIQUE,
-                value TEXT NOT NULL,
-                type  TEXT NOT NULL
-            )"""
-        )
+    try:
+        with sqlite3.connect(db_path) as conn:
+            conn.execute(
+                """CREATE TABLE IF NOT EXISTS Customdata (
+                    id    INTEGER PRIMARY KEY AUTOINCREMENT,
+                    name  TEXT NOT NULL UNIQUE,
+                    value TEXT NOT NULL,
+                    type  TEXT NOT NULL
+                )"""
+            )
+    except sqlite3.Error as e:
+        logger.error("Erreur lors de la création de Customdata : %s", e)
+        raise
 
 
 def _get_db_version(db_path: str) -> int:
     """Retourne la version courante de la base (0 si absente)."""
-    with sqlite3.connect(db_path) as conn:
-        row = conn.execute(
-            "SELECT value FROM Customdata WHERE name = 'db_version'"
-        ).fetchone()
-    return int(row[0]) if row else 0
-
-
-def _set_db_version(db_path: str, version: int) -> None:
-    """Enregistre la version courante dans Customdata."""
-    with sqlite3.connect(db_path) as conn:
-        conn.execute(
-            "INSERT OR REPLACE INTO Customdata (name, value, type) VALUES ('db_version', ?, 'int')",
-            (str(version),),
-        )
+    try:
+        with sqlite3.connect(db_path) as conn:
+            row = conn.execute(
+                "SELECT value FROM Customdata WHERE name = 'db_version'"
+            ).fetchone()
+    except sqlite3.Error as e:
+        logger.error("Erreur lors de la lecture de db_version : %s", e)
+        raise
+    if not row:
+        return 0
+    try:
+        return int(row[0])
+    except ValueError:
+        logger.warning("db_version invalide : %s, reset à 0", row[0])
+        return 0
 
 
 def _migrate_v1(conn: sqlite3.Connection) -> None:
     """Schéma original — crée toutes les tables de base."""
-    conn.executescript(
-        """
-        CREATE TABLE IF NOT EXISTS TokensDatabase (
+    conn.execute(
+        """CREATE TABLE IF NOT EXISTS TokensDatabase (
             timestamp INTEGER,
             token     TEXT,
             price     REAL,
             count     REAL
-        );
-
-        CREATE TABLE IF NOT EXISTS Portfolios (
+        )"""
+    )
+    conn.execute(
+        """CREATE TABLE IF NOT EXISTS Portfolios (
             id     INTEGER PRIMARY KEY AUTOINCREMENT,
             name   TEXT    NOT NULL UNIQUE,
             bundle INTEGER DEFAULT 0
-        );
-
-        CREATE TABLE IF NOT EXISTS Portfolios_Tokens (
+        )"""
+    )
+    conn.execute(
+        """CREATE TABLE IF NOT EXISTS Portfolios_Tokens (
             portfolio_id INTEGER NOT NULL,
             token        TEXT    NOT NULL,
             amount       REAL,
             PRIMARY KEY (portfolio_id, token),
             FOREIGN KEY (portfolio_id) REFERENCES Portfolios(id)
-        );
-
-        CREATE TABLE IF NOT EXISTS Operations (
+        )"""
+    )
+    conn.execute(
+        """CREATE TABLE IF NOT EXISTS Operations (
             id               INTEGER PRIMARY KEY AUTOINCREMENT,
             type             TEXT,
             source           REAL,
@@ -79,23 +86,27 @@ def _migrate_v1(conn: sqlite3.Connection) -> None:
             destination_unit TEXT,
             timestamp        INTEGER,
             portfolio        TEXT
-        );
-
-        CREATE TABLE IF NOT EXISTS Market (
+        )"""
+    )
+    conn.execute(
+        """CREATE TABLE IF NOT EXISTS Market (
             timestamp INTEGER,
             token     TEXT,
             price     REAL
-        );
-
-        CREATE TABLE IF NOT EXISTS Currency (
+        )"""
+    )
+    conn.execute(
+        """CREATE TABLE IF NOT EXISTS Currency (
             timestamp INTEGER,
             currency  TEXT,
             price     REAL
-        );
-
-        CREATE INDEX IF NOT EXISTS idx_currency ON Currency (timestamp, currency);
-
-        CREATE TABLE IF NOT EXISTS Swaps (
+        )"""
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_currency ON Currency (timestamp, currency)"
+    )
+    conn.execute(
+        """CREATE TABLE IF NOT EXISTS Swaps (
             id          INTEGER PRIMARY KEY AUTOINCREMENT,
             timestamp   INTEGER,
             token_from  TEXT,
@@ -105,9 +116,10 @@ def _migrate_v1(conn: sqlite3.Connection) -> None:
             amount_to   REAL,
             wallet_to   TEXT,
             tag         TEXT
-        );
-
-        CREATE TABLE IF NOT EXISTS TokenMetadata (
+        )"""
+    )
+    conn.execute(
+        """CREATE TABLE IF NOT EXISTS TokenMetadata (
             token                TEXT PRIMARY KEY,
             status               TEXT,
             delisting_date       INTEGER,
@@ -115,19 +127,24 @@ def _migrate_v1(conn: sqlite3.Connection) -> None:
             notes                TEXT,
             created_at           INTEGER DEFAULT (strftime('%s', 'now')),
             updated_at           INTEGER DEFAULT (strftime('%s', 'now'))
-        );
-        """
+        )"""
     )
+
+
+_V2_COLUMNS: dict = {
+    "mr_id": "INTEGER",
+    "name": "TEXT",
+}
 
 
 def _migrate_v2(conn: sqlite3.Connection) -> None:
     """Ajout des colonnes MarketRaccoon : mr_id et name dans TokenMetadata."""
     cursor = conn.cursor()
-    for col, typedef in [("mr_id", "INTEGER"), ("name", "TEXT")]:
+    for col, typedef in _V2_COLUMNS.items():
         try:
             cursor.execute(f"ALTER TABLE TokenMetadata ADD COLUMN {col} {typedef}")
         except sqlite3.OperationalError:
-            pass  # colonne déjà présente
+            logger.debug("Colonne %s déjà présente, skip", col)
 
 
 def _migrate_v3(conn: sqlite3.Connection) -> None:
@@ -186,7 +203,7 @@ def _migrate_v5(conn: sqlite3.Connection) -> None:
     try:
         conn.execute("ALTER TABLE Swaps ADD COLUMN note TEXT")
     except sqlite3.OperationalError:
-        pass  # colonne déjà présente
+        logger.debug("Colonne note déjà présente dans Swaps, skip")
 
 
 def _migrate_v6(conn: sqlite3.Connection) -> None:
@@ -196,6 +213,37 @@ def _migrate_v6(conn: sqlite3.Connection) -> None:
     )
 
 
+def _migrate_v7(conn: sqlite3.Connection) -> None:
+    """Conversion des colonnes amount_from/amount_to de TEXT en REAL dans Swaps."""
+    conn.execute(
+        """CREATE TABLE IF NOT EXISTS Swaps_new (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            timestamp   INTEGER,
+            token_from  TEXT,
+            amount_from REAL,
+            wallet_from TEXT,
+            token_to    TEXT,
+            amount_to   REAL,
+            wallet_to   TEXT,
+            tag         TEXT,
+            note        TEXT
+        )"""
+    )
+    conn.execute(
+        """INSERT INTO Swaps_new
+               (id, timestamp, token_from, amount_from, wallet_from,
+                token_to, amount_to, wallet_to, tag, note)
+           SELECT id, timestamp, token_from,
+                  CAST(amount_from AS REAL),
+                  wallet_from, token_to,
+                  CAST(amount_to AS REAL),
+                  wallet_to, tag, note
+           FROM Swaps"""
+    )
+    conn.execute("DROP TABLE Swaps")
+    conn.execute("ALTER TABLE Swaps_new RENAME TO Swaps")
+
+
 MIGRATIONS: dict = {
     1: _migrate_v1,
     2: _migrate_v2,
@@ -203,6 +251,7 @@ MIGRATIONS: dict = {
     4: _migrate_v4,
     5: _migrate_v5,
     6: _migrate_v6,
+    7: _migrate_v7,
 }
 
 
@@ -222,5 +271,8 @@ def run_migrations(db_path: str) -> None:
         logger.info("Application de la migration v%d…", version)
         with sqlite3.connect(db_path) as conn:
             MIGRATIONS[version](conn)
-        _set_db_version(db_path, version)
+            conn.execute(
+                "INSERT OR REPLACE INTO Customdata (name, value, type) VALUES ('db_version', ?, 'int')",
+                (str(version),),
+            )
         logger.info("Migration v%d appliquée — db_version = %d", version, version)

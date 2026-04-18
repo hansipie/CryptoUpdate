@@ -303,7 +303,7 @@ with st.sidebar:
                     _clear_checked_state()
                     st.rerun()
                 except Exception as e:
-                    logger.exception(f"Error saving token metadata: {e}")
+                    logger.exception("Error saving token metadata: %s", e)
                     st.error(f"Error saving metadata: {e}")
 
     st.divider()

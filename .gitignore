@@ -24,3 +24,5 @@ requirements.txt
 !.github/workflows/
 .ruff_cache/
 .claude/
+stats.json
+stats.json.lock

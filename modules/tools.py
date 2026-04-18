@@ -8,13 +8,15 @@ This module provides various utility functions for:
 """
 
 from datetime import datetime
+import glob
 import logging
 import os
 import shutil
-import traceback
+import sqlite3
 
 import numpy as np
 import pandas as pd
+import requests
 import streamlit as st
 
 from modules.database.customdata import Customdata
@@ -88,6 +90,10 @@ def convert_price_to_target_currency(
 
         usd_to_eur_rate = df_rate["price"].iloc[-1]  # Ex: 0.85 (1 USD = 0.85 EUR)
 
+        if not usd_to_eur_rate or usd_to_eur_rate < 0:
+            logger.warning("Taux USD/EUR invalide: %s, retour valeur originale", usd_to_eur_rate)
+            return value
+
         # Conversion USD → EUR
         if source_currency == "USD" and target_currency == "EUR":
             return value * usd_to_eur_rate
@@ -102,7 +108,7 @@ def convert_price_to_target_currency(
             )
             return value
 
-    except Exception as e:
+    except (requests.exceptions.RequestException, ValueError, KeyError) as e:
         logger.error("Erreur conversion devise: %s", e)
         return value
 
@@ -189,10 +195,9 @@ def convert_dataframe_prices_historical(
     if source_currency == "USD" and target_currency == "EUR":
         converted = merged["price_value"] * merged["rate"]
     else:  # EUR → USD
-        converted = merged["price_value"] / merged["rate"]
+        converted = merged["price_value"] / merged["rate"].replace(0, pd.NA)
 
-    # Remettre les valeurs converties dans le DataFrame original (même ordre d'index)
-    df[price_column] = converted.values
+    df[price_column] = converted.set_axis(merged["Date"])
 
     return df
 
@@ -226,9 +231,16 @@ def get_cached_api_market() -> ApiMarket:
 def update_database(dbfile: str, cmc_apikey: str, debug: bool):
     """Update the database with the latest market data"""
 
-    backup_database(dbfile)
+    if os.path.exists(dbfile):
+        backup_database(dbfile)
 
-    market = Market(dbfile, cmc_apikey)
+    market = Market(
+        dbfile,
+        cmc_apikey,
+        ratesdb_url=st.session_state.settings.get(
+            "ratesdb_url", "https://free.ratesdb.com/v1/rates"
+        ),
+    )
     portfolio = Portfolios(dbfile)
 
     aggregated = portfolio.aggregate_portfolios()
@@ -249,7 +261,7 @@ def update_database(dbfile: str, cmc_apikey: str, debug: bool):
         market.update_currencies(debug=debug)
     except Exception as e:
         logger.error("Error updating market data: %s", str(e))
-        traceback.print_exc()
+        logger.exception("Error updating market data")
         raise ValueError("Error updating market data") from e
 
     tokens_prices = market.get_last_market()
@@ -271,7 +283,7 @@ def update_database(dbfile: str, cmc_apikey: str, debug: bool):
 
     custom = Customdata(dbfile)
     custom.set(
-        "last_update", str(int(pd.Timestamp.now(tz="UTC").timestamp())), "integer"
+        "last_update", str(int(pd.Timestamp.now(tz="UTC").timestamp())), "int"
     )
 
 
@@ -286,7 +298,7 @@ def parse_last_update(last_update_data: tuple) -> pd.Timestamp:
     """
     value, value_type = last_update_data
 
-    if value_type == "integer":
+    if value_type in ("int", "integer"):
         timestamp = int(value)
     elif value_type == "float":
         timestamp = int(float(value))
@@ -368,6 +380,9 @@ def load_settings(settings: dict):
     st.session_state.settings["marketraccoon_token"] = settings["MarketRaccoon"].get(
         "token", ""
     )
+    st.session_state.settings["ratesdb_url"] = settings.get("RatesDB", {}).get(
+        "url", "https://free.ratesdb.com/v1/rates"
+    )
     st.session_state.settings["notion_token"] = settings["Notion"]["token"]
     st.session_state.settings["notion_database"] = settings["Notion"]["database"]
     st.session_state.settings["notion_parentpage"] = settings["Notion"]["parentpage"]
@@ -432,10 +447,8 @@ def load_settings(settings: dict):
             logger.error("Unable to create db directory %s: %s", db_dir, e)
 
     try:
-        import sqlite3 as _sqlite
-
         # Attempt to open/create the database file
-        with _sqlite.connect(st.session_state.settings["dbfile"]) as _conn:
+        with sqlite3.connect(st.session_state.settings["dbfile"]) as _conn:
             pass
     except Exception as e:
         logger.error(
@@ -445,7 +458,7 @@ def load_settings(settings: dict):
         )
         fallback_db = os.path.join(os.getcwd(), "db.sqlite3")
         try:
-            with _sqlite.connect(fallback_db) as _conn:
+            with sqlite3.connect(fallback_db) as _conn:
                 pass
             st.session_state.settings["dbfile"] = fallback_db
             logger.info("Falling back to dbfile: %s", fallback_db)
@@ -553,6 +566,8 @@ def calculate_crypto_rate(
     value_a = __interpolate_token(token_a, timestamp, dbfile)
     value_b = __interpolate_token(token_b, timestamp, dbfile)
     if value_a is None or value_b is None:
+        return None
+    if value_b == 0:
         return None
     rate = value_a / value_b
     logger.debug("Calculate crypto rate - 1 %s = %f %s", token_a, rate, token_b)
@@ -687,7 +702,7 @@ def _get_api_fiat_rate() -> float:
         USD to EUR rate (e.g. 0.85 means 1 USD = 0.85 EUR), or None on error
     """
     api = get_cached_api_market()
-    fiat_df = api.get_fiat_latest_rate()
+    fiat_df = api.get_fiat_latest_rate_cached()
     if fiat_df is not None and not fiat_df.empty:
         rate = fiat_df.iloc[-1]["price"]
         logger.info("API fiat rate USD→EUR: %s", rate)
@@ -804,7 +819,7 @@ def batch_convert_historical_api(
             fiat_df = api.get_currency()
             if fiat_df is not None and not fiat_df.empty:
                 # price = usd_to_eur rate, we need price in USD: 1/rate
-                series_cache[token] = 1.0 / fiat_df["price"]
+                series_cache[token] = 1.0 / fiat_df["price"].replace(0, pd.NA)
             else:
                 series_cache[token] = None
         else:
@@ -958,7 +973,7 @@ def calc_perf_api(
 
         df["Current Rate"] = df[col_token].map(get_price_target)
 
-    df["Perf."] = ((df["Current Rate"] * 100) / df[col_rate]) - 100
+    df["Perf."] = ((df["Current Rate"] * 100) / df[col_rate].replace(0, pd.NA)) - 100
     return df
 
 
@@ -978,27 +993,50 @@ def update():
         st.rerun()
     except (ConnectionError, ValueError) as e:
         st.error(f"Update Error: {str(e)}")
-        traceback.print_exc()
+        logger.exception("Price update failed")
 
 
-def backup_database(dbfile: str) -> str:
+def backup_database(dbfile: str, max_backups: int = 10) -> str:
     """Crée une sauvegarde du fichier de base de données en ajoutant un timestamp dans le nom.
 
     Args:
         dbfile: Chemin vers le fichier de base de données
+        max_backups: Nombre maximum de sauvegardes à conserver (défaut: 10)
 
     Returns:
         Chemin vers le fichier de sauvegarde créé
 
     Raises:
         FileNotFoundError: Si le fichier source n'existe pas
+        OSError: Si l'espace disque est insuffisant
     """
     if not os.path.exists(dbfile):
         raise FileNotFoundError(f"Fichier de base de données introuvable : {dbfile}")
+
+    db_size = os.path.getsize(dbfile)
+    disk_usage = shutil.disk_usage(os.path.dirname(os.path.abspath(dbfile)))
+    if disk_usage.free < db_size * 2:
+        raise OSError(
+            f"Espace disque insuffisant pour la sauvegarde : "
+            f"{disk_usage.free // (1024**2)} Mo disponibles, "
+            f"{db_size * 2 // (1024**2)} Mo requis"
+        )
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     backup_file = f"{dbfile}_{timestamp}.bak"
 
     shutil.copy2(dbfile, backup_file)
     logger.info("Base de données sauvegardée dans : %s", backup_file)
+
+    # Rotation : conserver uniquement les max_backups sauvegardes les plus récentes
+    pattern = f"{dbfile}_*.bak"
+    existing_backups = sorted(glob.glob(pattern))
+    while len(existing_backups) > max_backups:
+        oldest = existing_backups.pop(0)
+        try:
+            os.remove(oldest)
+            logger.info("Ancienne sauvegarde supprimée : %s", oldest)
+        except OSError as e:
+            logger.warning("Impossible de supprimer l'ancienne sauvegarde %s : %s", oldest, e)
+
     return backup_file

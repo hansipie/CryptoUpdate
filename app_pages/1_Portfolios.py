@@ -1,13 +1,10 @@
 import logging
-import traceback
 
 import pandas as pd
 import streamlit as st
-import plotly.graph_objects as go
 
 from modules.database.customdata import Customdata
 from modules.database.portfolios import Portfolios
-from modules.database.tokensdb import TokensDatabase
 from modules.tools import (
     create_portfolio_dataframe,
     update,
@@ -105,7 +102,7 @@ def delete_token(portfolio_name: str):
     )
     if st.button("Submit"):
         for token in tokens:
-            g_portfolios.delete_token_a(portfolio_name, token)
+            g_portfolios.delete_token_by_name(portfolio_name, token)
         # Close dialog
         st.rerun()
 
@@ -214,69 +211,6 @@ def load_portfolios(dbfile: str) -> Portfolios:
     return Portfolios(dbfile)
 
 
-def get_portfolio_history(portfolio_name: str, dbfile: str) -> pd.DataFrame:
-    """Get historical value of a portfolio over time.
-
-    Args:
-        portfolio_name: Name of the portfolio
-        dbfile: Path to database file
-
-    Returns:
-        DataFrame with timestamp index and portfolio value
-    """
-    logger.debug("Getting history for portfolio %s", portfolio_name)
-
-    # Get current portfolio tokens and amounts
-    portfolio = Portfolios(dbfile)
-    tokens_dict = portfolio.get_tokens(portfolio_name)
-
-    if not tokens_dict:
-        logger.warning("Portfolio %s is empty", portfolio_name)
-        return pd.DataFrame()
-
-    # Get historical prices from TokensDatabase
-    tokensdb = TokensDatabase(dbfile)
-
-    # Query all historical data for tokens in this portfolio
-    import sqlite3
-
-    with sqlite3.connect(dbfile) as con:
-        # Get tokens list
-        tokens_list = list(tokens_dict.keys())
-        tokens_placeholder = ",".join(["?" for _ in tokens_list])
-
-        query = f"""
-            SELECT timestamp, token, price
-            FROM TokensDatabase
-            WHERE token IN ({tokens_placeholder})
-            ORDER BY timestamp
-        """
-        df = pd.read_sql_query(query, con, params=tokens_list)
-
-    if df.empty:
-        logger.warning("No historical data found for portfolio %s", portfolio_name)
-        return pd.DataFrame()
-
-    # Convert timestamp to datetime
-    df["timestamp"] = pd.to_datetime(df["timestamp"], unit="s", utc=True)
-    df["timestamp"] = (
-        df["timestamp"].dt.tz_convert(tokensdb.local_timezone).dt.tz_localize(None)
-    )
-
-    # Calculate value for each token at each timestamp
-    df["amount"] = df["token"].map(lambda t: float(tokens_dict.get(t, 0)))
-    df["value"] = df["price"] * df["amount"]
-
-    # Group by timestamp and sum values
-    portfolio_value = df.groupby("timestamp")["value"].sum().reset_index()
-    portfolio_value.columns = ["Date", "Value"]
-    portfolio_value.set_index("Date", inplace=True)
-    portfolio_value.sort_index(inplace=True)
-
-    logger.debug("Portfolio history shape: %s", portfolio_value.shape)
-    return portfolio_value
-
-
 @st.fragment
 def execute_search():
     """Execute token search and display results.
@@ -368,13 +302,9 @@ with st.sidebar:
 
 def is_portfolio_empty(pf_name):
     pf = g_portfolios.get_portfolio(pf_name)
-    df = create_portfolio_dataframe(pf)
-    if df.empty:
+    if not pf:
         return True
-    # Si tous les montants sont nuls ou absents
-    if (df["amount"].fillna(0) == 0).all():
-        return True
-    return False
+    return all((v.get("amount") or 0) == 0 for v in pf.values())
 
 
 all_tabs = g_portfolios.get_portfolio_names()
@@ -393,4 +323,4 @@ else:
         portfolio_ui(tabs)
     except Exception as e:
         st.error(f"UI Error: {str(e)}")
-        traceback.print_exc()
+        logger.exception("Portfolio UI rendering failed")

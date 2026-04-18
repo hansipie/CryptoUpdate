@@ -6,7 +6,7 @@ formatting, and timezone conversions for financial data.
 """
 
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 import pandas as pd
@@ -16,6 +16,9 @@ import tzlocal
 from modules.database.fiat_cache import FiatCacheManager
 
 logger = logging.getLogger(__name__)
+
+_SOURCE_CURRENCY = "USD"
+_MAX_PAGES = 1000
 
 
 class ApiMarket:
@@ -56,13 +59,17 @@ class ApiMarket:
         if self.api_key:
             headers["X-API-Key"] = self.api_key
 
-        request = requests.get(
-            self.url + "/api/v1/fiat/latest",
-            headers=headers,
-            timeout=10,
-        )
-        if request.status_code == 200:
-            data = request.json()
+        try:
+            response = requests.get(
+                self.url + "/api/v1/fiat/latest",
+                headers=headers,
+                timeout=10,
+            )
+        except requests.exceptions.RequestException as e:
+            logger.error("API request failed: %s", e)
+            return None
+        if response.status_code == 200:
+            data = response.json()
             # L'API retourne un array, pas un objet
             if not data:  # Si la liste est vide
                 return None
@@ -73,17 +80,17 @@ class ApiMarket:
             df["date"] = (
                 df["date"].dt.tz_convert(self.local_timezone).dt.tz_localize(None)
             )
-            df.rename(columns={"date": "Date", "eur": "price"}, inplace=True)
-            df.set_index("Date", inplace=True)
-            df.sort_index(inplace=True)
+            df = df.rename(columns={"date": "Date", "eur": "price"})
+            df = df.set_index("Date")
+            df = df.sort_index()
 
             return df
-        if request.status_code == 204:
+        if response.status_code == 204:
             # Pas de données disponibles
             logger.info("No fiat data available (204)")
             return None
 
-        logger.error("Error fetching fiat rates: %s", request.status_code)
+        logger.error("Error fetching fiat rates: %s", response.status_code)
         return None
 
     def get_fiat_latest_rate_cached(self) -> Optional[pd.DataFrame]:
@@ -148,7 +155,7 @@ class ApiMarket:
             ]
         )
 
-        df.set_index("Date", inplace=True)
+        df = df.set_index("Date")
         return df
 
     def get_currency(self, timestamp: int = None) -> pd.DataFrame:
@@ -172,21 +179,25 @@ class ApiMarket:
 
             # Convert Unix timestamp to ISO 8601 format
             dt = datetime.fromtimestamp(timestamp, tz=self.local_timezone)
-            date_str = dt.astimezone(pd.Timestamp.now(tz="UTC").tz).isoformat()
+            date_str = dt.astimezone(timezone.utc).isoformat()
 
             headers = {}
             if self.api_key:
                 headers["X-API-Key"] = self.api_key
 
-            request = requests.get(
-                self.url + "/api/v1/fiat",
-                params={"date": date_str},
-                headers=headers,
-                timeout=10,
-            )
+            try:
+                response = requests.get(
+                    self.url + "/api/v1/fiat",
+                    params={"date": date_str},
+                    headers=headers,
+                    timeout=10,
+                )
+            except requests.exceptions.RequestException as e:
+                logger.error("API request failed: %s", e)
+                return None
 
-            if request.status_code == 200:
-                data = request.json()
+            if response.status_code == 200:
+                data = response.json()
                 results = data.get("results", [])
 
                 if not results:
@@ -198,18 +209,18 @@ class ApiMarket:
                 df["date"] = (
                     df["date"].dt.tz_convert(self.local_timezone).dt.tz_localize(None)
                 )
-                df.rename(columns={"date": "Date", "eur": "price"}, inplace=True)
-                df.set_index("Date", inplace=True)
+                df = df.rename(columns={"date": "Date", "eur": "price"})
+                df = df.set_index("Date")
 
                 logger.info(
                     "Retrieved interpolated fiat rate for timestamp %d", timestamp
                 )
                 return df
-            elif request.status_code == 204:
+            elif response.status_code == 204:
                 logger.info("No fiat data available (204)")
                 return None
             else:
-                logger.error("Error fetching fiat data: %s", request.status_code)
+                logger.error("Error fetching fiat data: %s", response.status_code)
                 return None
 
         # Otherwise, fetch all data with pagination
@@ -222,12 +233,18 @@ class ApiMarket:
         if self.api_key:
             headers["X-API-Key"] = self.api_key
 
-        while next_url:
+        pages_fetched = 0
+        while next_url and pages_fetched < _MAX_PAGES:
             logger.debug("Fetching page: %s", next_url)
-            request = requests.get(next_url, headers=headers, timeout=10)
+            try:
+                response = requests.get(next_url, headers=headers, timeout=10)
+            except requests.exceptions.RequestException as e:
+                logger.error("API request failed: %s", e)
+                return None
+            pages_fetched += 1
 
-            if request.status_code == 200:
-                data = request.json()
+            if response.status_code == 200:
+                data = response.json()
                 results = data.get("results", [])
                 all_results.extend(results)
 
@@ -239,12 +256,15 @@ class ApiMarket:
                     len(results),
                     len(all_results),
                 )
-            elif request.status_code == 204:
+            elif response.status_code == 204:
                 logger.info("No fiat data available (204)")
                 return None
             else:
-                logger.error("Error fetching fiat data: %s", request.status_code)
+                logger.error("Error fetching fiat data: %s", response.status_code)
                 return None
+
+        if pages_fetched >= _MAX_PAGES:
+            logger.warning("Pagination limit reached for fiat data")
 
         # Convert to DataFrame
         if not all_results:
@@ -254,9 +274,9 @@ class ApiMarket:
         df = pd.DataFrame(all_results)
         df["date"] = pd.to_datetime(df["date"], utc=True)
         df["date"] = df["date"].dt.tz_convert(self.local_timezone).dt.tz_localize(None)
-        df.rename(columns={"date": "Date", "eur": "price"}, inplace=True)
-        df.set_index("Date", inplace=True)
-        df.sort_index(inplace=True)
+        df = df.rename(columns={"date": "Date", "eur": "price"})
+        df = df.set_index("Date")
+        df = df.sort_index()
 
         logger.info("Retrieved %d total fiat records", len(df))
         return df
@@ -281,15 +301,19 @@ class ApiMarket:
         if self.api_key:
             headers["X-API-Key"] = self.api_key
 
-        request = requests.get(
-            self.url + "/api/v1/coins",
-            params=params,
-            headers=headers,
-            timeout=10,
-        )
+        try:
+            response = requests.get(
+                self.url + "/api/v1/coins",
+                params=params,
+                headers=headers,
+                timeout=10,
+            )
+        except requests.exceptions.RequestException as e:
+            logger.error("API request failed: %s", e)
+            return None
 
-        if request.status_code == 200:
-            data = request.json()
+        if response.status_code == 200:
+            data = response.json()
             results = data.get("results", [])
 
             if not results:
@@ -298,11 +322,11 @@ class ApiMarket:
 
             df = pd.DataFrame(results)
             return df
-        elif request.status_code == 204:
+        elif response.status_code == 204:
             logger.info("No coins data available (204)")
             return None
         else:
-            logger.error("Error fetching coins: %s", request.status_code)
+            logger.error("Error fetching coins: %s", response.status_code)
             return None
 
     def get_cryptocurrency_market(
@@ -345,31 +369,35 @@ class ApiMarket:
         params = {"coinid": coinid}
         if from_timestamp:
             dt = datetime.fromtimestamp(from_timestamp, tz=self.local_timezone)
-            params["startdate"] = dt.astimezone(
-                pd.Timestamp.now(tz="UTC").tz
-            ).isoformat()
+            params["startdate"] = dt.astimezone(timezone.utc).isoformat()
         if to_timestamp:
             dt = datetime.fromtimestamp(to_timestamp, tz=self.local_timezone)
-            params["enddate"] = dt.astimezone(pd.Timestamp.now(tz="UTC").tz).isoformat()
+            params["enddate"] = dt.astimezone(timezone.utc).isoformat()
 
         # Fetch all pages
         headers = {}
         if self.api_key:
             headers["X-API-Key"] = self.api_key
 
-        while next_url:
+        first_page = True
+        pages_fetched = 0
+        while next_url and pages_fetched < _MAX_PAGES:
             logger.debug("Fetching page: %s", next_url)
-            request = requests.get(
-                next_url,
-                params=params
-                if next_url == self.url + "/api/v1/cryptocurrency"
-                else None,
-                headers=headers,
-                timeout=10,
-            )
+            try:
+                response = requests.get(
+                    next_url,
+                    params=params if first_page else None,
+                    headers=headers,
+                    timeout=10,
+                )
+            except requests.exceptions.RequestException as e:
+                logger.error("API request failed: %s", e)
+                return None
+            first_page = False
+            pages_fetched += 1
 
-            if request.status_code == 200:
-                data = request.json()
+            if response.status_code == 200:
+                data = response.json()
                 results = data.get("results", [])
                 all_results.extend(results)
 
@@ -381,14 +409,17 @@ class ApiMarket:
                     len(results),
                     len(all_results),
                 )
-            elif request.status_code == 204:
+            elif response.status_code == 204:
                 logger.info("No cryptocurrency data available (204)")
                 return None
             else:
                 logger.error(
-                    "Error fetching cryptocurrency data: %s", request.status_code
+                    "Error fetching cryptocurrency data: %s", response.status_code
                 )
                 return None
+
+        if pages_fetched >= _MAX_PAGES:
+            logger.warning("Pagination limit reached for cryptocurrency data")
 
         # Convert to DataFrame
         if not all_results:
@@ -402,11 +433,11 @@ class ApiMarket:
         df["last_updated"] = (
             df["last_updated"].dt.tz_convert(self.local_timezone).dt.tz_localize(None)
         )
-        df.rename(columns={"last_updated": "Date", "price": "Price"}, inplace=True)
-        df["source_currency"] = "USD"  # MÉTADONNÉE : Prix en USD
+        df = df.rename(columns={"last_updated": "Date", "price": "Price"})
+        df["source_currency"] = _SOURCE_CURRENCY  # MÉTADONNÉE : Prix en USD
         df = df[["Date", "Price", "source_currency"]]  # Keep only relevant columns
-        df.set_index("Date", inplace=True)
-        df.sort_index(inplace=True)
+        df = df.set_index("Date")
+        df = df.sort_index()
 
         logger.info("Retrieved %d total cryptocurrency records", len(df))
         return df
@@ -571,11 +602,11 @@ class ApiMarket:
         # Reconstruct DataFrame
         df = pd.DataFrame(records)
         df["date"] = pd.to_datetime(df["date"], format="ISO8601")
-        df.rename(columns={"date": "Date", "price": "Price"}, inplace=True)
+        df = df.rename(columns={"date": "Date", "price": "Price"})
         # Restaurer la métadonnée de devise source (USD par défaut pour rétrocompatibilité cache)
-        df["source_currency"] = cached_data.get("source_currency", "USD")
-        df.set_index("Date", inplace=True)
-        df.sort_index(inplace=True)
+        df["source_currency"] = cached_data.get("source_currency", _SOURCE_CURRENCY)
+        df = df.set_index("Date")
+        df = df.sort_index()
 
         return df
 
@@ -634,8 +665,8 @@ class ApiMarket:
         """
         df = pd.DataFrame(cached_data["records"])
         df["date"] = pd.to_datetime(df["date"], format="ISO8601")
-        df.rename(columns={"date": "Date"}, inplace=True)
-        df.set_index("Date", inplace=True)
+        df = df.rename(columns={"date": "Date"})
+        df = df.set_index("Date")
         return df
 
     def get_cryptocurrency_latest(self, symbols: list = None) -> pd.DataFrame:
@@ -660,15 +691,19 @@ class ApiMarket:
             params["symbols"] = ",".join(symbols)
             logger.debug("Filtering by symbols: %s", params["symbols"])
 
-        request = requests.get(
-            self.url + "/api/v1/cryptocurrency/latests",
-            params=params,
-            headers=headers,
-            timeout=10,
-        )
+        try:
+            response = requests.get(
+                self.url + "/api/v1/cryptocurrency/latests",
+                params=params,
+                headers=headers,
+                timeout=10,
+            )
+        except requests.exceptions.RequestException as e:
+            logger.error("API request failed: %s", e)
+            return None
 
-        if request.status_code == 200:
-            data = request.json()
+        if response.status_code == 200:
+            data = response.json()
 
             if not data:
                 logger.info("No latest cryptocurrency data available")
@@ -679,23 +714,23 @@ class ApiMarket:
                 df["last_updated"], format="ISO8601", utc=True
             )
             # Sort by last_updated and drop duplicates to ensure only the latest price per coin is kept
-            df.sort_values(by="last_updated", ascending=False, inplace=True)
-            df.drop_duplicates(subset="coin", keep="first", inplace=True)
+            df = df.sort_values(by="last_updated", ascending=False)
+            df = df.drop_duplicates(subset="coin", keep="first")
             df["last_updated"] = (
                 df["last_updated"]
                 .dt.tz_convert(self.local_timezone)
                 .dt.tz_localize(None)
             )
-            df.rename(columns={"last_updated": "Date"}, inplace=True)
-            df.set_index("Date", inplace=True)
+            df = df.rename(columns={"last_updated": "Date"})
+            df = df.set_index("Date")
 
             logger.info("Retrieved %d latest cryptocurrency records", len(df))
             return df
-        elif request.status_code == 204:
+        elif response.status_code == 204:
             logger.info("No latest cryptocurrency data available (204)")
             return None
         else:
             logger.error(
-                "Error fetching latest cryptocurrency data: %s", request.status_code
+                "Error fetching latest cryptocurrency data: %s", response.status_code
             )
             return None

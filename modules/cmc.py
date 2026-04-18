@@ -1,6 +1,5 @@
 from datetime import datetime
 import logging
-import traceback
 import pytz
 import requests
 
@@ -8,7 +7,7 @@ logger = logging.getLogger(__name__)
 
 
 class CMC:
-    def __init__(self, coinmarketcap_token: str) -> dict:
+    def __init__(self, coinmarketcap_token: str) -> None:
         self.coinmarketcap_token = coinmarketcap_token
 
     def get_current_fiat_prices(
@@ -42,7 +41,11 @@ class CMC:
             "convert": names,
         }
 
-        response = requests.get(url, headers=headers, params=params, timeout=10)
+        try:
+            response = requests.get(url, headers=headers, params=params, timeout=10)
+        except requests.exceptions.RequestException as e:
+            logger.error("Erreur réseau CMC (fiat) : %s", e)
+            return None
         if response.status_code == 200:
             fiat_prices = {}
             content = response.json()
@@ -69,7 +72,7 @@ class CMC:
 
                 except (KeyError, IndexError, TypeError) as e:
                     logger.error("Error getting price for %s : %s", fiat, str(e))
-                    traceback.print_exc()
+                    logger.exception("Failed to parse fiat price for %s", fiat)
                     logger.debug("Data received: %s", content["data"])
                     return None
             return fiat_prices
@@ -107,7 +110,11 @@ class CMC:
             "convert": unit,
         }
 
-        response = requests.get(url, headers=headers, params=params, timeout=10)
+        try:
+            response = requests.get(url, headers=headers, params=params, timeout=10)
+        except requests.exceptions.RequestException as e:
+            logger.error("Erreur réseau CMC (crypto) : %s", e)
+            return None
         if response.status_code == 200:
             logger.info("Get current market prices from Coinmarketcap successfully")
             content = response.json()

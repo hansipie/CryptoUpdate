@@ -8,7 +8,6 @@ This module handles cryptocurrency swap operations including:
 
 import logging
 import sqlite3
-import traceback
 
 logger = logging.getLogger(__name__)
 
@@ -26,10 +25,10 @@ class Swaps:
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     timestamp INTEGER,
                     token_from TEXT,
-                    amount_from TEXT,
+                    amount_from REAL,
                     wallet_from TEXT,
                     token_to TEXT,
-                    amount_to TEXT,
+                    amount_to REAL,
                     wallet_to TEXT,
                     tag TEXT,
                     note TEXT
@@ -55,19 +54,15 @@ class Swaps:
 
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
+            _sql = (
+                "SELECT id, timestamp, token_from, amount_from, wallet_from,"
+                " token_to, amount_to, wallet_to, tag, note FROM Swaps"
+            )
             if not tag:
-                cursor.execute(
-                    """
-                    SELECT id, timestamp, token_from, amount_from, wallet_from, token_to, amount_to, wallet_to, tag, note
-                    FROM Swaps WHERE tag IS NULL ORDER BY timestamp DESC
-                    """
-                )
+                cursor.execute(f"{_sql} WHERE tag IS NULL ORDER BY timestamp DESC")
             else:
                 cursor.execute(
-                    """
-                    SELECT id, timestamp, token_from, amount_from, wallet_from, token_to, amount_to, wallet_to, tag, note
-                    FROM Swaps WHERE tag = ? ORDER BY timestamp DESC
-                    """,
+                    f"{_sql} WHERE tag = ? ORDER BY timestamp DESC",
                     (tag,),
                 )
             return cursor.fetchall()
@@ -87,10 +82,10 @@ class Swaps:
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
             cursor.execute(
-                """
-                INSERT INTO Swaps (timestamp, token_from, amount_from, wallet_from, token_to, amount_to, wallet_to, tag, note)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """,
+                "INSERT INTO Swaps"
+                " (timestamp, token_from, amount_from, wallet_from,"
+                " token_to, amount_to, wallet_to, tag, note)"
+                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (
                     timestamp,
                     token_from,
@@ -113,10 +108,9 @@ class Swaps:
                 cursor = conn.cursor()
                 cursor.execute("DELETE FROM Swaps WHERE id = ?", (entry_id,))
                 conn.commit()
-                logger.debug(f"Entry with id {entry_id} deleted successfully.")
+                logger.debug("Entry with id %s deleted successfully.", entry_id)
         except Exception as e:
-            logger.error(f"Error deleting swap: {e}")
-            traceback.print_exc()
+            logger.exception("Error deleting swap: %s", e)
 
     def update_note(self, entry_id: int, note: str):
         logger.debug("Updating swap note")
@@ -126,10 +120,9 @@ class Swaps:
                     "UPDATE Swaps SET note = ? WHERE id = ?", (note or None, entry_id)
                 )
                 conn.commit()
-                logger.debug(f"Note updated for entry with id {entry_id}")
+                logger.debug("Note updated for entry with id %s", entry_id)
         except Exception as e:
-            logger.error(f"Error updating note: {e}")
-            traceback.print_exc()
+            logger.exception("Error updating note: %s", e)
 
     def update_tag(self, entry_id: int, tag: str):
         logger.debug("Updating swap tag")
@@ -145,7 +138,6 @@ class Swaps:
                         "UPDATE Swaps SET tag = ? WHERE id = ?", (tag, entry_id)
                     )
                 conn.commit()
-                logger.debug(f"Tag updated for entry with id {entry_id}")
+                logger.debug("Tag updated for entry with id %s", entry_id)
         except Exception as e:
-            logger.error(f"Error updating tag: {e}")
-            traceback.print_exc()
+            logger.exception("Error updating tag: %s", e)

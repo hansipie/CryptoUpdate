@@ -19,19 +19,32 @@ from modules.cmc import CMC
 
 logger = logging.getLogger(__name__)
 
+DEFAULT_RATESDB_URL = "https://free.ratesdb.com/v1/rates"
+
+_DROP_DUPLICATE_QUERIES = {
+    "TokensDatabase": "SELECT * FROM TokensDatabase;",
+    "Market": "SELECT * FROM Market;",
+    "Currency": "SELECT * FROM Currency;",
+    "Swaps": "SELECT * FROM Swaps;",
+}
+
 
 class Market:
     """Class for managing cryptocurrency market data and currency rates."""
 
-    def __init__(self, db_path: str, cmc_token: str):
+    def __init__(
+        self, db_path: str, cmc_token: str, ratesdb_url: str = DEFAULT_RATESDB_URL
+    ):
         """Initialize Market instance.
 
         Args:
             db_path: Path to SQLite database file
             cmc_token: CoinMarketCap API token
+            ratesdb_url: Base URL for historical fiat rates API
         """
         self.db_path = db_path
         self.cmc_token = cmc_token
+        self.ratesdb_url = ratesdb_url.rstrip("/")
         self.__init_database()
         self.local_timezone = tzlocal.get_localzone()
 
@@ -71,26 +84,16 @@ class Market:
         """
         logger.debug("Get market")
         with sqlite3.connect(self.db_path) as con:
-            df_tokens = pd.read_sql_query("select DISTINCT token from Market", con)
-            if df_tokens.empty:
+            df_all = pd.read_sql_query(
+                "SELECT timestamp, token, price FROM Market ORDER BY timestamp", con
+            )
+            if df_all.empty:
                 return None
-            df_market = pd.DataFrame()
-            for token in df_tokens["token"]:
-                df = pd.read_sql_query(
-                    "SELECT timestamp, price FROM Market WHERE token = ?",
-                    con,
-                    params=(token,),
-                )
-                if df.empty:
-                    continue
-                df.rename(columns={"price": token}, inplace=True)
-                if df_market.empty:
-                    df_market = df
-                else:
-                    df_market = df_market.merge(df, on="timestamp", how="outer")
-            if df_market.empty:
-                return None
-
+            df_market = df_all.pivot_table(
+                index="timestamp", columns="token", values="price", aggfunc="last"
+            )
+            df_market.columns.name = None
+            df_market.reset_index(inplace=True)
             df_market["timestamp"] = (
                 pd.to_datetime(df_market["timestamp"], unit="s", utc=True)
                 .dt.tz_convert(self.local_timezone)
@@ -119,10 +122,10 @@ class Market:
         with sqlite3.connect(self.db_path) as con:
             query = "SELECT timestamp AS Date, price AS Price FROM Market WHERE token = ?"
             params = [token]
-            if from_timestamp:
+            if from_timestamp is not None:
                 query += " AND timestamp >= ?"
                 params.append(from_timestamp)
-            if to_timestamp:
+            if to_timestamp is not None:
                 query += " AND timestamp <= ?"
                 params.append(to_timestamp)
             query += " ORDER BY timestamp"
@@ -144,28 +147,17 @@ class Market:
             DataFrame with latest token prices or None if empty
         """
         logger.debug("Get last market")
-        tokens_list = self.get_tokens()
-        if not tokens_list:
-            logger.warning("No tokens available")
-            return None
         with sqlite3.connect(self.db_path) as con:
-            market_data = []
-            for token in tokens_list:
-                df = pd.read_sql_query(
-                    "SELECT timestamp, price FROM Market WHERE token = ? ORDER BY timestamp DESC LIMIT 1",
-                    con,
-                    params=(token,),
-                )
-                if df.empty:
-                    continue
-                market_data.append(
-                    {
-                        "token": token,
-                        "timestamp": df["timestamp"][0],
-                        "value": df["price"][0],
-                    }
-                )
-            market_df = pd.DataFrame(market_data)
+            market_df = pd.read_sql_query(
+                "SELECT m.token, m.timestamp, m.price AS value "
+                "FROM Market m "
+                "INNER JOIN (SELECT token, MAX(timestamp) AS ts FROM Market GROUP BY token) mx "
+                "    ON m.token = mx.token AND m.timestamp = mx.ts",
+                con,
+            )
+            if market_df.empty:
+                logger.warning("No tokens available")
+                return None
             market_df.set_index("token", inplace=True)
             logger.debug("Last Market get size: %d", len(market_df))
             logger.debug("Last Market get:\n%s", market_df)
@@ -180,7 +172,8 @@ class Market:
         logger.debug("Add tokens")
 
         known_tokens = self.get_tokens()
-        tokens = list(set(tokens + known_tokens))
+        all_tokens = set(tokens + known_tokens)
+        tokens = list(all_tokens)
         logger.debug("tokens: %s", str(tokens))
 
         timestamp = int(pd.Timestamp.now(tz=pytz.UTC).timestamp())
@@ -224,7 +217,7 @@ class Market:
             Token price or 0.0 if not found
         """
         with sqlite3.connect(self.db_path) as con:
-            if timestamp:
+            if timestamp is not None:
                 df = pd.read_sql_query(
                     "SELECT price FROM Market WHERE token = ? AND timestamp <= ? ORDER BY timestamp DESC LIMIT 1",
                     con,
@@ -265,14 +258,17 @@ class Market:
             table: Table name
         """
         logger.debug("Drop duplicate from %s", table)
+        if table not in _DROP_DUPLICATE_QUERIES:
+            raise ValueError(f"Table non autorisée : {table}")
         with sqlite3.connect(self.db_path) as con:
-            df = pd.read_sql_query(f"SELECT * from {table};", con)
+            df = pd.read_sql_query(_DROP_DUPLICATE_QUERIES[table], con)
             dupcount = df.duplicated().sum()
-            logger.debug("Found %d rows with %f duplicated rows", len(df), dupcount)
+            logger.debug("Found %d rows with %d duplicated rows", len(df), dupcount)
             if dupcount > 0:
                 logger.debug("Found %d duplicated rows. Dropping...", dupcount)
                 df.drop_duplicates(inplace=True)
-                df.to_sql(table, con, if_exists="replace", index=False)
+                con.execute(f"DELETE FROM {table}")  # noqa: S608
+                df.to_sql(table, con, if_exists="append", index=False)
 
     def __find_missing_timestamps(self) -> pd.DataFrame:
         """Find missing timestamps in the Currency table.
@@ -312,7 +308,7 @@ class Market:
             df_ret = df_timestamps[
                 ~df_timestamps["timestamp"].isin(df_rate_timestamps["timestamp"])
             ]
-            logging.debug("Missing timestamps: %d", len(df_ret))
+            logger.debug("Missing timestamps: %d", len(df_ret))
             return df_ret
 
     def update_currencies(self, debug: bool = False):
@@ -324,54 +320,112 @@ class Market:
         if count == 0:
             logger.debug("No missing timestamps")
         else:
-            idx = 0
-            for timestamp in df_timestamps["timestamp"]:
-                idx += 1
-                # convert timestamp to datetime(YYYY-MM-DD)
-                date = pd.to_datetime(timestamp, unit="s", utc=True).strftime(
-                    "%Y-%m-%d"
+            # Build unique date -> canonical rate timestamp mapping once.
+            # This avoids one HTTP request per raw timestamp when several map to the same day.
+            ts_series = pd.to_datetime(df_timestamps["timestamp"], unit="s", utc=True)
+            date_to_rate_ts = {
+                d.strftime("%Y-%m-%d"): int(
+                    pd.Timestamp(f"{d.strftime('%Y-%m-%d')} 14:30:00+00:00").timestamp()
                 )
-                rate_date = f"{date} 14:30:00+00:00"
-                rate_timestamp = int(pd.Timestamp(rate_date).timestamp())
+                for d in ts_series
+            }
+
+            rows_to_insert: list[tuple[int, str, float]] = []
+            session = requests.Session()
+            dates = sorted(date_to_rate_ts.keys())
+            logger.debug("Missing timestamps: %d, unique dates to fetch: %d", count, len(dates))
+
+            for idx, date in enumerate(dates, start=1):
+                rate_timestamp = date_to_rate_ts[date]
                 logger.debug(
-                    "%d/%d Timestamp: %d -> Date: %s -> Rate Date: %s -> Rate Timestamp: %d",
+                    "%d/%d Date: %s -> Rate Timestamp: %d",
                     idx,
-                    count,
-                    timestamp,
+                    len(dates),
                     date,
-                    rate_date,
                     rate_timestamp,
                 )
 
-                # request the currency rate
-                url = f"https://free.ratesdb.com/v1/rates?from=EUR&to=USD&date={date}"
-                response = requests.get(url, timeout=10)
-                if response.status_code != 200:
-                    logging.error(
-                        "Error updating currencies. Code: %d", response.status_code
+                url = f"{self.ratesdb_url}?from=EUR&to=USD&date={date}"
+
+                # Retry only on transient errors (429/5xx or network errors).
+                max_attempts = 3
+                resp = None
+                for attempt in range(1, max_attempts + 1):
+                    try:
+                        response = session.get(url, timeout=10)
+                    except requests.exceptions.RequestException as e:
+                        logger.warning(
+                            "Currency request failed for %s (attempt %d/%d): %s",
+                            date,
+                            attempt,
+                            max_attempts,
+                            e,
+                        )
+                        if attempt < max_attempts:
+                            time.sleep(attempt)
+                        continue
+
+                    if response.status_code == 200:
+                        try:
+                            resp = response.json()
+                        except ValueError:
+                            logger.error(
+                                "Invalid JSON response from currency API for date %s",
+                                date,
+                            )
+                        break
+
+                    if response.status_code == 429 or response.status_code >= 500:
+                        logger.warning(
+                            "Transient currency API status for %s: %d (attempt %d/%d)",
+                            date,
+                            response.status_code,
+                            attempt,
+                            max_attempts,
+                        )
+                        if attempt < max_attempts:
+                            time.sleep(attempt)
+                        continue
+
+                    logger.error(
+                        "Error updating currencies for %s. Code: %d",
+                        date,
+                        response.status_code,
                     )
-                    time.sleep(1)
-                    raise ValueError("Error updating currencies")
-                resp = response.json()
+                    break
 
-                logger.debug(
-                    "Rate Timestamp: %d  - Rate: %f",
-                    rate_timestamp,
-                    resp["data"]["rates"]["USD"],
-                )
-                self.add_currency(rate_timestamp, "USD", resp["data"]["rates"]["USD"])
+                if resp is None:
+                    continue
 
-                # sleep 1 second to avoid api request rate limit
-                time.sleep(1)
+                usd_rate = resp.get("data", {}).get("rates", {}).get("USD")
+                if usd_rate is None:
+                    logger.error("Missing USD rate in response for date %s", date)
+                    continue
+
+                logger.debug("Rate Timestamp: %d - Rate: %f", rate_timestamp, usd_rate)
+                rows_to_insert.append((rate_timestamp, "USD", float(usd_rate)))
+
+            if rows_to_insert:
+                with sqlite3.connect(self.db_path) as con:
+                    cur = con.cursor()
+                    cur.executemany(
+                        "INSERT INTO Currency (timestamp, currency, price) VALUES (?, ?, ?)",
+                        rows_to_insert,
+                    )
+                    con.commit()
+                logger.info("Inserted %d historical currency rates", len(rows_to_insert))
+            else:
+                logger.warning("No historical currency rates inserted")
 
         # add current rate to Currency from CMC
         cmc_prices = CMC(self.cmc_token)
         price = cmc_prices.get_current_fiat_prices(debug=debug)
         logger.debug("Adding current rate to Currency: %s", price)
-        for currency in price:
-            self.add_currency(
-                price[currency]["timestamp"], currency, price[currency]["price"]
-            )
+        if price is None:
+            logger.warning("CMC fiat prices unavailable, skipping currency update")
+        else:
+            for currency, data in price.items():
+                self.add_currency(data["timestamp"], currency, data["price"])
 
         # drop duplicate
         self.drop_duplicate("Currency")
@@ -405,12 +459,14 @@ class Market:
         """
         with sqlite3.connect(self.db_path) as con:
             df_low = pd.read_sql_query(
-                "SELECT timestamp, price FROM Market WHERE token = ? AND timestamp <= ? ORDER BY timestamp DESC LIMIT 1",
+                "SELECT timestamp, price FROM Market"
+                " WHERE token = ? AND timestamp <= ? ORDER BY timestamp DESC LIMIT 1",
                 con,
                 params=(token, timestamp),
             )
             df_high = pd.read_sql_query(
-                "SELECT timestamp, price FROM Market WHERE token = ? AND timestamp >= ? ORDER BY timestamp ASC LIMIT 1",
+                "SELECT timestamp, price FROM Market"
+                " WHERE token = ? AND timestamp >= ? ORDER BY timestamp ASC LIMIT 1",
                 con,
                 params=(token, timestamp),
             )
@@ -428,12 +484,14 @@ class Market:
         """
         with sqlite3.connect(self.db_path) as con:
             df_low = pd.read_sql_query(
-                "SELECT timestamp, price FROM Currency WHERE currency = ? AND timestamp <= ? ORDER BY timestamp DESC LIMIT 1",
+                "SELECT timestamp, price FROM Currency"
+                " WHERE currency = ? AND timestamp <= ? ORDER BY timestamp DESC LIMIT 1",
                 con,
                 params=(currency, timestamp),
             )
             df_high = pd.read_sql_query(
-                "SELECT timestamp, price FROM Currency WHERE currency = ? AND timestamp >= ? ORDER BY timestamp ASC LIMIT 1",
+                "SELECT timestamp, price FROM Currency"
+                " WHERE currency = ? AND timestamp >= ? ORDER BY timestamp ASC LIMIT 1",
                 con,
                 params=(currency, timestamp),
             )

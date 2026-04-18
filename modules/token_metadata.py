@@ -22,7 +22,7 @@ class TokenStatus(Enum):
 class TokenMetadataManager:
     """Gestionnaire des métadonnées des tokens"""
 
-    def __init__(self, db_path: str = "data/db.sqlite3"):
+    def __init__(self, db_path: str):
         self.db_path = db_path
 
     def get_token_status(self, token: str) -> Optional[TokenStatus]:
@@ -248,7 +248,18 @@ class TokenMetadataManager:
         Returns:
             Liste filtrée contenant uniquement les tokens actifs
         """
-        return [token for token in tokens if self.is_token_active(token)]
+        if not tokens:
+            return []
+        placeholders = ",".join(["?" for _ in tokens])
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                f"SELECT token FROM TokenMetadata WHERE token IN ({placeholders})"
+                f" AND status = ?",
+                (*tokens, TokenStatus.DELISTED.value),
+            )
+            delisted = {row[0] for row in cursor.fetchall()}
+        return [token for token in tokens if token not in delisted]
 
     def get_mr_id(self, token: str) -> Optional[int]:
         """Get MarketRaccoon ID for a token symbol.
@@ -456,31 +467,3 @@ class TokenMetadataManager:
                    ORDER BY status, token"""
             )
             return [dict(row) for row in cursor.fetchall()]
-
-
-# Exemple d'utilisation
-if __name__ == "__main__":
-    manager = TokenMetadataManager()
-
-    # Vérifier si un token est actif
-    print(
-        f"BTC actif: {manager.is_token_active('BTC')}"
-    )  # True (pas dans métadonnées = actif par défaut)
-    print(f"KYROS actif: {manager.is_token_active('KYROS')}")  # False
-    print(f"MATIC délisté: {manager.is_token_delisted('MATIC')}")  # True
-
-    # Récupérer tous les tokens délistés
-    delisted = manager.get_delisted_tokens()
-    print(f"\nTokens délistés: {delisted}")
-
-    # Récupérer les infos d'un token
-    info = manager.get_token_info("MATIC")
-    if info:
-        print("\nInfo MATIC:")
-        for key, value in info.items():
-            print(f"  {key}: {value}")
-
-    # Filtrer une liste de tokens
-    all_tokens = ["BTC", "ETH", "MATIC", "KYROS", "SOL"]
-    active_only = manager.filter_active_tokens(all_tokens)
-    print(f"\nTokens actifs parmi {all_tokens}: {active_only}")
