@@ -15,22 +15,22 @@ def plot_as_pie(df: pd.DataFrame, column):
 
     total = df[column].sum()
     limit = total / 100
-    logger.debug(f"1% of {total} is {limit}")
+    logger.debug("1%% of %s is %s", total, limit)
 
     # Group token representing less then 1% of total value
     dffinal = df.loc[df[column] >= limit]
-    logger.debug(f"Dataframe more than {limit}:\n{dffinal}")
+    logger.debug("Dataframe more than %s:\n%s", limit, dffinal)
 
     dfless = df.loc[df[column] < limit]
     if not dfless.empty:
-        logger.debug(f"Dataframe less than {limit}:\n{dfless}")
+        logger.debug("Dataframe less than %s:\n%s", limit, dfless)
 
         dfless_sum = pd.DataFrame(dfless.sum()).T
         dfless_sum.index = ["Others"]
-        logger.debug(f"Dataframe less than 1% sum:\n{dfless_sum}")
+        logger.debug("Dataframe less than 1%% sum:\n%s", dfless_sum)
 
         dffinal = pd.concat([dffinal, dfless_sum])
-        logger.debug(f"Dataframe more than 1% sum with Others:\n{dffinal}")
+        logger.debug("Dataframe more than 1%% sum with Others:\n%s", dffinal)
 
     fig = px.pie(dffinal, dffinal.index, column, width=700, height=700)
     st.plotly_chart(fig, use_container_width=True)
@@ -64,4 +64,4 @@ def plot_as_graph(df: pd.DataFrame):
     # Définir le titre de l'axe y par défaut pour la première colonne
     fig.update_layout(yaxis={"title": df.columns[0]})
 
-    st.plotly_chart(fig)
+    st.plotly_chart(fig, use_container_width=True)

@@ -159,7 +159,7 @@ def plot_modern_graph(
 
     fig.update_layout(**layout_config)
 
-    st.plotly_chart(fig, width="stretch")
+    st.plotly_chart(fig, use_container_width=True)
 
 
 def plot_dual_axis_graph(df: pd.DataFrame, title: str = None, token: str = None):
@@ -257,7 +257,7 @@ def plot_dual_axis_graph(df: pd.DataFrame, title: str = None, token: str = None)
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
     )
 
-    st.plotly_chart(fig, width="stretch")
+    st.plotly_chart(fig, use_container_width=True)
 
 
 def load_portfolios(dbfile: str) -> Portfolios:
@@ -651,9 +651,9 @@ def build_price_tab(
         st.info("No data available")
         return
     if st.session_state.startdate < st.session_state.enddate:
-        df_view = df.loc[df.index > str(st.session_state.startdate)]
+        df_view = df.loc[df.index > pd.Timestamp(st.session_state.startdate)]
         df_view = df_view.loc[
-            df_view.index < str(st.session_state.enddate + pd.to_timedelta(1, unit="d"))
+            df_view.index < pd.Timestamp(st.session_state.enddate) + pd.to_timedelta(1, unit="d")
         ]
         df_view = df_view.loc[:, ["price"]]
         df_view = df_view.dropna()

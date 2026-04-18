@@ -25,12 +25,12 @@ class Portfolios:
             cursor.execute("SELECT name FROM Portfolios")
             # return sorted list of portfolios
             portfolio_names = [row[0] for row in cursor.fetchall()]
-            logger.debug(f"Getting portfolios from database {portfolio_names}")
+            logger.debug("Getting portfolios from database %s", portfolio_names)
             portfolio_names.sort()
             return portfolio_names
 
     def get_portfolio(self, name: str) -> dict:
-        logger.debug(f"Getting portfolio {name} from database")
+        logger.debug("Getting portfolio %s from database", name)
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
             cursor.execute(
@@ -103,7 +103,7 @@ class Portfolios:
                     ?
                 )
             """,
-                (portfolio_name, token, str(amount)),
+                (portfolio_name, token, amount),
             )
 
     def set_token_add(self, name: str, token: str, amount: float):
@@ -127,7 +127,7 @@ class Portfolios:
                     SET amount = ?
                     WHERE portfolio_id = (SELECT id FROM Portfolios WHERE name = ?) AND token = ?
                 """,
-                    (str(new_amount), name, token),
+                    (new_amount, name, token),
                 )
             else:
                 cursor.execute(

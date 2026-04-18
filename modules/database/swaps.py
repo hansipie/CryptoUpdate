@@ -25,10 +25,10 @@ class Swaps:
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     timestamp INTEGER,
                     token_from TEXT,
-                    amount_from TEXT,
+                    amount_from REAL,
                     wallet_from TEXT,
                     token_to TEXT,
-                    amount_to TEXT,
+                    amount_to REAL,
                     wallet_to TEXT,
                     tag TEXT,
                     note TEXT
@@ -112,7 +112,7 @@ class Swaps:
                 cursor = conn.cursor()
                 cursor.execute("DELETE FROM Swaps WHERE id = ?", (entry_id,))
                 conn.commit()
-                logger.debug(f"Entry with id {entry_id} deleted successfully.")
+                logger.debug("Entry with id %s deleted successfully.", entry_id)
         except Exception as e:
             logger.exception("Error deleting swap: %s", e)
 
@@ -124,7 +124,7 @@ class Swaps:
                     "UPDATE Swaps SET note = ? WHERE id = ?", (note or None, entry_id)
                 )
                 conn.commit()
-                logger.debug(f"Note updated for entry with id {entry_id}")
+                logger.debug("Note updated for entry with id %s", entry_id)
         except Exception as e:
             logger.exception("Error updating note: %s", e)
 
@@ -142,6 +142,6 @@ class Swaps:
                         "UPDATE Swaps SET tag = ? WHERE id = ?", (tag, entry_id)
                     )
                 conn.commit()
-                logger.debug(f"Tag updated for entry with id {entry_id}")
+                logger.debug("Tag updated for entry with id %s", entry_id)
         except Exception as e:
             logger.exception("Error updating tag: %s", e)

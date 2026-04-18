@@ -45,7 +45,6 @@ class TokensDatabase:
             df_sum.rename(columns={"timestamp": "Date", "value": "Sum"}, inplace=True)
             df_sum.set_index("Date", inplace=True)
             df_sum.sort_index(inplace=True)
-            df_sum = df_sum.reindex(sorted(df_sum.columns), axis=1)
             logger.debug("Final Sums:\n%s", df_sum)
             return df_sum
 
@@ -92,9 +91,6 @@ class TokensDatabase:
             df_balance.rename(columns={"timestamp": "Date"}, inplace=True)
             df_balance.set_index("Date", inplace=True)
             df_balance.sort_index(inplace=True)
-
-            # Sort columns alphabetically
-            df_balance = df_balance.reindex(sorted(df_balance.columns), axis=1)
             logger.debug("Balances shape: %s", df_balance.shape)
             logger.debug("Balances:\n%s", df_balance.head())
             return df_balance
@@ -225,7 +221,8 @@ class TokensDatabase:
             if dupcount > 0:
                 logger.debug("Found %d duplicated rows. Dropping...", dupcount)
                 df.drop_duplicates(inplace=True)
-                df.to_sql("TokensDatabase", con, if_exists="replace", index=False)
+                con.execute("DELETE FROM TokensDatabase")
+                df.to_sql("TokensDatabase", con, if_exists="append", index=False)
 
     def get_tokens(self) -> list:
         with sqlite3.connect(self.db_path) as con:

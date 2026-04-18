@@ -22,7 +22,7 @@ class TokenStatus(Enum):
 class TokenMetadataManager:
     """Gestionnaire des métadonnées des tokens"""
 
-    def __init__(self, db_path: str = "data/db.sqlite3"):
+    def __init__(self, db_path: str):
         self.db_path = db_path
 
     def get_token_status(self, token: str) -> Optional[TokenStatus]:

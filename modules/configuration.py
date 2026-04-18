@@ -41,10 +41,40 @@ class Configuration:
             settings: Dictionary containing settings to save
         """
         logger.debug("Saving configuration")
+
+        project_root = os.path.abspath(os.getcwd())
+
+        def _project_relative(path: str) -> str:
+            """Return a project-relative path when possible, preserving subfolders."""
+            abs_path = os.path.abspath(path)
+            return os.path.relpath(abs_path, project_root)
+
+        def _strip_debug_prefix(path: str) -> str:
+            """Remove debug_ prefix only from final filename component."""
+            directory, filename = os.path.split(path)
+            if filename.startswith("debug_"):
+                filename = filename[len("debug_") :]
+            return os.path.join(directory, filename) if directory else filename
+
+        data_path = _project_relative(settings["data_path"])
+        archive_path = _strip_debug_prefix(_project_relative(settings["archive_path"]))
+
+        db_abs = os.path.abspath(settings["dbfile"])
+        data_abs = os.path.abspath(settings["data_path"])
+        sqlite_file = os.path.relpath(db_abs, data_abs)
+        if sqlite_file.startswith(".."):
+            sqlite_file = os.path.basename(db_abs)
+        sqlite_file = _strip_debug_prefix(sqlite_file)
+
         config = {
             "MarketRaccoon": {
                 "url": settings["marketraccoon_url"],
                 "token": settings.get("marketraccoon_token", ""),
+            },
+            "RatesDB": {
+                "url": settings.get(
+                    "ratesdb_url", "https://free.ratesdb.com/v1/rates"
+                )
             },
             "Notion": {
                 "token": settings["notion_token"],
@@ -55,13 +85,9 @@ class Configuration:
             "AI": {"token": settings["ai_apitoken"]},
             "Debug": {"flag": str(settings["debug_flag"])},
             "Local": {
-                "archive_path": os.path.basename(settings["archive_path"]).replace(
-                    "debug_", ""
-                ),
-                "data_path": os.path.basename(settings["data_path"]),
-                "sqlite_file": os.path.basename(settings["dbfile"]).replace(
-                    "debug_", ""
-                ),
+                "archive_path": archive_path,
+                "data_path": data_path,
+                "sqlite_file": sqlite_file,
             },
             "OperationsColors": {
                 "green_threshold": settings.get("operations_green_threshold", 100),

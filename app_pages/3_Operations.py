@@ -788,7 +788,7 @@ def build_buy_avg_table(use_api: bool = False):
 
 
 @st.cache_data(
-    hash_funcs={str: lambda x: get_file_hash(x) if os.path.isfile(x) else hash(x)},
+    hash_funcs={str: lambda x: get_file_hash(x) if (os.path.sep in x and os.path.isfile(x)) else hash(x)},
 )
 def build_swap_dataframes(
     db_file: str,

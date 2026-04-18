@@ -1,5 +1,4 @@
 import logging
-import traceback
 
 import pandas as pd
 import streamlit as st
@@ -303,13 +302,9 @@ with st.sidebar:
 
 def is_portfolio_empty(pf_name):
     pf = g_portfolios.get_portfolio(pf_name)
-    df = create_portfolio_dataframe(pf)
-    if df.empty:
+    if not pf:
         return True
-    # Si tous les montants sont nuls ou absents
-    if (df["amount"].fillna(0) == 0).all():
-        return True
-    return False
+    return all((v.get("amount") or 0) == 0 for v in pf.values())
 
 
 all_tabs = g_portfolios.get_portfolio_names()
@@ -328,4 +323,4 @@ else:
         portfolio_ui(tabs)
     except Exception as e:
         st.error(f"UI Error: {str(e)}")
-        traceback.print_exc()
+        logger.exception("Portfolio UI rendering failed")

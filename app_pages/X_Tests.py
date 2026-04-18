@@ -4,6 +4,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 
 import pandas as pd
+import requests
 import streamlit as st
 
 
@@ -64,8 +65,6 @@ def check_api_data_for_date(api_url: str, api_key: str, date) -> bool:
         True if API has at least one cryptocurrency data point for that day, False otherwise
     """
     try:
-        import requests
-
         # Create start and end of day in ISO format
         start_dt = datetime.combine(date, datetime.min.time())
         end_dt = datetime.combine(date, datetime.max.time())
@@ -92,7 +91,7 @@ def check_api_data_for_date(api_url: str, api_key: str, date) -> bool:
             results = data.get("results", [])
 
             # If we have at least one result for this day, return True
-            if results and len(results) > 0:
+            if results:
                 logger.debug(
                     "Found %d cryptocurrency data points for date %s",
                     len(results),
@@ -160,7 +159,7 @@ if missing_dates:
         status_text = st.empty()
 
         # Use ThreadPoolExecutor to make 10 requests in parallel
-        with ThreadPoolExecutor(max_workers=10) as executor:
+        with ThreadPoolExecutor(max_workers=3) as executor:
             # Submit all tasks
             future_to_date = {
                 executor.submit(check_api_data_for_date, api_url, api_key, date): date
@@ -175,7 +174,7 @@ if missing_dates:
                     has_data = future.result()
                     api_status_dict[date] = "✅" if has_data else "❌"
                 except Exception as e:
-                    logger.error("Error checking date %s: %s", date, str(e))
+                    logger.exception("Error checking date %s", date)
                     api_status_dict[date] = "❌"
 
                 completed += 1

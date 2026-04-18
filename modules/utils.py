@@ -10,7 +10,7 @@ from dateutil import parser
 logger = logging.getLogger(__name__)
 
 
-def __find_linear_function(x1, y1, x2, y2):
+def _find_linear_function(x1, y1, x2, y2):
     # Calculer la pente a
     a = (y2 - y1) / (x2 - x1)
     # Calculer l'ordonnée à l'origine b
@@ -26,7 +26,7 @@ def interpolate(x1, y1, x2, y2, x):
         y1, y2 = y2, y1
     if x < x1 or x > x2:
         raise ValueError(f"x={x} is out of range [{x1}, {x2}]")
-    a, b = __find_linear_function(x1, y1, x2, y2)
+    a, b = _find_linear_function(x1, y1, x2, y2)
     return a * x + b
 
 

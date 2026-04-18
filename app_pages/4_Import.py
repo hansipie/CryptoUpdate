@@ -73,14 +73,14 @@ def extract(input_data: any) -> pd.DataFrame:
                     st.session_state.settings["ai_apitoken"],
                     model=st.session_state.settings.get("ai_model"),
                 )
-                output = pd.DataFrame.from_dict(loads(message_json).get("assets"))
+                output = pd.DataFrame(loads(message_json).get("assets"))
             elif isinstance(input_data, pd.DataFrame):
                 message_json, _ = aiprocessing.extract_from_df(
                     input_data,
                     st.session_state.settings["ai_apitoken"],
                     model=st.session_state.settings.get("ai_model"),
                 )
-                output = pd.DataFrame.from_dict(loads(message_json).get("assets"))
+                output = pd.DataFrame(loads(message_json).get("assets"))
             else:
                 raise ValueError("Invalid input type")
         except (ValueError, KeyError, TypeError) as e:
@@ -155,7 +155,7 @@ def draw_ui():
     """
     col_input, col_output = st.columns(2)
     with col_input:
-        if st.session_state.import_page["type"] == "application/vnd.ms-excel":
+        if isinstance(st.session_state.import_page["input"], pd.DataFrame):
             st.dataframe(
                 st.session_state.import_page["input"],
                 column_config={
@@ -223,7 +223,7 @@ if file is None:
 else:
     logger.debug("File: %s - file type: %s", file.name, file.type)
 
-    if file.type in ("text/csv", "application/vnd.ms-excel") or file.name.endswith(".csv"):
+    if file.type == "text/csv" or file.name.endswith(".csv"):
         logger.debug("CSV file detected")
         input_file = process_csv(file)
     else:

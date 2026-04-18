@@ -3,7 +3,6 @@ import io
 import json
 import logging
 import re
-import traceback
 
 import pandas as pd
 from anthropic import Anthropic
@@ -17,7 +16,7 @@ logging.getLogger("httpcore").setLevel(logging.WARNING)
 logger = logging.getLogger(__name__)
 
 # Default model — can be overridden by settings.json key "AI.model"
-_DEFAULT_CLAUDE_MODEL = "claude-sonnet-4-20250514"
+_DEFAULT_CLAUDE_MODEL = "claude-sonnet-4-6-20251022"
 
 # Module-level singleton; rebuilt only when the API key changes.
 _anthropic_client: Anthropic | None = None
@@ -165,7 +164,7 @@ def call_ai(messages: list, api_key: str, system_prompt: str = "", model: str | 
         )
     except Exception as e:
         logger.error("API call failed: %s", str(e))
-        traceback.print_exc()
+        logger.exception("Anthropic API call failed")
         return None, None
 
     # Extract text content from response

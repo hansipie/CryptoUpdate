@@ -96,7 +96,7 @@ with st.container(border=True):
         balance = (
             0
             if df_balance is None or df_balance.empty
-            else df_balance.iloc[-1, 1:].sum()
+            else df_balance.iloc[-1].sum()
         )
         balance = round(balance, 2)
         st.metric("Total value", value=f"{balance} {currency_symbol}")

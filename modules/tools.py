@@ -13,7 +13,6 @@ import logging
 import os
 import shutil
 import sqlite3
-import traceback
 
 import numpy as np
 import pandas as pd
@@ -198,8 +197,7 @@ def convert_dataframe_prices_historical(
     else:  # EUR → USD
         converted = merged["price_value"] / merged["rate"].replace(0, pd.NA)
 
-    # Remettre les valeurs converties dans le DataFrame original (même ordre d'index)
-    df[price_column] = converted.values
+    df[price_column] = converted.set_axis(merged["Date"])
 
     return df
 
@@ -233,9 +231,16 @@ def get_cached_api_market() -> ApiMarket:
 def update_database(dbfile: str, cmc_apikey: str, debug: bool):
     """Update the database with the latest market data"""
 
-    backup_database(dbfile)
+    if os.path.exists(dbfile):
+        backup_database(dbfile)
 
-    market = Market(dbfile, cmc_apikey)
+    market = Market(
+        dbfile,
+        cmc_apikey,
+        ratesdb_url=st.session_state.settings.get(
+            "ratesdb_url", "https://free.ratesdb.com/v1/rates"
+        ),
+    )
     portfolio = Portfolios(dbfile)
 
     aggregated = portfolio.aggregate_portfolios()
@@ -256,7 +261,7 @@ def update_database(dbfile: str, cmc_apikey: str, debug: bool):
         market.update_currencies(debug=debug)
     except Exception as e:
         logger.error("Error updating market data: %s", str(e))
-        traceback.print_exc()
+        logger.exception("Error updating market data")
         raise ValueError("Error updating market data") from e
 
     tokens_prices = market.get_last_market()
@@ -278,7 +283,7 @@ def update_database(dbfile: str, cmc_apikey: str, debug: bool):
 
     custom = Customdata(dbfile)
     custom.set(
-        "last_update", str(int(pd.Timestamp.now(tz="UTC").timestamp())), "integer"
+        "last_update", str(int(pd.Timestamp.now(tz="UTC").timestamp())), "int"
     )
 
 
@@ -293,7 +298,7 @@ def parse_last_update(last_update_data: tuple) -> pd.Timestamp:
     """
     value, value_type = last_update_data
 
-    if value_type == "integer":
+    if value_type in ("int", "integer"):
         timestamp = int(value)
     elif value_type == "float":
         timestamp = int(float(value))
@@ -374,6 +379,9 @@ def load_settings(settings: dict):
     st.session_state.settings["marketraccoon_url"] = settings["MarketRaccoon"]["url"]
     st.session_state.settings["marketraccoon_token"] = settings["MarketRaccoon"].get(
         "token", ""
+    )
+    st.session_state.settings["ratesdb_url"] = settings.get("RatesDB", {}).get(
+        "url", "https://free.ratesdb.com/v1/rates"
     )
     st.session_state.settings["notion_token"] = settings["Notion"]["token"]
     st.session_state.settings["notion_database"] = settings["Notion"]["database"]
@@ -694,7 +702,7 @@ def _get_api_fiat_rate() -> float:
         USD to EUR rate (e.g. 0.85 means 1 USD = 0.85 EUR), or None on error
     """
     api = get_cached_api_market()
-    fiat_df = api.get_fiat_latest_rate()
+    fiat_df = api.get_fiat_latest_rate_cached()
     if fiat_df is not None and not fiat_df.empty:
         rate = fiat_df.iloc[-1]["price"]
         logger.info("API fiat rate USD→EUR: %s", rate)
@@ -985,7 +993,7 @@ def update():
         st.rerun()
     except (ConnectionError, ValueError) as e:
         st.error(f"Update Error: {str(e)}")
-        traceback.print_exc()
+        logger.exception("Price update failed")
 
 
 def backup_database(dbfile: str, max_backups: int = 10) -> str:

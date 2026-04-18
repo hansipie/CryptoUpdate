@@ -50,45 +50,34 @@ def _get_db_version(db_path: str) -> int:
         return 0
 
 
-def _set_db_version(db_path: str, version: int) -> None:
-    """Enregistre la version courante dans Customdata."""
-    try:
-        with sqlite3.connect(db_path) as conn:
-            conn.execute(
-                "INSERT OR REPLACE INTO Customdata (name, value, type) VALUES ('db_version', ?, 'int')",
-                (str(version),),
-            )
-    except sqlite3.Error as e:
-        logger.error("Erreur lors de l'écriture de db_version : %s", e)
-        raise
-
-
 def _migrate_v1(conn: sqlite3.Connection) -> None:
     """Schéma original — crée toutes les tables de base."""
-    conn.executescript(
-        """
-        CREATE TABLE IF NOT EXISTS TokensDatabase (
+    conn.execute(
+        """CREATE TABLE IF NOT EXISTS TokensDatabase (
             timestamp INTEGER,
             token     TEXT,
             price     REAL,
             count     REAL
-        );
-
-        CREATE TABLE IF NOT EXISTS Portfolios (
+        )"""
+    )
+    conn.execute(
+        """CREATE TABLE IF NOT EXISTS Portfolios (
             id     INTEGER PRIMARY KEY AUTOINCREMENT,
             name   TEXT    NOT NULL UNIQUE,
             bundle INTEGER DEFAULT 0
-        );
-
-        CREATE TABLE IF NOT EXISTS Portfolios_Tokens (
+        )"""
+    )
+    conn.execute(
+        """CREATE TABLE IF NOT EXISTS Portfolios_Tokens (
             portfolio_id INTEGER NOT NULL,
             token        TEXT    NOT NULL,
             amount       REAL,
             PRIMARY KEY (portfolio_id, token),
             FOREIGN KEY (portfolio_id) REFERENCES Portfolios(id)
-        );
-
-        CREATE TABLE IF NOT EXISTS Operations (
+        )"""
+    )
+    conn.execute(
+        """CREATE TABLE IF NOT EXISTS Operations (
             id               INTEGER PRIMARY KEY AUTOINCREMENT,
             type             TEXT,
             source           REAL,
@@ -97,23 +86,27 @@ def _migrate_v1(conn: sqlite3.Connection) -> None:
             destination_unit TEXT,
             timestamp        INTEGER,
             portfolio        TEXT
-        );
-
-        CREATE TABLE IF NOT EXISTS Market (
+        )"""
+    )
+    conn.execute(
+        """CREATE TABLE IF NOT EXISTS Market (
             timestamp INTEGER,
             token     TEXT,
             price     REAL
-        );
-
-        CREATE TABLE IF NOT EXISTS Currency (
+        )"""
+    )
+    conn.execute(
+        """CREATE TABLE IF NOT EXISTS Currency (
             timestamp INTEGER,
             currency  TEXT,
             price     REAL
-        );
-
-        CREATE INDEX IF NOT EXISTS idx_currency ON Currency (timestamp, currency);
-
-        CREATE TABLE IF NOT EXISTS Swaps (
+        )"""
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_currency ON Currency (timestamp, currency)"
+    )
+    conn.execute(
+        """CREATE TABLE IF NOT EXISTS Swaps (
             id          INTEGER PRIMARY KEY AUTOINCREMENT,
             timestamp   INTEGER,
             token_from  TEXT,
@@ -123,9 +116,10 @@ def _migrate_v1(conn: sqlite3.Connection) -> None:
             amount_to   REAL,
             wallet_to   TEXT,
             tag         TEXT
-        );
-
-        CREATE TABLE IF NOT EXISTS TokenMetadata (
+        )"""
+    )
+    conn.execute(
+        """CREATE TABLE IF NOT EXISTS TokenMetadata (
             token                TEXT PRIMARY KEY,
             status               TEXT,
             delisting_date       INTEGER,
@@ -133,8 +127,7 @@ def _migrate_v1(conn: sqlite3.Connection) -> None:
             notes                TEXT,
             created_at           INTEGER DEFAULT (strftime('%s', 'now')),
             updated_at           INTEGER DEFAULT (strftime('%s', 'now'))
-        );
-        """
+        )"""
     )
 
 
@@ -220,6 +213,37 @@ def _migrate_v6(conn: sqlite3.Connection) -> None:
     )
 
 
+def _migrate_v7(conn: sqlite3.Connection) -> None:
+    """Conversion des colonnes amount_from/amount_to de TEXT en REAL dans Swaps."""
+    conn.execute(
+        """CREATE TABLE IF NOT EXISTS Swaps_new (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            timestamp   INTEGER,
+            token_from  TEXT,
+            amount_from REAL,
+            wallet_from TEXT,
+            token_to    TEXT,
+            amount_to   REAL,
+            wallet_to   TEXT,
+            tag         TEXT,
+            note        TEXT
+        )"""
+    )
+    conn.execute(
+        """INSERT INTO Swaps_new
+               (id, timestamp, token_from, amount_from, wallet_from,
+                token_to, amount_to, wallet_to, tag, note)
+           SELECT id, timestamp, token_from,
+                  CAST(amount_from AS REAL),
+                  wallet_from, token_to,
+                  CAST(amount_to AS REAL),
+                  wallet_to, tag, note
+           FROM Swaps"""
+    )
+    conn.execute("DROP TABLE Swaps")
+    conn.execute("ALTER TABLE Swaps_new RENAME TO Swaps")
+
+
 MIGRATIONS: dict = {
     1: _migrate_v1,
     2: _migrate_v2,
@@ -227,6 +251,7 @@ MIGRATIONS: dict = {
     4: _migrate_v4,
     5: _migrate_v5,
     6: _migrate_v6,
+    7: _migrate_v7,
 }
 
 

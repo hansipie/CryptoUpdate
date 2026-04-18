@@ -25,6 +25,8 @@ def _check_marketraccoon(url: str, api_key: str) -> str:
         return "timeout"
     except requests.exceptions.MissingSchema:
         return "invalid_url"
+    except requests.exceptions.RequestException:
+        return "request_error"
 
 
 with st.sidebar:
@@ -43,6 +45,12 @@ with st.sidebar:
     elif _status == "timeout":
         st.error("MarketRaccoon :material/timer_off:")
         logger.error("API request timed out.")
+    elif _status == "invalid_url":
+        st.error("MarketRaccoon :material/error:")
+        logger.error("Invalid MarketRaccoon URL format.")
+    elif _status == "request_error":
+        st.error("MarketRaccoon :material/warning:")
+        logger.error("Unhandled request error during API healthcheck.")
 
 with st.form(key="settings_form"):
     st.subheader("MarketRaccoon")
@@ -56,6 +64,15 @@ with st.form(key="settings_form"):
         key="marketraccoon_token",
         type="password",
         value=st.session_state.settings.get("marketraccoon_token", ""),
+    )
+
+    ratesdb_url = st.text_input(
+        "RatesDB URL",
+        key="ratesdb_url",
+        value=st.session_state.settings.get(
+            "ratesdb_url", "https://free.ratesdb.com/v1/rates"
+        ),
+        help="Fallback API URL for historical EUR/USD rates",
     )
 
     st.subheader("Coinmarketcap")
@@ -140,6 +157,7 @@ with st.form(key="settings_form"):
         logger.debug("Submitted")
         st.session_state.settings["marketraccoon_url"] = marketraccoon_url
         st.session_state.settings["marketraccoon_token"] = marketraccoon_token
+        st.session_state.settings["ratesdb_url"] = ratesdb_url
         st.session_state.settings["coinmarketcap_token"] = coinmarketcap_token
         st.session_state.settings["ai_apitoken"] = ai_apitoken
         st.session_state.settings["debug_flag"] = debug_flag

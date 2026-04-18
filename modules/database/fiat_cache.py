@@ -50,7 +50,7 @@ class FiatCacheManager:
         cache_dir = os.path.dirname(cache_file)
         if cache_dir and not os.path.exists(cache_dir):
             os.makedirs(cache_dir, exist_ok=True)
-            logger.info(f"Created cache directory: {cache_dir}")
+            logger.info("Created cache directory: %s", cache_dir)
 
     def get(self, key: str) -> Optional[dict]:
         """Get cached value if it exists and is not expired.
@@ -64,17 +64,17 @@ class FiatCacheManager:
         cache_data = self._load_cache()
 
         if key not in cache_data:
-            logger.debug(f"Cache MISS for key: {key} (not found)")
+            logger.debug("Cache MISS for key: %s (not found)", key)
             return None
 
         entry = cache_data[key]
         current_time = int(time.time())
 
         if current_time >= entry["expiry"]:
-            logger.debug(f"Cache MISS for key: {key} (expired)")
+            logger.debug("Cache MISS for key: %s (expired)", key)
             return None
 
-        logger.debug(f"Cache HIT for key: {key}")
+        logger.debug("Cache HIT for key: %s", key)
         return entry["data"]
 
     def set(self, key: str, value: dict, ttl_override: Optional[int] = None):
@@ -96,7 +96,7 @@ class FiatCacheManager:
             "data": value,
         }
 
-        logger.debug(f"Cache SET for key: {key} (TTL: {ttl}s)")
+        logger.debug("Cache SET for key: %s (TTL: %ss)", key, ttl)
 
         # Cleanup expired entries before saving
         cache_data = self._cleanup_expired_entries(cache_data)
@@ -149,33 +149,34 @@ class FiatCacheManager:
         # Strategy 1: Try fresh cache
         cached = self.get(key)
         if cached is not None:
-            logger.debug(f"Using fresh cache for key: {key}")
+            logger.debug("Using fresh cache for key: %s", key)
             return cached
 
         # Strategy 2: Try to fetch fresh data
         try:
-            logger.debug(f"Cache miss for key: {key}, fetching from source")
+            logger.debug("Cache miss for key: %s, fetching from source", key)
             fresh_data = fetch_func()
 
             if fresh_data is not None:
                 self.set(key, fresh_data)
-                logger.info(f"Fetched and cached fresh data for key: {key}")
+                logger.info("Fetched and cached fresh data for key: %s", key)
                 return fresh_data
             else:
-                logger.warning(f"Fetch returned None for key: {key}")
+                logger.warning("Fetch returned None for key: %s", key)
         except Exception as e:
-            logger.error(f"Failed to fetch data for key {key}: {e}")
+            logger.error("Failed to fetch data for key %s: %s", key, e)
 
         # Strategy 3: Fallback to expired cache if allowed
         if allow_expired_fallback:
             expired_data = self._get_expired(key)
             if expired_data is not None:
                 logger.warning(
-                    f"Using EXPIRED cache for key: {key} due to fetch failure"
+                    "Using EXPIRED cache for key: %s due to fetch failure",
+                    key,
                 )
                 return expired_data
 
-        logger.error(f"All strategies failed for key: {key}")
+        logger.error("All strategies failed for key: %s", key)
         return None
 
     def cleanup_expired(self):
@@ -191,7 +192,7 @@ class FiatCacheManager:
 
         if cleaned_count > 0:
             self._save_cache(cache_data)
-            logger.info(f"Cleaned {cleaned_count} expired entries from cache")
+            logger.info("Cleaned %d expired entries from cache", cleaned_count)
         else:
             logger.debug("No expired entries to clean")
 
@@ -218,25 +219,25 @@ class FiatCacheManager:
             Cache data dict, or empty dict if file doesn't exist or is corrupted
         """
         if not os.path.exists(self.cache_file):
-            logger.debug(f"Cache file does not exist: {self.cache_file}")
+            logger.debug("Cache file does not exist: %s", self.cache_file)
             return {}
 
         try:
             with open(self.cache_file, "r", encoding="utf-8") as f:
                 cache_data = json.load(f)
-            logger.debug(f"Loaded cache with {len(cache_data)} entries")
+            logger.debug("Loaded cache with %d entries", len(cache_data))
             return cache_data
         except (json.JSONDecodeError, IOError) as e:
-            logger.error(f"Cache file corrupted: {e}, resetting cache")
+            logger.error("Cache file corrupted: %s, resetting cache", e)
 
             # Backup corrupted file for debugging
             timestamp = int(time.time())
             backup_file = f"{self.cache_file}.corrupted.{timestamp}"
             try:
                 shutil.copy(self.cache_file, backup_file)
-                logger.info(f"Corrupted cache backed up to: {backup_file}")
+                logger.info("Corrupted cache backed up to: %s", backup_file)
             except Exception as backup_error:
-                logger.error(f"Failed to backup corrupted cache: {backup_error}")
+                logger.error("Failed to backup corrupted cache: %s", backup_error)
 
             return {}
 
@@ -250,6 +251,7 @@ class FiatCacheManager:
             cache_data: Cache data dict to save
         """
         cache_dir = os.path.dirname(self.cache_file)
+        temp_path: str | None = None
 
         # Create temp file in same directory for atomic rename
         try:
@@ -263,12 +265,12 @@ class FiatCacheManager:
 
             # Atomic rename (OS-level atomic operation)
             shutil.move(temp_path, self.cache_file)
-            logger.debug(f"Saved cache with {len(cache_data)} entries")
+            logger.debug("Saved cache with %d entries", len(cache_data))
 
         except Exception as e:
-            logger.error(f"Failed to save cache: {e}")
+            logger.error("Failed to save cache: %s", e)
             # Cleanup temp file if it exists
-            if "temp_path" in locals() and os.path.exists(temp_path):
+            if temp_path is not None and os.path.exists(temp_path):
                 try:
                     os.unlink(temp_path)
                 except Exception:
@@ -294,7 +296,7 @@ class FiatCacheManager:
 
         removed_count = len(cache_data) - len(cleaned)
         if removed_count > 0:
-            logger.debug(f"Cleaned {removed_count} expired entries")
+            logger.debug("Cleaned %d expired entries", removed_count)
 
         return cleaned
 
@@ -317,6 +319,6 @@ class FiatCacheManager:
         evict_count = len(cache_data) - self.max_entries
         kept_items = sorted_items[evict_count:]
 
-        logger.warning(f"Evicted {evict_count} oldest entries (LRU)")
+        logger.warning("Evicted %d oldest entries (LRU)", evict_count)
 
         return dict(kept_items)
