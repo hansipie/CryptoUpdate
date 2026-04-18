@@ -173,7 +173,7 @@ if missing_dates:
                 try:
                     has_data = future.result()
                     api_status_dict[date] = "✅" if has_data else "❌"
-                except Exception as e:
+                except Exception:
                     logger.exception("Error checking date %s", date)
                     api_status_dict[date] = "❌"
 
