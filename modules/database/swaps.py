@@ -54,19 +54,15 @@ class Swaps:
 
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
+            _sql = (
+                "SELECT id, timestamp, token_from, amount_from, wallet_from,"
+                " token_to, amount_to, wallet_to, tag, note FROM Swaps"
+            )
             if not tag:
-                cursor.execute(
-                    """
-                    SELECT id, timestamp, token_from, amount_from, wallet_from, token_to, amount_to, wallet_to, tag, note
-                    FROM Swaps WHERE tag IS NULL ORDER BY timestamp DESC
-                    """
-                )
+                cursor.execute(f"{_sql} WHERE tag IS NULL ORDER BY timestamp DESC")
             else:
                 cursor.execute(
-                    """
-                    SELECT id, timestamp, token_from, amount_from, wallet_from, token_to, amount_to, wallet_to, tag, note
-                    FROM Swaps WHERE tag = ? ORDER BY timestamp DESC
-                    """,
+                    f"{_sql} WHERE tag = ? ORDER BY timestamp DESC",
                     (tag,),
                 )
             return cursor.fetchall()
@@ -86,10 +82,10 @@ class Swaps:
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
             cursor.execute(
-                """
-                INSERT INTO Swaps (timestamp, token_from, amount_from, wallet_from, token_to, amount_to, wallet_to, tag, note)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """,
+                "INSERT INTO Swaps"
+                " (timestamp, token_from, amount_from, wallet_from,"
+                " token_to, amount_to, wallet_to, tag, note)"
+                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (
                     timestamp,
                     token_from,

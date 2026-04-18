@@ -31,7 +31,7 @@ def _check_marketraccoon(url: str, api_key: str) -> str:
 
 with st.sidebar:
     st.subheader("Status")
-    _status = _check_marketraccoon(
+    _status = _check_marketraccoon(  # pylint: disable=invalid-name
         st.session_state.settings.get("marketraccoon_url", ""),
         st.session_state.settings.get("marketraccoon_token", ""),
     )

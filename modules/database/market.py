@@ -424,10 +424,8 @@ class Market:
         if price is None:
             logger.warning("CMC fiat prices unavailable, skipping currency update")
         else:
-            for currency in price:
-                self.add_currency(
-                    price[currency]["timestamp"], currency, price[currency]["price"]
-                )
+            for currency, data in price.items():
+                self.add_currency(data["timestamp"], currency, data["price"])
 
         # drop duplicate
         self.drop_duplicate("Currency")
@@ -461,12 +459,14 @@ class Market:
         """
         with sqlite3.connect(self.db_path) as con:
             df_low = pd.read_sql_query(
-                "SELECT timestamp, price FROM Market WHERE token = ? AND timestamp <= ? ORDER BY timestamp DESC LIMIT 1",
+                "SELECT timestamp, price FROM Market"
+                " WHERE token = ? AND timestamp <= ? ORDER BY timestamp DESC LIMIT 1",
                 con,
                 params=(token, timestamp),
             )
             df_high = pd.read_sql_query(
-                "SELECT timestamp, price FROM Market WHERE token = ? AND timestamp >= ? ORDER BY timestamp ASC LIMIT 1",
+                "SELECT timestamp, price FROM Market"
+                " WHERE token = ? AND timestamp >= ? ORDER BY timestamp ASC LIMIT 1",
                 con,
                 params=(token, timestamp),
             )
@@ -484,12 +484,14 @@ class Market:
         """
         with sqlite3.connect(self.db_path) as con:
             df_low = pd.read_sql_query(
-                "SELECT timestamp, price FROM Currency WHERE currency = ? AND timestamp <= ? ORDER BY timestamp DESC LIMIT 1",
+                "SELECT timestamp, price FROM Currency"
+                " WHERE currency = ? AND timestamp <= ? ORDER BY timestamp DESC LIMIT 1",
                 con,
                 params=(currency, timestamp),
             )
             df_high = pd.read_sql_query(
-                "SELECT timestamp, price FROM Currency WHERE currency = ? AND timestamp >= ? ORDER BY timestamp ASC LIMIT 1",
+                "SELECT timestamp, price FROM Currency"
+                " WHERE currency = ? AND timestamp >= ? ORDER BY timestamp ASC LIMIT 1",
                 con,
                 params=(currency, timestamp),
             )

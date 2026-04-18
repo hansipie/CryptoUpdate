@@ -19,13 +19,13 @@ logger = logging.getLogger(__name__)
 _DEFAULT_CLAUDE_MODEL = "claude-sonnet-4-6-20251022"
 
 # Module-level singleton; rebuilt only when the API key changes.
-_anthropic_client: Anthropic | None = None
-_anthropic_client_key: str | None = None
+_anthropic_client: Anthropic | None = None  # pylint: disable=invalid-name
+_anthropic_client_key: str | None = None  # pylint: disable=invalid-name
 
 
 def _get_client(api_key: str) -> Anthropic:
     """Return a cached Anthropic client, rebuilding only when the key changes."""
-    global _anthropic_client, _anthropic_client_key
+    global _anthropic_client, _anthropic_client_key  # pylint: disable=global-statement
     if _anthropic_client is None or _anthropic_client_key != api_key:
         _anthropic_client = Anthropic(api_key=api_key)
         _anthropic_client_key = api_key

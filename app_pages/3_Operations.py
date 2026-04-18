@@ -973,30 +973,30 @@ def _draw_swap_table(
         styled_df = df.style.apply(color_rows, axis=1)
 
         # Build dynamic column order and config
-        COL_FROM_amount = (
+        col_from_amount = (
             f"From Amount ({convert_from})" if convert_from else "From Amount"
         )
-        COL_TO_amount = f"To Amount ({convert_to})" if convert_to else "To Amount"
-        RATE_COL = "Swap Rate"
+        col_to_amount = f"To Amount ({convert_to})" if convert_to else "To Amount"
+        rate_col = "Swap Rate"
 
         column_order = [
             "Date",
-            COL_FROM_amount,
+            col_from_amount,
             *(() if convert_from else ("From Token",)),
-            COL_TO_amount,
+            col_to_amount,
             *(() if convert_to else ("To Token",)),
             "From Wallet",
             "To Wallet",
-            RATE_COL,
+            rate_col,
             "Current Rate",
             "Perf.",
             "note",
         ]
 
         column_config = {
-            COL_FROM_amount: st.column_config.NumberColumn(format="%.8g"),
-            COL_TO_amount: st.column_config.NumberColumn(format="%.8g"),
-            RATE_COL: st.column_config.NumberColumn(format="%.8g"),
+            col_from_amount: st.column_config.NumberColumn(format="%.8g"),
+            col_to_amount: st.column_config.NumberColumn(format="%.8g"),
+            rate_col: st.column_config.NumberColumn(format="%.8g"),
             "Current Rate": st.column_config.NumberColumn(format="%.8g"),
             "Perf.": st.column_config.NumberColumn(format="%.2f%%"),
         }
