@@ -69,6 +69,7 @@ Configure `settings.json` at the root of the project:
 ```json
 {
     "MarketRaccoon":    { "url": "http://api.marketraccoon.eu", "token": "" },
+    "RatesDB":          { "url": "https://free.ratesdb.com/v1/rates" },
     "Coinmarketcap":    { "token": "your-coinmarketcap-token" },
     "AI":               { "token": "your-anthropic-api-key" },
     "Notion":           { "token": "", "database": "", "parentpage": "" },
@@ -124,7 +125,7 @@ CryptoUpdate/
 │   └── X_Tests.py           # Development testing page
 ├── modules/                  # Core business logic
 │   ├── database/            # Database layer
-│   │   ├── migrations.py   # Versioned schema migrations (v1–v5)
+│   │   ├── migrations.py   # Versioned schema migrations (v1–v7)
 │   │   ├── tokensdb.py     # Historical token data
 │   │   ├── portfolios.py   # Portfolio CRUD operations
 │   │   ├── operations.py   # Transaction history
@@ -162,6 +163,7 @@ CryptoUpdate/
 - **Plotly**: Interactive charting and visualizations
 - **MarketRaccoon API**: Historical cryptocurrency prices and fiat exchange rates
 - **CoinMarketCap API**: Current cryptocurrency market data
+- **RatesDB API**: Fallback source for historical EUR/USD rates
 - **Anthropic Claude**: AI-powered data extraction from images (optional)
 
 ### Development Tools
@@ -201,7 +203,7 @@ uv sync                     # Sync environment to lockfile
 
 ### Database Management
 
-The application uses SQLite with versioned schema migrations (v1–v5, applied automatically at startup).
+The application uses SQLite with versioned schema migrations (v1–v7, applied automatically at startup).
 
 Tables:
 - **TokensDatabase**: Historical token prices and holdings
@@ -210,7 +212,7 @@ Tables:
 - **Operations**: Transaction history (source=0 = airdrop, do not delete)
 - **Market**: Historical cryptocurrency market data
 - **Currency**: Fiat currency exchange rates
-- **Swaps**: Token swap transactions (includes `note` column)
+- **Swaps**: Token swap transactions (`amount_from`/`amount_to` as REAL, includes `note` column)
 - **TokenMetadata**: Token status, MarketRaccoon ID mapping (`id`, `token`, `mraccoon_id`, `name`, `status`, ...)
 - **Customdata**: Key-value configuration store
 

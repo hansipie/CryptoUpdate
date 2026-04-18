@@ -58,7 +58,7 @@ Ces tokens sont **actifs** mais ont quelques enregistrements de prix à 0 dus à
 ```python
 from modules.token_metadata import TokenMetadataManager, TokenStatus
 
-manager = TokenMetadataManager()
+manager = TokenMetadataManager(db_path="data/db.sqlite3")
 
 # Vérifier si un token est actif
 if manager.is_token_active('BTC'):
@@ -129,4 +129,18 @@ Une sauvegarde de la base de données a été créée avant toute modification:
 
 ---
 
-*Dernière mise à jour: 2025-10-29*
+---
+
+## Migrations de schéma
+
+| Version | Description |
+|---------|-------------|
+| v1 | Création de toutes les tables de base |
+| v2 | `TokenMetadata`: ajout colonnes `mr_id`, `name` |
+| v3 | `TokenMetadata`: renommage `mr_id` → `mraccoon_id` |
+| v4 | `TokenMetadata`: ajout `id AUTOINCREMENT`, `token` n'est plus PK |
+| v5 | `Swaps`: ajout colonne `note TEXT` |
+| v6 | `TokenMetadata`: ajout colonne `mraccoon_id` unique index |
+| v7 | `Swaps`: conversion `amount_from`/`amount_to` de TEXT en REAL |
+
+*Dernière mise à jour: 2026-04-18*

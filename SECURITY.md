@@ -1,6 +1,6 @@
 # Security Report
 
-## Last Updated: 2025-10-22
+## Last Updated: 2026-04-18
 
 ## Executive Summary
 
@@ -300,69 +300,49 @@ For security concerns or to report vulnerabilities:
 
 ## Dependency Security Status
 
-### Current Vulnerability Status
+### Current Vulnerability Status (2026-04-18)
 
-**pip-audit scan results:** 1 known vulnerability (mitigated)
+**pip-audit scan results:** 11 vulnerabilities in 8 packages — none in CryptoUpdate's direct application code.
 
-All direct project dependencies have been upgraded to their latest secure versions. The only remaining vulnerability is in pip itself, which is mitigated by Python 3.12.3's PEP 706 implementation.
+| Package | Version | CVE / GHSA | Fix Version | Impact on CryptoUpdate |
+|---------|---------|-----------|-------------|------------------------|
+| requests | 2.32.5 | CVE-2026-25645 | 2.33.0 | ⚠️ Direct dep — upgrade recommended |
+| pillow | 12.1.1 | CVE-2026-40192 | 12.2.0 | ⚠️ Direct dep — upgrade recommended |
+| flask | 3.1.2 | CVE-2026-27205 | 3.1.3 | ℹ️ Transitive (Streamlit) |
+| mcp | 1.9.4 | CVE-2025-53365, CVE-2025-66416 | 1.10.0 / 1.23.0 | ℹ️ Dev/tool dep only |
+| pygments | 2.19.2 | CVE-2026-4539 | 2.20.0 | ℹ️ Transitive |
+| python-multipart | 0.0.22 | CVE-2026-40347 | 0.0.26 | ℹ️ Transitive (Streamlit) |
+| tornado | 6.5.4 | GHSA-78cv + 2 CVEs | 6.5.5 | ℹ️ Transitive (Streamlit) |
+| werkzeug | 3.1.5 | CVE-2026-27199 | 3.1.6 | ℹ️ Transitive (Streamlit) |
 
-### Known Vulnerability: pip 25.2 (MITIGATED)
+### Current Dependency Versions
 
-**Vulnerability:** GHSA-4xh5-x5gv-qwph / CVE-2025-8869
-
-**Description:** pip's fallback tar extraction doesn't check symbolic links point to extraction directory. In the fallback extraction path for source distributions, pip used Python's tarfile module without verifying that symbolic/hard link targets resolve inside the intended extraction directory.
-
-**Affected Versions:** pip <= 25.2
-
-**Fix Version:** pip 25.3 (not yet released as of 2025-10-22)
-
-**Mitigation Status:** ✅ MITIGATED
-
-The project uses Python 3.12.3, which implements PEP 706 safe-extraction behavior. This provides defense-in-depth protection against this vulnerability and other tarfile extraction issues. While upgrading to pip 25.3 is recommended when available, the current configuration is considered secure.
-
-**References:**
-- https://github.com/advisories/GHSA-4xh5-x5gv-qwph
-- https://www.python.org/dev/peps/pep-0706/
-
-### Dependency Versions (Latest Secure Versions)
-
-The following major dependencies have been verified as secure:
-
-| Package | Version | Security Status | Notes |
-|---------|---------|-----------------|-------|
-| streamlit | 1.50.0 | ✅ Secure | Fixes CVE-2025-1684, CVE-2024-42474 |
-| requests | 2.32.5 | ✅ Secure | Fixes .netrc credentials leak |
-| urllib3 | 2.5.0 | ✅ Secure | Fixes CVE-2025-50182, CVE-2024-37891 |
-| openai | 2.6.0 | ✅ Secure | Updated from 1.109.1, minor breaking changes |
-| dash | 3.2.0 | ✅ Secure | Fixes CVE-2024-21485 (XSS) |
-| pandas | 2.3.3 | ✅ Secure | Latest stable version |
-| pillow | 11.3.0 | ✅ Secure | Latest stable version |
-| jinja2 | 3.1.6 | ✅ Secure | Latest stable version |
-| certifi | 2025.10.5 | ✅ Secure | Latest CA bundle |
-
-### Recent Dependency Updates (2025-10-22)
-
-The following packages were upgraded to their latest versions:
-
-**Major Version Updates:**
-- openai: 1.109.1 → 2.6.0
-- pylint: 3.3.8 → 4.0.2
-- isort: 6.0.1 → 7.0.0
-- astroid: 3.3.11 → 4.0.1
-
-**Minor/Patch Updates:**
-- certifi: 2025.8.3 → 2025.10.5
-- numpy: 2.3.3 → 2.3.4
-- pandas: 2.3.2 → 2.3.3
-- matplotlib: 3.10.6 → 3.10.7
-- ruff: 0.13.2 → 0.14.1
-- And 15+ other patch updates
-
-**Compatibility:** All upgrades have been tested for basic import compatibility. The OpenAI 2.x upgrade includes minor breaking changes to ResponseFunctionToolCallOutput, which does not affect this project's usage.
+| Package | Version | Notes |
+|---------|---------|-------|
+| streamlit | 1.54.0 | Latest |
+| anthropic | 0.79.0 | Latest |
+| requests | 2.32.5 | CVE-2026-25645 pending upgrade |
+| urllib3 | 2.6.3 | Latest |
+| pandas | 2.3.3 | Latest |
+| pillow | 12.1.1 | CVE-2026-40192 pending upgrade |
+| jinja2 | 3.1.6 | Latest |
+| certifi | 2026.1.4 | Latest |
+| ruff | 0.15.0 | Latest |
+| pylint | 4.0.4 | Latest |
 
 ---
 
 ## Version History
+
+### Version 1.2 - 2026-04-18
+- Code review security hardening across all modules:
+  - Added broad `requests.exceptions.RequestException` catch in `_check_marketraccoon` — prevents unhandled SSL/proxy/redirect errors crashing the sidebar
+  - Added network error handling in `cmc.py` for both fiat and crypto price requests
+  - Fixed `temp_path` pre-initialization in `fiat_cache.py` — deterministic cleanup in exception handlers (`if "temp_path" in locals()` was fragile)
+  - Replaced all `traceback.print_exc()` with `logger.exception()` — stack traces now flow through the structured logging pipeline instead of stdout
+  - Retry with exponential backoff for fiat currency API (ratesdb.com) — handles transient 429/5xx gracefully
+  - Fixed `drop_duplicate()` to use `DELETE` + `append` instead of `to_sql(if_exists="replace")` — avoids unintended table DROP under concurrent access
+- Updated pip-audit scan results (11 vulns in 8 packages, 2 in direct deps)
 
 ### Version 1.1 - 2025-10-22
 - Upgraded all dependencies to latest secure versions
