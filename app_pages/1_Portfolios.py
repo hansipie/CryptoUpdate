@@ -31,6 +31,9 @@ def add_new_portfolio():
     if st.button("Submit"):
         logger.debug("Adding portfolio %s", name)
         g_portfolios.add_portfolio(name, (1 if isbundle else 0))
+        # Keep the new (empty) portfolio visible this session even if
+        # "show empty portfolios" is off, otherwise it has no tab to add tokens to.
+        st.session_state.setdefault("pinned_empty_portfolios", set()).add(name)
         # Close dialog
         st.rerun()
 
@@ -310,10 +313,15 @@ def is_portfolio_empty(pf_name):
 all_tabs = g_portfolios.get_portfolio_names()
 # Lecture robuste de l'état du toggle avec fallback
 show_empty = st.session_state.get("show_empty_portfolios", True)
+pinned_empty_portfolios = st.session_state.get("pinned_empty_portfolios", set())
 if show_empty:
     tabs = all_tabs
 else:
-    tabs = [name for name in all_tabs if not is_portfolio_empty(name)]
+    tabs = [
+        name
+        for name in all_tabs
+        if not is_portfolio_empty(name) or name in pinned_empty_portfolios
+    ]
 logger.debug("Portfolios: %s", tabs)
 if not tabs:
     st.info("Aucun portefeuille à afficher avec ce filtre.")
