@@ -26,3 +26,4 @@ requirements.txt
 .claude/
 stats.json
 stats.json.lock
+/.agents
