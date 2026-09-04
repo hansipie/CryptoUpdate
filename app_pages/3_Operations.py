@@ -122,15 +122,24 @@ def submit_swap(
     )
 
 
-def rows_selected(selectable) -> list:
-    """Get the selected row index in the swap table"""
+def rows_selected(selectable, max_len: int) -> list:
+    """Get the selected row index in the swap table.
+
+    Selection state can outlive the dataframe it was captured from (e.g. after
+    an archive/delete or a refresh shrinks the table), so indices no longer
+    valid for the current dataframe (>= max_len) are dropped here to avoid an
+    out-of-bounds .iloc[] downstream.
+    """
     logger.debug("Row selection: %s", selectable)
     if (
         "selection" in selectable
         and "rows" in selectable["selection"]
         and len(selectable["selection"]["rows"]) > 0
     ):
-        selected_row = selectable["selection"]["rows"]
+        selected_row = [i for i in selectable["selection"]["rows"] if i < max_len]
+        if not selected_row:
+            logger.debug("Selection is stale for current data, ignoring")
+            return None
         return selected_row
     else:
         logger.debug("No swap row selected")
@@ -489,7 +498,7 @@ def buy_edit():
     Shows edit dialog if a row is selected.
     Otherwise displays a warning toast.
     """
-    _sel = rows_selected(st.session_state.buyselection)
+    _sel = rows_selected(st.session_state.buyselection, len(df_buy))
     rowidx = _sel[0] if _sel is not None else None
     if rowidx is None:
         st.toast("Please select a row", icon=":material/warning:")
@@ -504,7 +513,7 @@ def buy_delete():
     Otherwise displays a warning toast.
     """
     logger.debug("Delete row")
-    _sel = rows_selected(st.session_state.buyselection)
+    _sel = rows_selected(st.session_state.buyselection, len(df_buy))
     rowidx = _sel[0] if _sel is not None else None
     if rowidx is None:
         st.toast("Please select a row", icon=":material/warning:")
@@ -518,7 +527,7 @@ def swap_edit(df_swaps_active: pd.DataFrame):
     Shows edit dialog if a row is selected.
     Otherwise displays a warning toast.
     """
-    rowidx = rows_selected(st.session_state.swapselection)
+    rowidx = rows_selected(st.session_state.swapselection, len(df_swaps_active))
     if rowidx is None:
         st.toast("Please select a row", icon=":material/warning:")
     elif len(rowidx) > 1:
@@ -534,7 +543,7 @@ def swap_delete(df_swaps_active: pd.DataFrame):
     Otherwise displays a warning toast.
     """
     logger.debug("Delete row")
-    rowidx = rows_selected(st.session_state.swapselection)
+    rowidx = rows_selected(st.session_state.swapselection, len(df_swaps_active))
     if rowidx is None:
         st.toast("Please select a row", icon=":material/warning:")
     else:
@@ -548,7 +557,7 @@ def swap_archive(df_swaps_active: pd.DataFrame):
     Otherwise displays a warning toast.
     """
     logger.debug("Archive row")
-    rowidx = rows_selected(st.session_state.swapselection)
+    rowidx = rows_selected(st.session_state.swapselection, len(df_swaps_active))
     if rowidx is None:
         st.toast("Please select a row", icon=":material/warning:")
     else:
@@ -562,7 +571,7 @@ def swap_unarchive(df_swaps_archived: pd.DataFrame):
     Otherwise displays a warning toast.
     """
     logger.debug("Unarchive row")
-    rowidx = rows_selected(st.session_state.swapachselection)
+    rowidx = rows_selected(st.session_state.swapachselection, len(df_swaps_archived))
     if rowidx is None:
         st.toast("Please select a row", icon=":material/warning:")
     else:
@@ -576,7 +585,7 @@ def swap_arch_delete(df_swaps_archived: pd.DataFrame):
     Otherwise displays a warning toast.
     """
     logger.debug("Delete archived row")
-    rowidx = rows_selected(st.session_state.swapachselection)
+    rowidx = rows_selected(st.session_state.swapachselection, len(df_swaps_archived))
     if rowidx is None:
         st.toast("Please select a row", icon=":material/warning:")
     else:
