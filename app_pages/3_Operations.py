@@ -747,7 +747,9 @@ def airdrop_edit_dialog(data: dict) -> None:
     idx_wallet = (
         g_wallets.index(data["Portfolio"]) if data["Portfolio"] in g_wallets else None
     )
-    wallet = st.selectbox("Portfolio", g_wallets, index=idx_wallet, key="airdrop_wallet")
+    wallet = st.selectbox(
+        "Portfolio", g_wallets, index=idx_wallet, key="airdrop_wallet"
+    )
     was_adjusted = bool(data["Synchronized"])
     adjust_portfolios = st.checkbox(
         "Synchronize portfolios", value=was_adjusted, key="airdrop_adjust_portfolios"
@@ -804,7 +806,9 @@ def calc_perf(df: pd.DataFrame, col_token: str, col_rate: str) -> pd.DataFrame:
     else:
         logger.debug("Market data:\n%s", market_df)
         df["Current Rate"] = df[col_token].map(market_df["value"].to_dict())
-        df["Perf."] = ((df["Current Rate"] * 100) / df[col_rate].replace(0, pd.NA)) - 100
+        df["Perf."] = (
+            (df["Current Rate"] * 100) / df[col_rate].replace(0, pd.NA)
+        ) - 100
     return df
 
 
@@ -932,7 +936,9 @@ def build_buy_dataframe(
                 ),
                 axis=1,
             )
-        df["Perf."] = ((df["Current Rate"] * 100) / df["Converted Rate"].replace(0, pd.NA)) - 100
+        df["Perf."] = (
+            (df["Current Rate"] * 100) / df["Converted Rate"].replace(0, pd.NA)
+        ) - 100
     else:
         if use_api:
             df = calc_perf_api(
@@ -973,9 +979,7 @@ def build_airdrop_dataframe(currency: str, use_api: bool = False) -> pd.DataFram
     df = df[df["From"] == 0].sort_values("timestamp", ascending=False)
     df = df.reset_index(drop=True)
     df["Date"] = pd.to_datetime(df["timestamp"], unit="s", utc=True)
-    df["Date"] = (
-        df["Date"].dt.tz_convert(tzlocal.get_localzone()).dt.tz_localize(None)
-    )
+    df["Date"] = df["Date"].dt.tz_convert(tzlocal.get_localzone()).dt.tz_localize(None)
     df["Synchronized"] = df["id"].map(g_operation.is_portfolio_adjusted)
     if df.empty:
         df["Value"] = pd.Series(dtype=float)
@@ -1036,7 +1040,11 @@ def build_buy_avg_table(use_api: bool = False):
 
 
 @st.cache_data(
-    hash_funcs={str: lambda x: get_file_hash(x) if (os.path.sep in x and os.path.isfile(x)) else hash(x)},
+    hash_funcs={
+        str: lambda x: (
+            get_file_hash(x) if (os.path.sep in x and os.path.isfile(x)) else hash(x)
+        )
+    },
 )
 def build_swap_dataframes(
     db_file: str,
@@ -1262,11 +1270,15 @@ def _draw_swap_table(
 
 
 def draw_swap(df: pd.DataFrame, convert_from: str = None, convert_to: str = None):
-    _draw_swap_table(df, "swapselection", "No swap operations", convert_from, convert_to)
+    _draw_swap_table(
+        df, "swapselection", "No swap operations", convert_from, convert_to
+    )
 
 
 def draw_swap_arch(df: pd.DataFrame, convert_from: str = None, convert_to: str = None):
-    _draw_swap_table(df, "swapachselection", "No archived swaps", convert_from, convert_to)
+    _draw_swap_table(
+        df, "swapachselection", "No archived swaps", convert_from, convert_to
+    )
 
 
 g_wallets = Portfolios(st.session_state.settings["dbfile"]).get_portfolio_names()
@@ -1516,12 +1528,31 @@ with swap_tab:
 
 with airdrop_tab:
     airdrop_currency = st.session_state.settings.get("fiat_currency", "EUR")
-    df_airdrop = build_airdrop_dataframe(airdrop_currency, use_api=use_api)
+    df_airdrop_all = build_airdrop_dataframe(airdrop_currency, use_api=use_api)
+    # df_airdrop = displayed rows: airdrop_edit() maps the selected row to it
+    df_airdrop = df_airdrop_all
     col_airdroplist, col_airdropbtns = st.columns([8, 1])
     with col_airdroplist:
-        if df_airdrop.empty:
+        if df_airdrop_all.empty:
             st.info("No airdrops")
         else:
+            airdrop_token_options = sorted(df_airdrop_all["Token"].dropna().unique())
+            # Drop filtered tokens that no longer have an airdrop (edit/delete)
+            st.session_state["airdrop_token_filter"] = [
+                t
+                for t in st.session_state.get("airdrop_token_filter", [])
+                if t in airdrop_token_options
+            ]
+            airdrop_token_filter = st.multiselect(
+                "Filter tokens",
+                airdrop_token_options,
+                key="airdrop_token_filter",
+                placeholder="All tokens",
+            )
+            if airdrop_token_filter:
+                df_airdrop = df_airdrop_all[
+                    df_airdrop_all["Token"].isin(airdrop_token_filter)
+                ].reset_index(drop=True)
             st.dataframe(
                 df_airdrop,
                 width="stretch",

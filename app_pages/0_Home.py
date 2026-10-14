@@ -14,7 +14,13 @@ import plotly.graph_objects as go
 from modules.database.customdata import Customdata
 from modules.database.operations import Operations
 from modules.database.tokensdb import TokensDatabase
-from modules.tools import update, parse_last_update, get_currency_symbol
+from modules.tools import (
+    convert_dataframe_to_target_currency,
+    convert_price_to_target_currency,
+    get_currency_symbol,
+    parse_last_update,
+    update,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -61,9 +67,10 @@ st.title("Crypto Update")
 
 tokensdb = TokensDatabase(st.session_state.settings["dbfile"])
 with st.spinner("Loading balances...", show_time=True):
-    df_balance = tokensdb.get_balances()
+    # TokensDatabase stocke les valeurs en EUR : conversion vers la devise des settings
+    df_balance = convert_dataframe_to_target_currency(tokensdb.get_balances())
 with st.spinner("Loading sums...", show_time=True):
-    df_sums = tokensdb.get_sum_over_time()
+    df_sums = convert_dataframe_to_target_currency(tokensdb.get_sum_over_time())
 
 # Update prices
 with st.sidebar:
@@ -87,16 +94,23 @@ with st.sidebar:
 
 with st.container(border=True):
     col1, col2, col3 = st.columns(3)
-    total = Operations(st.session_state.settings["dbfile"]).sum_buyoperations()
+    invested_by_unit = Operations(
+        st.session_state.settings["dbfile"]
+    ).sum_buyoperations_by_unit()
+    total = round(
+        sum(
+            convert_price_to_target_currency(amount, unit)
+            for unit, amount in invested_by_unit.items()
+        ),
+        2,
+    )
     currency_symbol = get_currency_symbol()
     with col1:
         st.metric("Invested", value=f"{total} {currency_symbol}")
     with col2:
         # get last values
         balance = (
-            0
-            if df_balance is None or df_balance.empty
-            else df_balance.iloc[-1].sum()
+            0 if df_balance is None or df_balance.empty else df_balance.iloc[-1].sum()
         )
         balance = round(balance, 2)
         st.metric("Total value", value=f"{balance} {currency_symbol}")

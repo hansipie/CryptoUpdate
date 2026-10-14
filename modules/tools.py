@@ -209,6 +209,38 @@ def convert_dataframe_prices_historical(
     return df
 
 
+def convert_dataframe_to_target_currency(
+    df: pd.DataFrame, source_currency: str = "EUR"
+) -> pd.DataFrame:
+    """Convertit toutes les colonnes d'un DataFrame (index datetime) vers la devise
+    cible des settings, avec les taux historiques.
+
+    Args:
+        df: DataFrame de valeurs monétaires indexé par date
+        source_currency: Devise des valeurs du DataFrame (EUR pour TokensDatabase)
+
+    Returns:
+        DataFrame converti (le DataFrame d'origine si aucune conversion n'est nécessaire)
+    """
+    target_currency = st.session_state.settings.get("fiat_currency", "EUR")
+    if df is None or df.empty or source_currency == target_currency:
+        return df
+
+    try:
+        fiat_df = get_cached_api_market().get_currency_cached()
+    except (requests.exceptions.RequestException, ValueError, KeyError) as e:
+        logger.error("Erreur récupération taux historiques: %s", e)
+        fiat_df = None
+
+    # Facteur de conversion par date = conversion d'une série de 1.0
+    df = df.sort_index()
+    ones = pd.DataFrame({"factor": 1.0}, index=df.index)
+    factor = convert_dataframe_prices_historical(
+        ones, "factor", source_currency, target_currency, fiat_df
+    )["factor"]
+    return df.mul(factor.to_numpy(), axis=0)
+
+
 def get_cached_api_market() -> ApiMarket:
     """Get or create cached ApiMarket instance in session state.
 

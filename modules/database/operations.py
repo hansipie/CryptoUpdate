@@ -112,6 +112,16 @@ class Operations:
                 return 0
             return ret
 
+    def sum_buyoperations_by_unit(self) -> dict:
+        """Total invested per source currency (ex: {"EUR": 1200.0, "USD": 300.0})."""
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT source_unit, SUM(source) FROM Operations "
+                "WHERE type = 'buy' GROUP BY source_unit"
+            )
+            return {unit: total or 0 for unit, total in cursor.fetchall()}
+
     def get_averages(self) -> list:
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
