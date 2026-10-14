@@ -32,6 +32,30 @@ _DAY = 86400
 _RECENT_TTL = 3600
 
 
+def _rank_coins(df: pd.DataFrame | None) -> pd.DataFrame | None:
+    """Sort coins so the most likely match for a symbol comes first.
+
+    A symbol is ambiguous on MarketRaccoon (17 coins for BTC, 6 for ETH, mostly
+    memecoins). The genuine asset is the native coin (no token_address), then
+    the one with the lowest CoinMarketCap id (older, major coins).
+    """
+    if df is None or df.empty:
+        return df
+    key = pd.DataFrame(index=df.index)
+    key["exclude"] = (
+        df["exclude"].fillna(False).astype(bool) if "exclude" in df else False
+    )
+    key["token"] = df["token_address"].notna() if "token_address" in df else False
+    key["cmc"] = (
+        pd.to_numeric(df["cmc_id"], errors="coerce").fillna(float("inf"))
+        if "cmc_id" in df
+        else float("inf")
+    )
+    key["id"] = df["id"]
+    order = key.sort_values(["exclude", "token", "cmc", "id"]).index
+    return df.loc[order].reset_index(drop=True)
+
+
 class ApiMarket:
     """Client for MarketRaccoon API to fetch fiat currency exchange rates.
 
@@ -365,7 +389,7 @@ class ApiMarket:
         if not results:
             logger.info("No coins available")
             return None
-        return pd.DataFrame(results)
+        return _rank_coins(pd.DataFrame(results))
 
     def get_cryptocurrency_market(
         self,
@@ -554,7 +578,7 @@ class ApiMarket:
         if cached_data is None:
             return None
 
-        return self._deserialize_coins(cached_data)
+        return _rank_coins(self._deserialize_coins(cached_data))
 
     def _fetch_and_serialize_coins(self, symbols: list | None = None) -> dict | None:
         """Fetch coins from API and serialize for caching.
