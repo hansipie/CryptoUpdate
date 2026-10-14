@@ -155,8 +155,8 @@ SQLite at `data/db.sqlite3`. Schema managed by versioned migrations (v1–v9).
 
 ### MarketRaccoon API
 
-Base URL: configurable in `settings.json` (`MarketRaccoon.url`, default `http://api.marketraccoon.eu`)
-Auth: optional `X-API-Key` header | Docs: http://api.marketraccoon.eu/api/yaml
+Base URL: configurable in `settings.json` (`MarketRaccoon.url`, default `http://api.marketraccoon.fr`)
+Auth: optional `X-API-Key` header | Docs: http://api.marketraccoon.fr/api/yaml
 
 **All prices from MarketRaccoon are in USD** → requires conversion for EUR display.
 
@@ -222,7 +222,7 @@ tools.update()
 
 ```json
 {
-    "MarketRaccoon":    { "url": "http://api.marketraccoon.eu", "token": "" },
+    "MarketRaccoon":    { "url": "http://api.marketraccoon.fr", "token": "" },
     "Notion":           { "token": "", "database": "", "parentpage": "" },
     "Coinmarketcap":    { "token": "required" },
     "AI":               { "token": "" },
@@ -259,4 +259,4 @@ Do what has been asked; nothing more, nothing less.
 NEVER create files unless they're absolutely necessary for achieving your goal.
 ALWAYS prefer editing an existing file to creating a new one.
 NEVER proactively create documentation files (*.md) or README files. Only create documentation files if explicitly requested by the User.
-- la documentation de l'API MarketRaccoon est a l'adresse http://api.marketraccoon.eu/api/yaml
+- la documentation de l'API MarketRaccoon est a l'adresse http://api.marketraccoon.fr/api/yaml
