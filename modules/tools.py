@@ -640,19 +640,26 @@ def _get_api_latest_prices() -> dict:
     # Get list of tokens we actually use from the database
     try:
         portfolios = Portfolios(st.session_state.settings["dbfile"])
-        portfolio_names = portfolios.get_portfolio_names()
-        portfolio_tokens = []
-        for pname in portfolio_names:
-            portfolio_tokens.extend(portfolios.get_tokens(pname).keys())
-        portfolio_tokens = list(set(portfolio_tokens))
-        logger.debug("Portfolio tokens: %s", portfolio_tokens)
-
-        # Fetch prices with symbol filter to avoid duplicates
-        # NOTE: Bypass cache to pass symbols parameter
-        latest_df = api.get_cryptocurrency_latest(symbols=portfolio_tokens)
+        portfolio_tokens = sorted(
+            {
+                token
+                for pname in portfolios.get_portfolio_names()
+                for token in portfolios.get_tokens(pname)
+            }
+        )
     except Exception as e:  # noqa: BLE001
-        logger.warning("Could not get portfolio tokens, fetching all: %s", e)
-        latest_df = api.get_cryptocurrency_latest()
+        logger.warning("Could not read portfolio tokens: %s", e)
+        return {}
+    logger.debug("Portfolio tokens: %s", portfolio_tokens)
+
+    # Never query /cryptocurrency/latest without a symbol filter: the unfiltered
+    # call returns every coin and times out or fails with 503.
+    if not portfolio_tokens:
+        logger.info("No portfolio tokens: skipping latest prices request")
+        return {}
+
+    # NOTE: Bypass cache to pass symbols parameter
+    latest_df = api.get_cryptocurrency_latest(symbols=portfolio_tokens)
 
     if latest_df is None or latest_df.empty:
         logger.warning("No latest cryptocurrency data from API")
