@@ -41,6 +41,7 @@ def submit_buy(
     to_amount: float,
     to_token: str,
     to_wallet: str,
+    adjust_portfolios: bool = False,
 ) -> None:
     """Submit a buy operation to the database.
 
@@ -51,6 +52,7 @@ def submit_buy(
         to_amount: Amount in target token
         to_token: Target token symbol
         to_wallet: Destination wallet name
+        adjust_portfolios: If True, add to_amount of to_token to the wallet's holdings
     """
     logger.debug(
         "submitbuy: timestamp=%d from_amount=%f, form_currency=%s, to_amount=%f, to_token=%s, to_wallet=%s",
@@ -63,15 +65,38 @@ def submit_buy(
     )
 
     g_operation.insert(
-        "buy", from_amount, to_amount, form_currency, to_token, timestamp, to_wallet
+        "buy",
+        from_amount,
+        to_amount,
+        form_currency,
+        to_token,
+        timestamp,
+        to_wallet,
+        portfolio_adjusted=adjust_portfolios,
     )
 
-    if to_wallet is not None:
+    if adjust_portfolios:
         Portfolios(st.session_state.settings["dbfile"]).set_token_add(
             to_wallet, to_token, to_amount
         )
 
     st.toast("Operation submitted", icon=":material/check:")
+
+
+def apply_swap_to_portfolios(
+    wallet_from: str,
+    token_from: str,
+    amount_from: float,
+    wallet_to: str,
+    token_to: str,
+    amount_to: float,
+    reverse: bool = False,
+) -> None:
+    """Move a swap's amounts between wallets holdings (or undo it if reverse)."""
+    sign = -1 if reverse else 1
+    portfolios = Portfolios(st.session_state.settings["dbfile"])
+    portfolios.set_token_add(wallet_from, token_from, -sign * amount_from)
+    portfolios.set_token_add(wallet_to, token_to, sign * amount_to)
 
 
 def submit_swap(
@@ -83,6 +108,7 @@ def submit_swap(
     swap_amount_to: float,
     swap_wallet_to: str,
     note: str = None,
+    adjust_portfolios: bool = False,
 ) -> None:
     """Submit a swap operation to the database.
 
@@ -95,6 +121,7 @@ def submit_swap(
         swap_amount_to: Amount of target token
         swap_wallet_to: Target wallet name
         note: Optional free-text annotation
+        adjust_portfolios: If True, move the amounts between the wallets' holdings
     """
     logger.debug(
         (
@@ -119,7 +146,18 @@ def submit_swap(
         swap_amount_to,
         swap_wallet_to,
         note=note,
+        portfolio_adjusted=adjust_portfolios,
     )
+
+    if adjust_portfolios:
+        apply_swap_to_portfolios(
+            swap_wallet_from,
+            swap_token_from,
+            swap_amount_from,
+            swap_wallet_to,
+            swap_token_to,
+            swap_amount_to,
+        )
 
 
 def rows_selected(selectable, max_len: int) -> list:
@@ -179,10 +217,22 @@ def buy_add() -> None:
             label_visibility="hidden",
         )
     to_wallet = st.selectbox("Portfolio", g_wallets, key="to_wallet", index=None)
+    adjust_portfolios = st.checkbox(
+        "Synchronize portfolios", value=False, key="buy_adjust_portfolios"
+    )
     if st.button("Submit", width="stretch"):
+        if to_wallet is None:
+            st.error("Portfolio is required")
+            return
         timestamp = toTimestamp_A(date, time)
         submit_buy(
-            timestamp, from_amount, form_currency, to_amount, to_token, to_wallet
+            timestamp,
+            from_amount,
+            form_currency,
+            to_amount,
+            to_token,
+            to_wallet,
+            adjust_portfolios=adjust_portfolios,
         )
         st.rerun()
 
@@ -220,7 +270,13 @@ def swap_add() -> None:
             "To Wallet", g_wallets, index=None, key="swap_wallet_to"
         )
     swap_note = st.text_area("Note", key="swap_note", value="")
+    adjust_portfolios = st.checkbox(
+        "Synchronize portfolios", value=False, key="swap_adjust_portfolios"
+    )
     if st.button("Submit", width="stretch"):
+        if swap_wallet_from is None or swap_wallet_to is None:
+            st.error("From Wallet and To Wallet are required")
+            return
         timestamp = toTimestamp_A(date, time)
         submit_swap(
             timestamp,
@@ -231,6 +287,7 @@ def swap_add() -> None:
             swap_amount_to,
             swap_wallet_to,
             note=swap_note,
+            adjust_portfolios=adjust_portfolios,
         )
         st.rerun()
 
@@ -287,11 +344,28 @@ def buy_edit_dialog(data: dict) -> None:
     else:
         idx_wallet = None
     to_wallet = st.selectbox("Portfolio", g_wallets, key="to_wallet", index=idx_wallet)
+    was_adjusted = g_operation.is_portfolio_adjusted(data["id"])
+    adjust_portfolios = st.checkbox(
+        "Synchronize portfolios", value=was_adjusted, key="buy_adjust_portfolios"
+    )
     if st.button("Submit", width="stretch"):
+        if to_wallet is None:
+            st.error("Portfolio is required")
+            return
         timestamp = toTimestamp_A(date, time)
+        if was_adjusted:
+            Portfolios(st.session_state.settings["dbfile"]).set_token_add(
+                data["Portfolio"], data["Token"], -float(data["To"])
+            )
         g_operation.delete(data["id"])
         submit_buy(
-            timestamp, from_amount, form_currency, to_amount, to_token, to_wallet
+            timestamp,
+            from_amount,
+            form_currency,
+            to_amount,
+            to_token,
+            to_wallet,
+            adjust_portfolios=adjust_portfolios,
         )
         st.rerun()
 
@@ -353,8 +427,25 @@ def swap_edit_dialog(data: dict):
             "To Wallet", g_wallets, index=idx_to, key="swap_wallet_to"
         )
     swap_note = st.text_area("Note", key="swap_note", value=data.get("note") or "")
+    was_adjusted = g_swaps.is_portfolio_adjusted(data["id"])
+    adjust_portfolios = st.checkbox(
+        "Synchronize portfolios", value=was_adjusted, key="swap_adjust_portfolios"
+    )
     if st.button("Submit", width="stretch"):
+        if swap_wallet_from is None or swap_wallet_to is None:
+            st.error("From Wallet and To Wallet are required")
+            return
         timestamp = toTimestamp_A(date, time)
+        if was_adjusted:
+            apply_swap_to_portfolios(
+                data["From Wallet"],
+                data["From Token"],
+                float(data["From Amount"]),
+                data["To Wallet"],
+                data["To Token"],
+                float(data["To Amount"]),
+                reverse=True,
+            )
         g_swaps.delete(data["id"])
         submit_swap(
             timestamp,
@@ -365,6 +456,7 @@ def swap_edit_dialog(data: dict):
             swap_amount_to,
             swap_wallet_to,
             note=swap_note,
+            adjust_portfolios=adjust_portfolios,
         )
         st.rerun()
 
@@ -382,8 +474,19 @@ def buy_delete_dialog(data: dict):
     logger.debug("Dialog Delete row: %s", data["id"])
     st.dataframe(data, width="stretch")
     st.write("Are you sure you want to delete this buy operation?")
+    was_adjusted = g_operation.is_portfolio_adjusted(data["id"])
+    sync_portfolios = st.checkbox(
+        "Synchronize portfolios",
+        value=was_adjusted,
+        key="buy_delete_sync_portfolios",
+        help="Remove the bought amount from the portfolio",
+    )
     if st.button("Confirm"):
         logger.debug("Delete row: %s - %s", data, type(data["id"]))
+        if sync_portfolios:
+            Portfolios(st.session_state.settings["dbfile"]).set_token_add(
+                data["Portfolio"], data["Token"], -float(data["To"])
+            )
         g_operation.delete(data["id"])
         st.rerun()
 

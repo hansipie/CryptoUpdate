@@ -34,7 +34,8 @@ class Operations:
                     source_unit TEXT NOT NULL, 
                     destination_unit TEXT NOT NULL,
                     timestamp INTEGER NOT NULL,
-                    portfolio TEXT
+                    portfolio TEXT,
+                    portfolio_adjusted INTEGER NOT NULL DEFAULT 0
                 )
             """
             )
@@ -49,13 +50,14 @@ class Operations:
         destination_unit,
         timestamp,
         portfolio,
+        portfolio_adjusted: bool = False,
     ):
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
             cursor.execute(
                 """
-                INSERT INTO Operations (type, source, destination, source_unit, destination_unit, timestamp, portfolio)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO Operations (type, source, destination, source_unit, destination_unit, timestamp, portfolio, portfolio_adjusted)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """,
                 (
                     op_type,
@@ -65,9 +67,18 @@ class Operations:
                     destination_unit,
                     timestamp,
                     portfolio,
+                    int(portfolio_adjusted),
                 ),
             )
             conn.commit()
+
+    def is_portfolio_adjusted(self, item_id: int) -> bool:
+        """Return True if the operation was applied to the portfolios holdings."""
+        with sqlite3.connect(self.db_path) as conn:
+            row = conn.execute(
+                "SELECT portfolio_adjusted FROM Operations WHERE id = ?", (item_id,)
+            ).fetchone()
+        return bool(row and row[0])
 
     def delete(self, item_id):
         with sqlite3.connect(self.db_path) as conn:
@@ -85,7 +96,9 @@ class Operations:
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
             cursor.execute(
-                "SELECT * FROM Operations WHERE type = ? ORDER BY timestamp DESC",
+                "SELECT id, type, source, destination, source_unit, destination_unit,"
+                " timestamp, portfolio FROM Operations"
+                " WHERE type = ? ORDER BY timestamp DESC",
                 (op_type,),
             )
             return cursor.fetchall()

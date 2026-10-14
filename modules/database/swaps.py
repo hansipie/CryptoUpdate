@@ -31,7 +31,8 @@ class Swaps:
                     amount_to REAL,
                     wallet_to TEXT,
                     tag TEXT,
-                    note TEXT
+                    note TEXT,
+                    portfolio_adjusted INTEGER NOT NULL DEFAULT 0
                 )
             """
             )
@@ -77,6 +78,7 @@ class Swaps:
         amount_to,
         wallet_to,
         note: str = None,
+        portfolio_adjusted: bool = False,
     ):
         logger.debug("Inserting swap")
         with sqlite3.connect(self.db_path) as conn:
@@ -84,8 +86,8 @@ class Swaps:
             cursor.execute(
                 "INSERT INTO Swaps"
                 " (timestamp, token_from, amount_from, wallet_from,"
-                " token_to, amount_to, wallet_to, tag, note)"
-                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                " token_to, amount_to, wallet_to, tag, note, portfolio_adjusted)"
+                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (
                     timestamp,
                     token_from,
@@ -96,10 +98,19 @@ class Swaps:
                     wallet_to,
                     None,
                     note or None,
+                    int(portfolio_adjusted),
                 ),
             )
             conn.commit()
             logger.debug("Swap inserted")
+
+    def is_portfolio_adjusted(self, entry_id: int) -> bool:
+        """Return True if the swap was applied to the portfolios holdings."""
+        with sqlite3.connect(self.db_path) as conn:
+            row = conn.execute(
+                "SELECT portfolio_adjusted FROM Swaps WHERE id = ?", (entry_id,)
+            ).fetchone()
+        return bool(row and row[0])
 
     def delete(self, entry_id: int):
         logger.debug("Deleting swap")
