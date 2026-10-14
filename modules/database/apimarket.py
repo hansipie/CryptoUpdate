@@ -23,9 +23,9 @@ logger = logging.getLogger(__name__)
 
 _SOURCE_CURRENCY = "USD"
 _MAX_PAGES = 1000
-_TIMEOUT = 10
-# Taille de page maximale acceptée par l'API (au-delà elle plafonne à 10000)
-_PAGE_SIZE = 10000
+_TIMEOUT = 30
+# Pages modestes : une grosse page (10000) met >15 s à répondre et dépasse le timeout
+_PAGE_SIZE = 1000
 _RETRY_STATUS = (429, 500, 502, 503, 504)
 _DAY = 86400
 # Au-delà de ce délai, la fin de série (données récentes) est rafraîchie
