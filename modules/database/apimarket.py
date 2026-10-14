@@ -460,7 +460,8 @@ class ApiMarket:
             List of API records, or None on error / no content
         """
         params = {"coinid": coinid}
-        if from_timestamp:
+        # 0 = depuis le début : sans startdate l'API ne renvoie que ~366 jours
+        if from_timestamp is not None:
             dt = datetime.fromtimestamp(from_timestamp, tz=self.local_timezone)
             params["startdate"] = dt.astimezone(UTC).isoformat()
         if to_timestamp:
