@@ -695,6 +695,93 @@ def swap_arch_delete(df_swaps_archived: pd.DataFrame):
         swap_arch_delete_dialog(rowidx, df_swaps_archived)
 
 
+@st.dialog("Add Airdrop")
+def airdrop_add() -> None:
+    """Display dialog for recording an airdrop (tokens received for free)."""
+    col_date, col_time = st.columns(2)
+    with col_date:
+        date = st.date_input("Date", key="airdrop_date")
+    with col_time:
+        time = st.time_input("Time", key="airdrop_time")
+    amount = st.number_input(
+        "Amount", min_value=0.0, format="%.8g", key="airdrop_amount"
+    )
+    token = st.selectbox("Token", g_tokens, index=None, key="airdrop_token")
+    wallet = st.selectbox("Portfolio", g_wallets, key="airdrop_wallet", index=None)
+    adjust_portfolios = st.checkbox(
+        "Synchronize portfolios", value=False, key="airdrop_adjust_portfolios"
+    )
+    if st.button("Submit", width="stretch", key="airdrop_add_submit"):
+        if wallet is None or token is None:
+            st.error("Token and portfolio are required")
+            return
+        submit_buy(
+            toTimestamp_A(date, time),
+            0.0,
+            "EUR",
+            amount,
+            token,
+            wallet,
+            adjust_portfolios=adjust_portfolios,
+        )
+        st.rerun()
+
+
+@st.dialog("Edit Airdrop")
+def airdrop_edit_dialog(data: dict) -> None:
+    """Display dialog for editing an airdrop, replacing the stored row."""
+    col_date, col_time = st.columns(2)
+    with col_date:
+        date = st.date_input("Date", key="airdrop_date", value=data["Date"])
+    with col_time:
+        time = st.time_input("Time", key="airdrop_time", value=data["Date"])
+    amount = st.number_input(
+        "Amount",
+        min_value=0.0,
+        format="%.8g",
+        key="airdrop_amount",
+        value=float(data["Amount"]),
+    )
+    idx_token = g_tokens.index(data["Token"]) if data["Token"] in g_tokens else None
+    token = st.selectbox("Token", g_tokens, index=idx_token, key="airdrop_token")
+    idx_wallet = (
+        g_wallets.index(data["Portfolio"]) if data["Portfolio"] in g_wallets else None
+    )
+    wallet = st.selectbox("Portfolio", g_wallets, index=idx_wallet, key="airdrop_wallet")
+    was_adjusted = bool(data["Synchronized"])
+    adjust_portfolios = st.checkbox(
+        "Synchronize portfolios", value=was_adjusted, key="airdrop_adjust_portfolios"
+    )
+    if st.button("Submit", width="stretch", key="airdrop_edit_submit"):
+        if wallet is None or token is None:
+            st.error("Token and portfolio are required")
+            return
+        if was_adjusted:
+            Portfolios(st.session_state.settings["dbfile"]).set_token_add(
+                data["Portfolio"], data["Token"], -float(data["Amount"])
+            )
+        g_operation.delete(data["id"])
+        submit_buy(
+            toTimestamp_A(date, time),
+            0.0,
+            "EUR",
+            amount,
+            token,
+            wallet,
+            adjust_portfolios=adjust_portfolios,
+        )
+        st.rerun()
+
+
+def airdrop_edit() -> None:
+    """Open the edit dialog for the selected airdrop, or warn if none."""
+    _sel = rows_selected(st.session_state.airdropselection, len(df_airdrop))
+    if _sel is None:
+        st.toast("Please select a row", icon=":material/warning:")
+    else:
+        airdrop_edit_dialog(df_airdrop.iloc[_sel[0]].to_dict())
+
+
 def calc_perf(df: pd.DataFrame, col_token: str, col_rate: str) -> pd.DataFrame:
     """Calculate current performance metrics for operations.
 
@@ -762,6 +849,9 @@ def build_buy_dataframe(
     # Ensure amount columns are numeric
     df["From"] = pd.to_numeric(df["From"], errors="coerce")
     df["To"] = pd.to_numeric(df["To"], errors="coerce")
+
+    # Airdrops (source = 0) have their own tab
+    df = df[df["From"] != 0].reset_index(drop=True)
 
     # convert timestamp to datetime
     df["Date"] = pd.to_datetime(df["timestamp"], unit="s", utc=True)
@@ -856,6 +946,52 @@ def build_buy_dataframe(
         else:
             df = calc_perf(df, "Token", "Buy Rate")
 
+    return df
+
+
+def build_airdrop_dataframe(currency: str, use_api: bool = False) -> pd.DataFrame:
+    """Build the airdrop table: buy operations whose source amount is 0.
+
+    The "Value" column is the airdropped amount priced in `currency` at the
+    date of the transaction.
+    """
+    df = pd.DataFrame(
+        g_operation.get_operations_by_type("buy"),
+        columns=[
+            "id",
+            "type",
+            "From",
+            "Amount",
+            "Currency",
+            "Token",
+            "timestamp",
+            "Portfolio",
+        ],
+    )
+    df["From"] = pd.to_numeric(df["From"], errors="coerce")
+    df["Amount"] = pd.to_numeric(df["Amount"], errors="coerce")
+    df = df[df["From"] == 0].sort_values("timestamp", ascending=False)
+    df = df.reset_index(drop=True)
+    df["Date"] = pd.to_datetime(df["timestamp"], unit="s", utc=True)
+    df["Date"] = (
+        df["Date"].dt.tz_convert(tzlocal.get_localzone()).dt.tz_localize(None)
+    )
+    df["Synchronized"] = df["id"].map(g_operation.is_portfolio_adjusted)
+    if df.empty:
+        df["Value"] = pd.Series(dtype=float)
+    elif use_api:
+        df["Value"] = batch_convert_historical_api(
+            df, "Amount", "Token", currency, "timestamp"
+        )
+    else:
+        df["Value"] = batch_convert_historical(
+            df,
+            "Amount",
+            "Token",
+            currency,
+            "timestamp",
+            st.session_state.settings["dbfile"],
+        )
     return df
 
 
@@ -1171,7 +1307,7 @@ with st.sidebar:
     else:
         st.caption("💾 SQLite local")
 
-buy_tab, swap_tab = st.tabs(["Buy", "Swap"])
+buy_tab, swap_tab, airdrop_tab = st.tabs(["Buy", "Swap", "Airdrop"])
 with buy_tab:
     # Conversion selectboxes for Buy
     g_convert_options = ["Original", "EUR", "USD"] + g_tokens
@@ -1376,4 +1512,44 @@ with swap_tab:
             width="stretch",
             icon=":material/delete:",
             key="swap_arch_delete",
+        )
+
+with airdrop_tab:
+    airdrop_currency = st.session_state.settings.get("fiat_currency", "EUR")
+    df_airdrop = build_airdrop_dataframe(airdrop_currency, use_api=use_api)
+    col_airdroplist, col_airdropbtns = st.columns([8, 1])
+    with col_airdroplist:
+        if df_airdrop.empty:
+            st.info("No airdrops")
+        else:
+            st.dataframe(
+                df_airdrop,
+                width="stretch",
+                height=600,
+                hide_index=True,
+                column_order=["Date", "Amount", "Token", "Value", "Portfolio"],
+                column_config={
+                    "Amount": st.column_config.NumberColumn(format="%.8g"),
+                    "Value": st.column_config.NumberColumn(
+                        f"Value ({airdrop_currency})", format="%.2f"
+                    ),
+                },
+                on_select="rerun",
+                selection_mode="single-row",
+                key="airdropselection",
+            )
+    with col_airdropbtns:
+        st.button(
+            "New",
+            on_click=airdrop_add,
+            width="stretch",
+            icon=":material/add:",
+            key="airdrop_new",
+        )
+        st.button(
+            "Edit",
+            on_click=airdrop_edit,
+            width="stretch",
+            icon=":material/edit:",
+            key="airdrop_edit",
         )
