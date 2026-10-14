@@ -16,7 +16,7 @@ logging.getLogger("httpcore").setLevel(logging.WARNING)
 logger = logging.getLogger(__name__)
 
 # Default model — can be overridden by settings.json key "AI.model"
-_DEFAULT_CLAUDE_MODEL = "claude-sonnet-4-6-20251022"
+_DEFAULT_CLAUDE_MODEL = "claude-sonnet-5-5"
 
 # Module-level singleton; rebuilt only when the API key changes.
 _anthropic_client: Anthropic | None = None  # pylint: disable=invalid-name

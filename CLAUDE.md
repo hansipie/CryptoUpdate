@@ -57,9 +57,10 @@ app.py
 - `operations.py` — Transaction history
 - `market.py` — Market data storage
 - `apimarket.py` — MarketRaccoon API integration
+- `price_cache.py` — Incremental SQLite cache of MarketRaccoon price history (`data/api_price_cache.sqlite3`, disposable; fetches only missing head/tail per coin)
 - `swaps.py` — Token swap transactions
 - `customdata.py` — Key-value config storage (stores `db_version`)
-- `migrations.py` — Versioned schema migrations (v1–v5)
+- `migrations.py` — Versioned schema migrations (v1–v9)
 
 **Business Logic (modules/):**
 - `token_metadata.py` — Token status management (active/delisted)
@@ -74,7 +75,7 @@ app.py
 
 ## Database Schema
 
-SQLite at `data/db.sqlite3`. Schema managed by versioned migrations (v1–v5).
+SQLite at `data/db.sqlite3`. Schema managed by versioned migrations (v1–v9).
 
 ### Tables
 
@@ -90,7 +91,8 @@ SQLite at `data/db.sqlite3`. Schema managed by versioned migrations (v1–v5).
 - PK: `(portfolio_id, token)`
 
 **Operations** — Transaction history
-- `id`, `type`, `source`, `destination`, `source_unit`, `destination_unit`, `timestamp`, `portfolio`
+- `id`, `type`, `source`, `destination`, `source_unit`, `destination_unit`, `timestamp`, `portfolio`, `portfolio_adjusted`
+- `portfolio_adjusted` (migration v9): 1 = buy applied to `Portfolios_Tokens`
 - CRITICAL: `source = 0` = airdrop — DO NOT delete these rows
 
 **Market** — Historical crypto market data
@@ -100,8 +102,9 @@ SQLite at `data/db.sqlite3`. Schema managed by versioned migrations (v1–v5).
 - `timestamp`, `currency`, `price`
 
 **Swaps** — Token swap transactions
-- `id`, `timestamp`, `token_from`, `amount_from`, `wallet_from`, `token_to`, `amount_to`, `wallet_to`, `tag`, `note`
+- `id`, `timestamp`, `token_from`, `amount_from`, `wallet_from`, `token_to`, `amount_to`, `wallet_to`, `tag`, `note`, `portfolio_adjusted`
 - `note TEXT` added in migration v5
+- `portfolio_adjusted INTEGER NOT NULL DEFAULT 0` added in migration v8 (1 = swap applied to `Portfolios_Tokens`)
 
 **TokenMetadata** — Token status and MarketRaccoon mapping
 - `id` (INTEGER PRIMARY KEY AUTOINCREMENT), `token`, `status`, `delisting_date`, `last_valid_price_date`, `notes`, `created_at`, `updated_at`, `mraccoon_id`, `name`
@@ -118,6 +121,10 @@ SQLite at `data/db.sqlite3`. Schema managed by versioned migrations (v1–v5).
 - v3: RENAME COLUMN `mr_id` → `mraccoon_id` in TokenMetadata
 - v4: Recreate TokenMetadata with `id` AUTOINCREMENT (removes `token` as PRIMARY KEY, adds indexes)
 - v5: ADD COLUMN `note TEXT` to Swaps
+- v6: Composite index `idx_tokensdb` on TokensDatabase `(timestamp, token)`
+- v7: Recreate Swaps with `amount_from`/`amount_to` as REAL (were TEXT)
+- v8: ADD COLUMN `portfolio_adjusted INTEGER NOT NULL DEFAULT 0` to Swaps
+- v9: ADD COLUMN `portfolio_adjusted INTEGER NOT NULL DEFAULT 0` to Operations
 
 ### Critical DB Rules
 
@@ -148,8 +155,8 @@ SQLite at `data/db.sqlite3`. Schema managed by versioned migrations (v1–v5).
 
 ### MarketRaccoon API
 
-Base URL: configurable in `settings.json` (`MarketRaccoon.url`, default `http://api.marketraccoon.eu`)
-Auth: optional `X-API-Key` header | Docs: http://api.marketraccoon.eu/api/yaml
+Base URL: configurable in `settings.json` (`MarketRaccoon.url`, default `https://api.marketraccoon.fr`)
+Auth: optional `X-API-Key` header | Docs: https://api.marketraccoon.fr/api/yaml
 
 **All prices from MarketRaccoon are in USD** → requires conversion for EUR display.
 
@@ -215,7 +222,7 @@ tools.update()
 
 ```json
 {
-    "MarketRaccoon":    { "url": "http://api.marketraccoon.eu", "token": "" },
+    "MarketRaccoon":    { "url": "https://api.marketraccoon.fr", "token": "" },
     "Notion":           { "token": "", "database": "", "parentpage": "" },
     "Coinmarketcap":    { "token": "required" },
     "AI":               { "token": "" },
@@ -252,4 +259,4 @@ Do what has been asked; nothing more, nothing less.
 NEVER create files unless they're absolutely necessary for achieving your goal.
 ALWAYS prefer editing an existing file to creating a new one.
 NEVER proactively create documentation files (*.md) or README files. Only create documentation files if explicitly requested by the User.
-- la documentation de l'API MarketRaccoon est a l'adresse http://api.marketraccoon.eu/api/yaml
+- la documentation de l'API MarketRaccoon est a l'adresse https://api.marketraccoon.fr/api/yaml

@@ -244,6 +244,26 @@ def _migrate_v7(conn: sqlite3.Connection) -> None:
     conn.execute("ALTER TABLE Swaps_new RENAME TO Swaps")
 
 
+def _migrate_v8(conn: sqlite3.Connection) -> None:
+    """Ajout de la colonne portfolio_adjusted dans Swaps."""
+    try:
+        conn.execute(
+            "ALTER TABLE Swaps ADD COLUMN portfolio_adjusted INTEGER NOT NULL DEFAULT 0"
+        )
+    except sqlite3.OperationalError:
+        logger.debug("Colonne portfolio_adjusted déjà présente dans Swaps, skip")
+
+
+def _migrate_v9(conn: sqlite3.Connection) -> None:
+    """Ajout de la colonne portfolio_adjusted dans Operations."""
+    try:
+        conn.execute(
+            "ALTER TABLE Operations ADD COLUMN portfolio_adjusted INTEGER NOT NULL DEFAULT 0"
+        )
+    except sqlite3.OperationalError:
+        logger.debug("Colonne portfolio_adjusted déjà présente dans Operations, skip")
+
+
 MIGRATIONS: dict = {
     1: _migrate_v1,
     2: _migrate_v2,
@@ -252,6 +272,8 @@ MIGRATIONS: dict = {
     5: _migrate_v5,
     6: _migrate_v6,
     7: _migrate_v7,
+    8: _migrate_v8,
+    9: _migrate_v9,
 }
 
 
