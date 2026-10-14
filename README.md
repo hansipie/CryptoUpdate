@@ -68,7 +68,7 @@ uv sync
 Configure `settings.json` at the root of the project:
 ```json
 {
-    "MarketRaccoon":    { "url": "http://api.marketraccoon.fr", "token": "" },
+    "MarketRaccoon":    { "url": "https://api.marketraccoon.fr", "token": "" },
     "RatesDB":          { "url": "https://free.ratesdb.com/v1/rates" },
     "Coinmarketcap":    { "token": "your-coinmarketcap-token" },
     "AI":               { "token": "your-anthropic-api-key" },
