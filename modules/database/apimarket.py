@@ -6,8 +6,9 @@ formatting, and timezone conversions for financial data.
 """
 
 import logging
-from datetime import datetime, timezone
-from typing import Optional
+import os
+import time
+from datetime import UTC, datetime
 
 import pandas as pd
 import requests
@@ -16,6 +17,7 @@ from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
 from modules.database.fiat_cache import FiatCacheManager
+from modules.database.price_cache import PriceCache
 
 logger = logging.getLogger(__name__)
 
@@ -25,6 +27,9 @@ _TIMEOUT = 10
 # Taille de page maximale acceptée par l'API (au-delà elle plafonne à 10000)
 _PAGE_SIZE = 10000
 _RETRY_STATUS = (429, 500, 502, 503, 504)
+_DAY = 86400
+# Au-delà de ce délai, la fin de série (données récentes) est rafraîchie
+_RECENT_TTL = 3600
 
 
 class ApiMarket:
@@ -40,7 +45,9 @@ class ApiMarket:
         cache (FiatCacheManager): Optional cache manager for API responses
     """
 
-    def __init__(self, url: str, api_key: str = None, cache_file: Optional[str] = None):
+    def __init__(
+        self, url: str, api_key: str | None = None, cache_file: str | None = None
+    ):
         """Initialize ApiMarket client.
 
         Args:
@@ -53,6 +60,13 @@ class ApiMarket:
         self.api_key = api_key
         self.local_timezone = tzlocal.get_localzone()
         self.cache = FiatCacheManager(cache_file) if cache_file else None
+        self.price_cache = (
+            PriceCache(
+                os.path.join(os.path.dirname(cache_file), "api_price_cache.sqlite3")
+            )
+            if cache_file
+            else None
+        )
         self.session = self._build_session()
 
     def _build_session(self) -> requests.Session:
@@ -78,7 +92,7 @@ class ApiMarket:
         session.mount("http://", HTTPAdapter(max_retries=retry))
         return session
 
-    def _get(self, url: str, params: Optional[dict] = None) -> Optional[requests.Response]:
+    def _get(self, url: str, params: dict | None = None) -> requests.Response | None:
         """GET a URL with the shared session.
 
         Args:
@@ -94,7 +108,7 @@ class ApiMarket:
             logger.error("API request failed: %s", e)
             return None
 
-    def _get_paginated(self, path: str, params: Optional[dict] = None) -> Optional[list]:
+    def _get_paginated(self, path: str, params: dict | None = None) -> list | None:
         """Fetch every page of a paginated endpoint.
 
         Args:
@@ -167,7 +181,7 @@ class ApiMarket:
         logger.error("Error fetching fiat rates: %s", response.status_code)
         return None
 
-    def get_fiat_latest_rate_cached(self) -> Optional[pd.DataFrame]:
+    def get_fiat_latest_rate_cached(self) -> pd.DataFrame | None:
         """Get latest currency rates with caching support.
 
         This is the cached version of get_fiat_latest_rate(). If cache is disabled
@@ -190,7 +204,7 @@ class ApiMarket:
 
         return self._deserialize_latest_rate(cached_data)
 
-    def _fetch_and_serialize_latest_rate(self) -> Optional[dict]:
+    def _fetch_and_serialize_latest_rate(self) -> dict | None:
         """Fetch latest rate from API and serialize for caching.
 
         Returns:
@@ -232,7 +246,7 @@ class ApiMarket:
         df = df.set_index("Date")
         return df
 
-    def get_currency(self, timestamp: int = None) -> pd.DataFrame:
+    def get_currency(self, timestamp: int | None = None) -> pd.DataFrame:
         """Get fiat currency exchange rates from the API.
 
         If timestamp is provided, fetches the interpolated rate for that specific
@@ -253,7 +267,7 @@ class ApiMarket:
 
             # Convert Unix timestamp to ISO 8601 format
             dt = datetime.fromtimestamp(timestamp, tz=self.local_timezone)
-            date_str = dt.astimezone(timezone.utc).isoformat()
+            date_str = dt.astimezone(UTC).isoformat()
 
             response = self._get(self.url + "/api/v1/fiat", params={"date": date_str})
             if response is None:
@@ -301,7 +315,7 @@ class ApiMarket:
         logger.info("Retrieved %d total fiat records", len(df))
         return df
 
-    def get_currency_cached(self) -> Optional[pd.DataFrame]:
+    def get_currency_cached(self) -> pd.DataFrame | None:
         """Get the full fiat history with caching support.
 
         Falls back to a direct API call when the cache is disabled.
@@ -322,7 +336,7 @@ class ApiMarket:
         df["Date"] = pd.to_datetime(df["Date"], format="ISO8601")
         return df.set_index("Date").sort_index()
 
-    def _fetch_and_serialize_fiat_history(self) -> Optional[dict]:
+    def _fetch_and_serialize_fiat_history(self) -> dict | None:
         """Fetch the full fiat history from API and serialize for caching."""
         df = self.get_currency()
         if df is None or df.empty:
@@ -331,7 +345,7 @@ class ApiMarket:
         out["Date"] = out["Date"].map(lambda d: d.isoformat())
         return {"records": out.to_dict(orient="records")}
 
-    def get_coins(self, symbols: list = None) -> pd.DataFrame:
+    def get_coins(self, symbols: list | None = None) -> pd.DataFrame:
         """Get list of coins from the API.
 
         Args:
@@ -355,10 +369,10 @@ class ApiMarket:
 
     def get_cryptocurrency_market(
         self,
-        coinid: int = None,
-        token_symbol: str = None,
-        from_timestamp: int = None,
-        to_timestamp: int = None,
+        coinid: int | None = None,
+        token_symbol: str | None = None,
+        from_timestamp: int | None = None,
+        to_timestamp: int | None = None,
     ) -> pd.DataFrame:
         """Get cryptocurrency market data from the API.
 
@@ -386,17 +400,7 @@ class ApiMarket:
             return None
 
         logger.debug("Get cryptocurrency market data for coinid: %d", coinid)
-
-        # Build query parameters
-        params = {"coinid": coinid}
-        if from_timestamp:
-            dt = datetime.fromtimestamp(from_timestamp, tz=self.local_timezone)
-            params["startdate"] = dt.astimezone(timezone.utc).isoformat()
-        if to_timestamp:
-            dt = datetime.fromtimestamp(to_timestamp, tz=self.local_timezone)
-            params["enddate"] = dt.astimezone(timezone.utc).isoformat()
-
-        all_results = self._get_paginated("/api/v1/cryptocurrency", params)
+        all_results = self._fetch_market_results(coinid, from_timestamp, to_timestamp)
         if not all_results:
             logger.info("No cryptocurrency data retrieved")
             return None
@@ -420,7 +424,108 @@ class ApiMarket:
         logger.info("Retrieved %d total cryptocurrency records", len(df))
         return df
 
-    def get_coins_cached(self, symbols: list = None) -> Optional[pd.DataFrame]:
+    def _fetch_market_results(
+        self,
+        coinid: int,
+        from_timestamp: int | None = None,
+        to_timestamp: int | None = None,
+    ) -> list | None:
+        """Fetch raw market records of a coin between two Unix timestamps.
+
+        Returns:
+            List of API records, or None on error / no content
+        """
+        params = {"coinid": coinid}
+        if from_timestamp:
+            dt = datetime.fromtimestamp(from_timestamp, tz=self.local_timezone)
+            params["startdate"] = dt.astimezone(UTC).isoformat()
+        if to_timestamp:
+            dt = datetime.fromtimestamp(to_timestamp, tz=self.local_timezone)
+            params["enddate"] = dt.astimezone(UTC).isoformat()
+        return self._get_paginated("/api/v1/cryptocurrency", params)
+
+    def _refresh_price_cache(self, coinid: int, lo: int, hi: int) -> None:
+        """Fetch only what the price cache is missing for [lo, hi].
+
+        Past prices are immutable, so a range already covered is never fetched
+        again. The missing head and the newer tail are fetched separately; the
+        tail is refreshed at most once per _RECENT_TTL unless a day or more is
+        missing.
+        """
+        now = int(time.time())
+        end = min(hi, now)
+        coverage = self.price_cache.get_coverage(coinid)
+
+        if coverage is None:
+            fetches = [(lo, end, now)]
+        else:
+            c_from, c_to, fetched_at = coverage
+            fetches = []
+            if lo < c_from:
+                # Head: data newer than the cache is not refreshed by this fetch
+                fetches.append((lo, c_from, fetched_at))
+            if end > c_to and (now - fetched_at >= _RECENT_TTL or end - c_to > _DAY):
+                # Tail: re-fetch one overlapping day to refresh interpolated edges
+                fetches.append((c_to - _DAY, end, now))
+
+        for start, stop, stamp in fetches:
+            results = self._fetch_market_results(coinid, start, stop)
+            if results is None:
+                logger.warning("Price fetch failed for coin %s, using cache", coinid)
+                continue
+            rows = []
+            for rec in results:
+                if rec.get("price") is None:
+                    continue
+                ts = int(pd.Timestamp(rec["last_updated"]).timestamp())
+                rows.append((ts, float(rec["price"]), rec.get("interpolated", False)))
+            self.price_cache.store(coinid, rows, start, stop, stamp)
+            logger.debug(
+                "Price cache: coin %s +%d rows for [%d, %d]",
+                coinid,
+                len(rows),
+                start,
+                stop,
+            )
+
+    def get_cryptocurrency_market_incremental(
+        self,
+        coinid: int,
+        from_timestamp: int | None = None,
+        to_timestamp: int | None = None,
+    ) -> pd.DataFrame | None:
+        """Get a coin's price series, downloading only what is not cached yet.
+
+        The returned range is padded by one day on each side so that local
+        interpolation is exact at the edges.
+
+        Args:
+            coinid: MarketRaccoon coin id
+            from_timestamp: Unix start (None = since the beginning)
+            to_timestamp: Unix end (None = now)
+
+        Returns:
+            DataFrame with columns: Date (index), Price, source_currency,
+            interpolated; None if no data
+        """
+        lo = max(0, (from_timestamp or 0) - _DAY)
+        hi = (to_timestamp or int(time.time())) + _DAY
+        self._refresh_price_cache(coinid, lo, hi)
+
+        rows = self.price_cache.read(coinid, lo, hi)
+        if not rows:
+            return None
+        df = pd.DataFrame(rows, columns=["ts", "Price", "interpolated"])
+        df["Date"] = (
+            pd.to_datetime(df["ts"], unit="s", utc=True)
+            .dt.tz_convert(self.local_timezone)
+            .dt.tz_localize(None)
+        )
+        df["interpolated"] = df["interpolated"].astype(bool)
+        df["source_currency"] = _SOURCE_CURRENCY
+        return df.set_index("Date")[["Price", "source_currency", "interpolated"]]
+
+    def get_coins_cached(self, symbols: list | None = None) -> pd.DataFrame | None:
         """Get list of coins with caching support.
 
         This is the cached version of get_coins(). If cache is disabled
@@ -451,7 +556,7 @@ class ApiMarket:
 
         return self._deserialize_coins(cached_data)
 
-    def _fetch_and_serialize_coins(self, symbols: list = None) -> Optional[dict]:
+    def _fetch_and_serialize_coins(self, symbols: list | None = None) -> dict | None:
         """Fetch coins from API and serialize for caching.
 
         Args:
@@ -481,11 +586,11 @@ class ApiMarket:
 
     def get_cryptocurrency_market_cached(
         self,
-        coinid: int = None,
-        token_symbol: str = None,
-        from_timestamp: int = None,
-        to_timestamp: int = None,
-    ) -> Optional[pd.DataFrame]:
+        coinid: int | None = None,
+        token_symbol: str | None = None,
+        from_timestamp: int | None = None,
+        to_timestamp: int | None = None,
+    ) -> pd.DataFrame | None:
         """Get cryptocurrency market data with caching support.
 
         This is the cached version of get_cryptocurrency_market(). If cache is disabled
@@ -518,85 +623,11 @@ class ApiMarket:
             logger.error("coinid or token_symbol required")
             return None
 
-        # Create cache key based on parameters
-        cache_key = f"crypto_{coinid}_{from_timestamp or 0}_{to_timestamp or 0}"
-
-        cached_data = self.cache.get_or_fetch(
-            cache_key,
-            lambda: self._fetch_and_serialize_crypto_market(
-                coinid, from_timestamp, to_timestamp
-            ),
+        return self.get_cryptocurrency_market_incremental(
+            coinid, from_timestamp, to_timestamp
         )
 
-        if cached_data is None:
-            return None
-
-        return self._deserialize_crypto_market(cached_data)
-
-    def _fetch_and_serialize_crypto_market(
-        self, coinid: int, from_timestamp: int = None, to_timestamp: int = None
-    ) -> Optional[dict]:
-        """Fetch cryptocurrency market data from API and serialize for caching.
-
-        Args:
-            coinid: Coin ID to fetch
-            from_timestamp: Optional Unix timestamp for start date
-            to_timestamp: Optional Unix timestamp for end date
-
-        Returns:
-            Serialized market data dict or None if fetch failed
-        """
-        df = self.get_cryptocurrency_market(
-            coinid=coinid, from_timestamp=from_timestamp, to_timestamp=to_timestamp
-        )
-
-        if df is None or df.empty:
-            return None
-
-        # Serialize DataFrame to cacheable dict
-        # Convert datetime index to ISO strings
-        records = []
-        for date, row in df.iterrows():
-            records.append(
-                {
-                    "date": date.isoformat(),
-                    "price": float(row["Price"]),
-                    "interpolated": bool(row.get("interpolated", False)),
-                }
-            )
-
-        # Préserver la métadonnée de devise source
-        source_currency = (
-            df["source_currency"].iloc[0] if "source_currency" in df.columns else "USD"
-        )
-
-        return {"records": records, "source_currency": source_currency}
-
-    def _deserialize_crypto_market(self, cached_data: dict) -> pd.DataFrame:
-        """Deserialize cached cryptocurrency market data back to DataFrame.
-
-        Args:
-            cached_data: Serialized market data from cache
-
-        Returns:
-            DataFrame with same structure as get_cryptocurrency_market()
-        """
-        records = cached_data["records"]
-
-        # Reconstruct DataFrame
-        df = pd.DataFrame(records)
-        df["date"] = pd.to_datetime(df["date"], format="ISO8601")
-        df = df.rename(columns={"date": "Date", "price": "Price"})
-        if "interpolated" not in df.columns:  # anciens caches
-            df["interpolated"] = False
-        # Restaurer la métadonnée de devise source (USD par défaut pour rétrocompatibilité cache)
-        df["source_currency"] = cached_data.get("source_currency", _SOURCE_CURRENCY)
-        df = df.set_index("Date")
-        df = df.sort_index()
-
-        return df
-
-    def get_cryptocurrency_latest_cached(self) -> Optional[pd.DataFrame]:
+    def get_cryptocurrency_latest_cached(self) -> pd.DataFrame | None:
         """Get latest cryptocurrency market data with caching support.
 
         This is the cached version of get_cryptocurrency_latest(). If cache is disabled
@@ -617,7 +648,7 @@ class ApiMarket:
 
         return self._deserialize_latest(cached_data)
 
-    def _fetch_and_serialize_latest(self) -> Optional[dict]:
+    def _fetch_and_serialize_latest(self) -> dict | None:
         """Fetch latest cryptocurrency data from API and serialize for caching.
 
         Returns:
@@ -655,7 +686,7 @@ class ApiMarket:
         df = df.set_index("Date")
         return df
 
-    def get_cryptocurrency_latest(self, symbols: list = None) -> pd.DataFrame:
+    def get_cryptocurrency_latest(self, symbols: list | None = None) -> pd.DataFrame:
         """Get latest cryptocurrency market data for all coins.
 
         Args:

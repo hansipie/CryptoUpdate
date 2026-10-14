@@ -57,6 +57,7 @@ app.py
 - `operations.py` — Transaction history
 - `market.py` — Market data storage
 - `apimarket.py` — MarketRaccoon API integration
+- `price_cache.py` — Incremental SQLite cache of MarketRaccoon price history (`data/api_price_cache.sqlite3`, disposable; fetches only missing head/tail per coin)
 - `swaps.py` — Token swap transactions
 - `customdata.py` — Key-value config storage (stores `db_version`)
 - `migrations.py` — Versioned schema migrations (v1–v9)

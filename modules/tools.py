@@ -7,30 +7,34 @@ This module provides various utility functions for:
 - Price calculations and interpolations
 """
 
-from datetime import datetime
 import glob
 import logging
 import os
 import shutil
 import sqlite3
+from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime
 
 import numpy as np
 import pandas as pd
 import requests
 import streamlit as st
 
+from modules.database.apimarket import ApiMarket
 from modules.database.customdata import Customdata
 from modules.database.market import Market
 from modules.database.portfolios import Portfolios
 from modules.database.tokensdb import TokensDatabase
-from modules.database.apimarket import ApiMarket
 from modules.token_metadata import TokenMetadataManager
 from modules.utils import debug_prefix, interpolate
 
 logger = logging.getLogger(__name__)
 
+# Téléchargements MarketRaccoon en parallèle (quota API : 100 req/min sans clé)
+_API_MAX_WORKERS = 4
 
-def get_currency_symbol(currency_code: str = None) -> str:
+
+def get_currency_symbol(currency_code: str | None = None) -> str:
     """Obtient le symbole pour un code devise donné.
 
     Args:
@@ -48,7 +52,7 @@ def get_currency_symbol(currency_code: str = None) -> str:
 
 
 def convert_price_to_target_currency(
-    value: float, source_currency: str, target_currency: str = None
+    value: float, source_currency: str, target_currency: str | None = None
 ) -> float:
     """Convertit un montant d'une devise source vers une devise cible (taux actuel).
 
@@ -92,7 +96,9 @@ def convert_price_to_target_currency(
         usd_to_eur_rate = df_rate["price"].iloc[-1]  # Ex: 0.85 (1 USD = 0.85 EUR)
 
         if not usd_to_eur_rate or usd_to_eur_rate < 0:
-            logger.warning("Taux USD/EUR invalide: %s, retour valeur originale", usd_to_eur_rate)
+            logger.warning(
+                "Taux USD/EUR invalide: %s, retour valeur originale", usd_to_eur_rate
+            )
             return value
 
         # Conversion USD → EUR
@@ -118,7 +124,7 @@ def convert_dataframe_prices_historical(
     df: pd.DataFrame,
     price_column: str,
     source_currency: str,
-    target_currency: str = None,
+    target_currency: str | None = None,
     fiat_rates_df: pd.DataFrame = None,
 ) -> pd.DataFrame:
     """Convertit les prix d'un DataFrame en utilisant les taux de change historiques.
@@ -228,7 +234,6 @@ def get_cached_api_market() -> ApiMarket:
     return st.session_state.api_market_instance
 
 
-
 def update_database(dbfile: str, cmc_apikey: str, debug: bool):
     """Update the database with the latest market data"""
 
@@ -283,9 +288,7 @@ def update_database(dbfile: str, cmc_apikey: str, debug: bool):
     TokensDatabase(dbfile).add_tokens(new_entries)
 
     custom = Customdata(dbfile)
-    custom.set(
-        "last_update", str(int(pd.Timestamp.now(tz="UTC").timestamp())), "int"
-    )
+    custom.set("last_update", str(int(pd.Timestamp.now(tz="UTC").timestamp())), "int")
 
 
 def parse_last_update(last_update_data: tuple) -> pd.Timestamp:
@@ -413,7 +416,7 @@ def load_settings(settings: dict):
     # fails, fall back to a safe local path inside the project directory.
     try:
         os.makedirs(st.session_state.settings["data_path"], exist_ok=True)
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         logger.error(
             "Unable to create data_path %s: %s",
             st.session_state.settings["data_path"],
@@ -424,14 +427,14 @@ def load_settings(settings: dict):
             os.makedirs(fallback_data, exist_ok=True)
             st.session_state.settings["data_path"] = fallback_data
             logger.info("Falling back to data_path: %s", fallback_data)
-        except Exception as e2:
+        except Exception as e2:  # noqa: BLE001
             logger.critical(
                 "Unable to create fallback data path %s: %s", fallback_data, e2
             )
 
     try:
         os.makedirs(st.session_state.settings["archive_path"], exist_ok=True)
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         logger.warning(
             "Unable to create archive_path %s: %s",
             st.session_state.settings["archive_path"],
@@ -444,14 +447,14 @@ def load_settings(settings: dict):
     if db_dir:
         try:
             os.makedirs(db_dir, exist_ok=True)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.error("Unable to create db directory %s: %s", db_dir, e)
 
     try:
         # Attempt to open/create the database file
         with sqlite3.connect(st.session_state.settings["dbfile"]) as _conn:
             pass
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         logger.error(
             "Unable to create/open DB file %s: %s",
             st.session_state.settings["dbfile"],
@@ -463,7 +466,7 @@ def load_settings(settings: dict):
                 pass
             st.session_state.settings["dbfile"] = fallback_db
             logger.info("Falling back to dbfile: %s", fallback_db)
-        except Exception as e2:
+        except Exception as e2:  # noqa: BLE001
             logger.critical("Unable to create fallback DB file %s: %s", fallback_db, e2)
 
     # Load fiat currency setting
@@ -647,7 +650,7 @@ def _get_api_latest_prices() -> dict:
         # Fetch prices with symbol filter to avoid duplicates
         # NOTE: Bypass cache to pass symbols parameter
         latest_df = api.get_cryptocurrency_latest(symbols=portfolio_tokens)
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         logger.warning("Could not get portfolio tokens, fetching all: %s", e)
         latest_df = api.get_cryptocurrency_latest()
 
@@ -736,8 +739,8 @@ def _interpolate_from_series(series: pd.Series, timestamp: int) -> float:
 def calculate_crypto_rate_api(
     token_a: str,
     token_b: str,
-    prices_usd: dict = None,
-    usd_to_eur: float = None,
+    prices_usd: dict | None = None,
+    usd_to_eur: float | None = None,
 ) -> float:
     """Calculate the current rate between two tokens using MarketRaccoon API.
 
@@ -815,6 +818,7 @@ def batch_convert_historical_api(
 
     # Pre-load price series for each token (in USD)
     series_cache = {}
+    coin_ids = {}
     for token in all_tokens:
         if token == "USD":
             series_cache[token] = None  # Always 1.0
@@ -827,17 +831,33 @@ def batch_convert_historical_api(
             else:
                 series_cache[token] = None
         else:
-            mr_id = metadata.get_mr_id(token)
-            crypto_df = api.get_cryptocurrency_market_cached(
-                coinid=mr_id,
-                token_symbol=None if mr_id else token,
-                from_timestamp=min_ts,
-                to_timestamp=max_ts,
-            )
-            if crypto_df is not None and not crypto_df.empty:
-                series_cache[token] = crypto_df["Price"]
-            else:
+            # Resolve ids here (main thread): worker threads must only hit the
+            # thread-safe price cache, not Streamlit state or the JSON cache.
+            coin_id = metadata.get_mr_id(token)
+            if coin_id is None:
+                coins_df = api.get_coins_cached(symbols=[token])
+                if coins_df is not None and not coins_df.empty:
+                    coin_id = int(coins_df.iloc[0]["id"])
+            if coin_id is None:
+                logger.warning("Token %s not found in MarketRaccoon", token)
                 series_cache[token] = None
+            else:
+                coin_ids[token] = coin_id
+
+    def _load_series(item):
+        token, coin_id = item
+        crypto_df = api.get_cryptocurrency_market_cached(
+            coinid=coin_id, from_timestamp=min_ts, to_timestamp=max_ts
+        )
+        if crypto_df is not None and not crypto_df.empty:
+            return token, crypto_df["Price"]
+        return token, None
+
+    if coin_ids:
+        workers = min(_API_MAX_WORKERS, len(coin_ids))
+        with ThreadPoolExecutor(max_workers=workers) as pool:
+            for token, series in pool.map(_load_series, coin_ids.items()):
+                series_cache[token] = series
 
     def _price_usd(token, ts):
         if token == "USD":
@@ -878,9 +898,9 @@ def calc_perf_api(
     df: pd.DataFrame,
     col_token: str,
     col_rate: str,
-    col_currency: str = None,
-    prices_usd: dict = None,
-    usd_to_eur: float = None,
+    col_currency: str | None = None,
+    prices_usd: dict | None = None,
+    usd_to_eur: float | None = None,
 ) -> pd.DataFrame:
     """Calculate current performance using MarketRaccoon API prices.
 
@@ -1000,7 +1020,7 @@ def update():
         st.toast("Prices updated", icon=":material/check:")
         st.rerun()
     except (ConnectionError, ValueError) as e:
-        st.error(f"Update Error: {str(e)}")
+        st.error(f"Update Error: {e!s}")
         logger.exception("Price update failed")
 
 
@@ -1030,7 +1050,7 @@ def backup_database(dbfile: str, max_backups: int = 10) -> str:
             f"{db_size * 2 // (1024**2)} Mo requis"
         )
 
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    timestamp = datetime.now().astimezone().strftime("%Y%m%d_%H%M%S")
     backup_file = f"{dbfile}_{timestamp}.bak"
 
     shutil.copy2(dbfile, backup_file)
@@ -1045,6 +1065,8 @@ def backup_database(dbfile: str, max_backups: int = 10) -> str:
             os.remove(oldest)
             logger.info("Ancienne sauvegarde supprimée : %s", oldest)
         except OSError as e:
-            logger.warning("Impossible de supprimer l'ancienne sauvegarde %s : %s", oldest, e)
+            logger.warning(
+                "Impossible de supprimer l'ancienne sauvegarde %s : %s", oldest, e
+            )
 
     return backup_file
