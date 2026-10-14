@@ -2,8 +2,8 @@ import logging
 import os
 
 import pandas as pd
-import streamlit as st
 import plotly.graph_objects as go
+import streamlit as st
 
 from modules.configuration import Configuration
 from modules.database.apimarket import ApiMarket
@@ -13,11 +13,12 @@ from modules.database.tokensdb import TokensDatabase
 from modules.plotter import plot_as_pie
 from modules.token_metadata import TokenMetadataManager
 from modules.tools import (
+    convert_dataframe_prices_historical,
     create_portfolio_dataframe,
     get_currency_symbol,
-    convert_dataframe_prices_historical,
 )
-from modules.utils import to_timestamp_a as toTimestamp_A, to_timestamp_b as toTimestamp_B
+from modules.utils import to_timestamp_a as toTimestamp_A
+from modules.utils import to_timestamp_b as toTimestamp_B
 
 logger = logging.getLogger(__name__)
 
@@ -25,7 +26,7 @@ logger = logging.getLogger(__name__)
 # Cached API wrappers for instant toggle responses
 @st.cache_data(ttl=3600, show_spinner=False)
 def fetch_api_coins(
-    api_url: str, api_key: str, cache_file: str, symbols: tuple = None
+    api_url: str, api_key: str, cache_file: str, symbols: tuple | None = None
 ) -> pd.DataFrame:
     """Fetch coins from API with Streamlit session cache.
 
@@ -51,7 +52,7 @@ def fetch_api_crypto_market(
     token_symbol: str,
     from_ts: int,
     to_ts: int,
-    coinid: int = None,
+    coinid: int | None = None,
 ) -> pd.DataFrame:
     """Fetch cryptocurrency market data from API with Streamlit session cache.
 
@@ -68,9 +69,28 @@ def fetch_api_crypto_market(
         DataFrame with columns: Date (index), Price or None if empty
     """
     api = ApiMarket(api_url, api_key=api_key, cache_file=cache_file)
-    return api.get_cryptocurrency_market_cached(
-        coinid=coinid, token_symbol=token_symbol, from_timestamp=from_ts, to_timestamp=to_ts
+    df = api.get_cryptocurrency_market_cached(
+        coinid=coinid,
+        token_symbol=token_symbol,
+        from_timestamp=from_ts,
+        to_timestamp=to_ts,
     )
+    if df is None or df.empty:
+        return df
+    # L'API renvoie la série avec un jour de marge de chaque côté : on recoupe
+    # sur la fenêtre demandée (index en heure locale, sans fuseau)
+    start = (
+        pd.to_datetime(max(from_ts, 0), unit="s", utc=True)
+        .tz_convert(api.local_timezone)
+        .tz_localize(None)
+    )
+    end = (
+        pd.to_datetime(to_ts, unit="s", utc=True)
+        .tz_convert(api.local_timezone)
+        .tz_localize(None)
+    )
+    df = df.loc[(df.index >= start) & (df.index <= end)]
+    return df if not df.empty else None
 
 
 @st.cache_data(ttl=3600, show_spinner=False)
@@ -92,8 +112,8 @@ def fetch_api_fiat_rates(api_url: str, api_key: str, cache_file: str) -> pd.Data
 
 def plot_modern_graph(
     df: pd.DataFrame,
-    title: str = None,
-    y_label: str = None,
+    title: str | None = None,
+    y_label: str | None = None,
     optimize_y_range: bool = False,
 ):
     """Plot data with modern style matching other pages.
@@ -124,7 +144,7 @@ def plot_modern_graph(
                 mode="lines",
                 name=col,
                 fill="tozeroy" if len(df.columns) == 1 else None,
-                line=dict(width=2),
+                line={"width": 2},
             )
         )
 
@@ -162,7 +182,9 @@ def plot_modern_graph(
     st.plotly_chart(fig, use_container_width=True)
 
 
-def plot_dual_axis_graph(df: pd.DataFrame, title: str = None, token: str = None):
+def plot_dual_axis_graph(
+    df: pd.DataFrame, title: str | None = None, token: str | None = None
+):
     """Plot data with two separate optimized y-axes for Value and Count.
 
     Args:
@@ -201,7 +223,7 @@ def plot_dual_axis_graph(df: pd.DataFrame, title: str = None, token: str = None)
             y=df[value_col],
             mode="lines",
             name=f"Value ({currency_symbol})",
-            line=dict(width=2, color="#1f77b4"),
+            line={"width": 2, "color": "#1f77b4"},
             yaxis="y1",
         )
     )
@@ -213,7 +235,7 @@ def plot_dual_axis_graph(df: pd.DataFrame, title: str = None, token: str = None)
             y=df[count_col],
             mode="lines",
             name="Count",
-            line=dict(width=2, color="#ff7f0e"),
+            line={"width": 2, "color": "#ff7f0e"},
             yaxis="y2",
         )
     )
@@ -241,20 +263,26 @@ def plot_dual_axis_graph(df: pd.DataFrame, title: str = None, token: str = None)
     fig.update_layout(
         title=title,
         xaxis_title="Date",
-        yaxis=dict(
-            title=f"Value ({currency_symbol})",
-            range=[value_min - value_margin, value_max + value_margin],
-            side="left",
-        ),
-        yaxis2=dict(
-            title="Count",
-            range=[count_min - count_margin, count_max + count_margin],
-            overlaying="y",
-            side="right",
-        ),
+        yaxis={
+            "title": f"Value ({currency_symbol})",
+            "range": [value_min - value_margin, value_max + value_margin],
+            "side": "left",
+        },
+        yaxis2={
+            "title": "Count",
+            "range": [count_min - count_margin, count_max + count_margin],
+            "overlaying": "y",
+            "side": "right",
+        },
         hovermode="x unified",
         height=400,
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+        legend={
+            "orientation": "h",
+            "yanchor": "bottom",
+            "y": 1.02,
+            "xanchor": "right",
+            "x": 1,
+        },
     )
 
     st.plotly_chart(fig, use_container_width=True)
@@ -315,8 +343,8 @@ def aggregater_ui():
         if not df.empty:
             try:
                 plot_as_pie(df, column=f"Value({target_currency})")
-            except Exception as e:
-                st.error(f"Error: {str(e)}")
+            except Exception as e:  # noqa: BLE001 - any plotting error is shown in the UI
+                st.error(f"Error: {e!s}")
         else:
             st.info("No data available")
 
@@ -348,7 +376,9 @@ def draw_tab_content(
                     cache_file = os.path.join(
                         st.session_state.settings["data_path"], "api_cache.json"
                     )
-                    metadata_manager = TokenMetadataManager(st.session_state.settings["dbfile"])
+                    metadata_manager = TokenMetadataManager(
+                        st.session_state.settings["dbfile"]
+                    )
                     mr_id = metadata_manager.get_mr_id(token)
                     df_prices = fetch_api_crypto_market(
                         api_url,
@@ -438,10 +468,17 @@ def draw_tab_content(
                 cache_file = os.path.join(
                     st.session_state.settings["data_path"], "api_cache.json"
                 )
-                metadata_manager = TokenMetadataManager(st.session_state.settings["dbfile"])
+                metadata_manager = TokenMetadataManager(
+                    st.session_state.settings["dbfile"]
+                )
                 mr_id = metadata_manager.get_mr_id(token)
                 df_view = fetch_api_crypto_market(
-                    api_url, api_key, cache_file, token, start_timestamp, end_timestamp,
+                    api_url,
+                    api_key,
+                    cache_file,
+                    token,
+                    start_timestamp,
+                    end_timestamp,
                     coinid=mr_id,
                 )
 
@@ -535,7 +572,8 @@ def draw_tab_content(
                 help=f"Date: {min_price_date[0]}",
                 delta=(
                     f"{round(((current_price - min_price) / min_price) * 100, 2)} %"
-                    if min_price != 0 else "∞ %"
+                    if min_price != 0
+                    else "∞ %"
                 ),
             )
         with mcol4:
@@ -549,7 +587,8 @@ def draw_tab_content(
                 help=f"Date: {max_price_date[0]}",
                 delta=(
                     f"{round(((current_price - max_price) / max_price) * 100, 2)} %"
-                    if max_price != 0 else "∞ %"
+                    if max_price != 0
+                    else "∞ %"
                 ),
             )
 
@@ -628,8 +667,7 @@ def build_tabs(section: str = "Assets Balances", use_api: bool = False):
 
     if st.session_state.tokens:
         tabs = st.tabs(st.session_state.tokens)
-        idx_token = 0
-        for tab in tabs:
+        for idx_token, tab in enumerate(tabs):
             with tab:
                 draw_tab_content(
                     section,
@@ -640,11 +678,10 @@ def build_tabs(section: str = "Assets Balances", use_api: bool = False):
                     marketdb,
                     use_api,
                 )
-            idx_token += 1
 
 
 def build_price_tab(
-    df: pd.DataFrame, chart_title: str = None, chart_y_label: str = None
+    df: pd.DataFrame, chart_title: str | None = None, chart_y_label: str | None = None
 ):
     logger.debug("Build tabs")
     if df is None or df.empty:
@@ -653,7 +690,8 @@ def build_price_tab(
     if st.session_state.startdate < st.session_state.enddate:
         df_view = df.loc[df.index > pd.Timestamp(st.session_state.startdate)]
         df_view = df_view.loc[
-            df_view.index < pd.Timestamp(st.session_state.enddate) + pd.to_timedelta(1, unit="d")
+            df_view.index
+            < pd.Timestamp(st.session_state.enddate) + pd.to_timedelta(1, unit="d")
         ]
         df_view = df_view.loc[:, ["price"]]
         df_view = df_view.dropna()
