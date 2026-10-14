@@ -87,7 +87,7 @@ def fetch_api_fiat_rates(api_url: str, api_key: str, cache_file: str) -> pd.Data
         or None if empty
     """
     api = ApiMarket(api_url, api_key=api_key, cache_file=cache_file)
-    return api.get_currency()
+    return api.get_currency_cached()
 
 
 def plot_modern_graph(

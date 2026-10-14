@@ -24,6 +24,7 @@ from modules.database.market import Market
 from modules.database.portfolios import Portfolios
 from modules.database.tokensdb import TokensDatabase
 from modules.database.apimarket import ApiMarket
+from modules.token_metadata import TokenMetadataManager
 from modules.utils import debug_prefix, interpolate
 
 logger = logging.getLogger(__name__)
@@ -809,6 +810,9 @@ def batch_convert_historical_api(
     min_ts = int(df[timestamp_column].min())
     max_ts = int(df[timestamp_column].max())
 
+    # Known MarketRaccoon ids avoid one /coins lookup per token
+    metadata = TokenMetadataManager(st.session_state.settings["dbfile"])
+
     # Pre-load price series for each token (in USD)
     series_cache = {}
     for token in all_tokens:
@@ -816,15 +820,19 @@ def batch_convert_historical_api(
             series_cache[token] = None  # Always 1.0
         elif token == "EUR":
             # Fetch fiat history -> Series of USD->EUR rates
-            fiat_df = api.get_currency()
+            fiat_df = api.get_currency_cached()
             if fiat_df is not None and not fiat_df.empty:
                 # price = usd_to_eur rate, we need price in USD: 1/rate
                 series_cache[token] = 1.0 / fiat_df["price"].replace(0, pd.NA)
             else:
                 series_cache[token] = None
         else:
+            mr_id = metadata.get_mr_id(token)
             crypto_df = api.get_cryptocurrency_market_cached(
-                token_symbol=token, from_timestamp=min_ts, to_timestamp=max_ts
+                coinid=mr_id,
+                token_symbol=None if mr_id else token,
+                from_timestamp=min_ts,
+                to_timestamp=max_ts,
             )
             if crypto_df is not None and not crypto_df.empty:
                 series_cache[token] = crypto_df["Price"]
