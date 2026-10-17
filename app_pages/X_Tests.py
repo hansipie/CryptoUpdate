@@ -1,5 +1,6 @@
 import logging
-import sqlite3
+
+from modules.utils import db_connect
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 
@@ -22,7 +23,7 @@ def find_missing_dates(dbfile: str) -> list:
     Returns:
         List of dates (as strings) with no data
     """
-    with sqlite3.connect(dbfile) as con:
+    with db_connect(dbfile) as con:
         # Get all unique dates from the database
         query = """
         SELECT DISTINCT date(timestamp, 'unixepoch') as date

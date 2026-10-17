@@ -1,6 +1,7 @@
 import hashlib
 import logging
 import os
+import sqlite3
 
 import pandas as pd
 import tzlocal
@@ -28,6 +29,25 @@ def interpolate(x1, y1, x2, y2, x):
         raise ValueError(f"x={x} is out of range [{x1}, {x2}]")
     a, b = _find_linear_function(x1, y1, x2, y2)
     return a * x + b
+
+
+class ClosingConnection(sqlite3.Connection):
+    """SQLite connection whose `with` block also closes it.
+
+    The stock context manager only commits/rolls back and leaves the
+    connection open until garbage collection.
+    """
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        try:
+            return super().__exit__(exc_type, exc_value, traceback)
+        finally:
+            self.close()
+
+
+def db_connect(db_path: str, **kwargs) -> sqlite3.Connection:
+    """Open a SQLite connection to use as `with db_connect(path) as conn:`."""
+    return sqlite3.connect(db_path, factory=ClosingConnection, **kwargs)
 
 
 def to_timestamp_a(date, time):

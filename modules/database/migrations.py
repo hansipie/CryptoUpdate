@@ -8,6 +8,8 @@ sont appliquées séquentiellement.
 import logging
 import sqlite3
 
+from modules.utils import db_connect
+
 logger = logging.getLogger(__name__)
 
 
@@ -17,7 +19,7 @@ def _ensure_customdata(db_path: str) -> None:
     Doit être appelé avant toute lecture de db_version.
     """
     try:
-        with sqlite3.connect(db_path) as conn:
+        with db_connect(db_path) as conn:
             conn.execute(
                 """CREATE TABLE IF NOT EXISTS Customdata (
                     id    INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -34,7 +36,7 @@ def _ensure_customdata(db_path: str) -> None:
 def _get_db_version(db_path: str) -> int:
     """Retourne la version courante de la base (0 si absente)."""
     try:
-        with sqlite3.connect(db_path) as conn:
+        with db_connect(db_path) as conn:
             row = conn.execute(
                 "SELECT value FROM Customdata WHERE name = 'db_version'"
             ).fetchone()

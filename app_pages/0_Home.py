@@ -97,16 +97,22 @@ with st.container(border=True):
     invested_by_unit = Operations(
         st.session_state.settings["dbfile"]
     ).sum_buyoperations_by_unit()
-    total = round(
-        sum(
-            convert_price_to_target_currency(amount, unit)
-            for unit, amount in invested_by_unit.items()
-        ),
-        2,
+    converted_invested = [
+        convert_price_to_target_currency(amount, unit)
+        for unit, amount in invested_by_unit.items()
+    ]
+    # None = exchange rate unavailable: show n/a rather than a wrong total
+    total = (
+        None
+        if any(amount is None for amount in converted_invested)
+        else round(sum(converted_invested), 2)
     )
     currency_symbol = get_currency_symbol()
     with col1:
-        st.metric("Invested", value=f"{total} {currency_symbol}")
+        st.metric(
+            "Invested",
+            value="n/a" if total is None else f"{total} {currency_symbol}",
+        )
     with col2:
         # get last values
         balance = (
@@ -115,11 +121,14 @@ with st.container(border=True):
         balance = round(balance, 2)
         st.metric("Total value", value=f"{balance} {currency_symbol}")
     with col3:
-        st.metric(
-            "Profit",
-            value=f"{round(balance - total, 2)} {currency_symbol}",
-            delta=f"{round((((balance - total) / total) * 100) if total != 0 else 0, 2)} %",
-        )
+        if total is None:
+            st.metric("Profit", value="n/a")
+        else:
+            st.metric(
+                "Profit",
+                value=f"{round(balance - total, 2)} {currency_symbol}",
+                delta=f"{round((((balance - total) / total) * 100) if total != 0 else 0, 2)} %",
+            )
 
 with st.container(border=True):
     plot_total_value(df_sums)

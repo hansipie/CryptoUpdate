@@ -1,5 +1,6 @@
 import logging
-import sqlite3
+
+from modules.utils import db_connect
 
 import pandas as pd
 import tzlocal
@@ -15,7 +16,7 @@ class TokensDatabase:
 
     def __init_database(self):
         logger.debug("Init database")
-        with sqlite3.connect(self.db_path) as con:
+        with db_connect(self.db_path) as con:
             cur = con.cursor()
             cur.execute(
                 "CREATE TABLE IF NOT EXISTS TokensDatabase (timestamp INTEGER, token TEXT, price REAL, count REAL)"
@@ -25,7 +26,7 @@ class TokensDatabase:
     def get_sum_over_time(self) -> pd.DataFrame:
         """Get the sum of all tokens through time"""
         logger.debug("Get sums")
-        with sqlite3.connect(self.db_path) as con:
+        with db_connect(self.db_path) as con:
             df_sql = pd.read_sql_query("SELECT * from TokensDatabase", con)
             if df_sql.empty:
                 logger.warning("No data found in database")
@@ -54,7 +55,7 @@ class TokensDatabase:
         Uses pivot_table instead of multiple merges to avoid memory explosion.
         """
         logger.debug("Get balances")
-        with sqlite3.connect(self.db_path) as con:
+        with db_connect(self.db_path) as con:
             # Load all data at once and use pivot instead of multiple merges
             df_all = pd.read_sql_query(
                 """SELECT timestamp, token,
@@ -110,7 +111,7 @@ class TokensDatabase:
             Returns None if no data is found
         """
         logger.debug("Get counts for token %s", token)
-        with sqlite3.connect(self.db_path) as con:
+        with db_connect(self.db_path) as con:
             # conditions contains only SQL structure (no user data); values are in params
             conditions = "WHERE token = ?"
             params: list = [token]
@@ -139,7 +140,7 @@ class TokensDatabase:
     ) -> pd.DataFrame:
         """Get the balances of a token through time"""
         logger.debug("Get balances for token %s", token)
-        with sqlite3.connect(self.db_path) as con:
+        with db_connect(self.db_path) as con:
             # conditions contains only SQL structure (no user data); values are in params
             conditions = "WHERE token = ?"
             params: list = [token]
@@ -167,7 +168,7 @@ class TokensDatabase:
             return df
 
     def add_token(self, timestamp: int, token: str, price: float, count: float):
-        with sqlite3.connect(self.db_path) as con:
+        with db_connect(self.db_path) as con:
             cur = con.cursor()
             cur.execute(
                 "INSERT INTO TokensDatabase (timestamp, token, price, count) VALUES (?, ?, ?, ?)",
@@ -190,11 +191,11 @@ class TokensDatabase:
         ]
         df = pd.DataFrame(rows, columns=["timestamp", "token", "price", "count"])
         logger.debug("Dataframe to add:\n%s", df)
-        with sqlite3.connect(self.db_path) as con:
+        with db_connect(self.db_path) as con:
             df.to_sql("TokensDatabase", con, if_exists="append", index=False)
 
     def get_last_timestamp(self) -> int:
-        with sqlite3.connect(self.db_path) as con:
+        with db_connect(self.db_path) as con:
             df = pd.read_sql_query(
                 "SELECT MAX(timestamp) as timestamp from TokensDatabase;", con
             )
@@ -203,7 +204,7 @@ class TokensDatabase:
             return df["timestamp"][0]
 
     def get_last_timestamp_by_token(self, token: str) -> int:
-        with sqlite3.connect(self.db_path) as con:
+        with db_connect(self.db_path) as con:
             df = pd.read_sql_query(
                 "SELECT MAX(timestamp) as timestamp from TokensDatabase WHERE token = ?;",
                 con,
@@ -214,7 +215,7 @@ class TokensDatabase:
             return df["timestamp"][0]
 
     def drop_duplicate(self):
-        with sqlite3.connect(self.db_path) as con:
+        with db_connect(self.db_path) as con:
             df = pd.read_sql_query("SELECT * from TokensDatabase;", con)
             dupcount = df.duplicated().sum()
             logger.debug("Found %d rows with %d duplicated rows", len(df), dupcount)
@@ -225,7 +226,7 @@ class TokensDatabase:
                 df.to_sql("TokensDatabase", con, if_exists="append", index=False)
 
     def get_tokens(self) -> list:
-        with sqlite3.connect(self.db_path) as con:
+        with db_connect(self.db_path) as con:
             df = pd.read_sql_query(
                 "SELECT DISTINCT token from TokensDatabase ORDER BY token", con
             )

@@ -1,3 +1,4 @@
+import math
 from datetime import datetime
 import logging
 import pytz
@@ -52,8 +53,6 @@ class CMC:
             logger.info("Get current market prices from Coinmarketcap successfully")
             logger.debug("API response data: %s", content)
             for fiat in converts:
-                # Initialiser l'entrée pour chaque token
-                fiat_prices[fiat] = {"price": 0, "timestamp": 0}
                 try:
                     logger.debug(
                         "Price for %s: %s", fiat, content["data"][0]["quote"][fiat]
@@ -61,14 +60,22 @@ class CMC:
                     price_data = content["data"][0]["quote"][fiat]["price"]
                     timestamp_data = content["data"][0]["quote"][fiat]["last_updated"]
 
-                    if price_data is not None:
-                        fiat_prices[fiat]["price"] = price_data
-                        utc_time = datetime.strptime(
-                            timestamp_data, "%Y-%m-%dT%H:%M:%S.%fZ"
-                        )
-                        fiat_prices[fiat]["timestamp"] = utc_time.replace(
-                            tzinfo=pytz.UTC
-                        ).timestamp()
+                    # A missing/invalid rate must not be stored as (0, 0)
+                    if (
+                        isinstance(price_data, bool)
+                        or not isinstance(price_data, (int, float))
+                        or not math.isfinite(price_data)
+                        or price_data <= 0
+                    ):
+                        logger.error("No valid rate for %s: %r", fiat, price_data)
+                        continue
+                    utc_time = datetime.strptime(
+                        timestamp_data, "%Y-%m-%dT%H:%M:%S.%fZ"
+                    )
+                    fiat_prices[fiat] = {
+                        "price": price_data,
+                        "timestamp": utc_time.replace(tzinfo=pytz.UTC).timestamp(),
+                    }
 
                 except (KeyError, IndexError, TypeError) as e:
                     logger.error("Error getting price for %s : %s", fiat, str(e))
@@ -120,13 +127,19 @@ class CMC:
             content = response.json()
             crypto_prices = {}
             for name in content["data"]:
-                # Initialiser l'entrée pour chaque token
-                crypto_prices[name] = {"price": 0, "unit": unit}
                 try:
                     price_data = content["data"][name][0]["quote"][unit]["price"]
-                    if price_data is not None:
-                        crypto_prices[name]["price"] = price_data
                     logger.debug("Price for %s: %s", name, price_data)
+                    # Only keep a usable price: a missing/invalid one must not
+                    # be stored as 0 (it would zero the token's value)
+                    if (
+                        isinstance(price_data, bool)
+                        or not isinstance(price_data, (int, float))
+                        or not math.isfinite(price_data)
+                    ):
+                        logger.error("No valid price for %s: %r", name, price_data)
+                        continue
+                    crypto_prices[name] = {"price": price_data, "unit": unit}
                 except (KeyError, IndexError, TypeError) as e:
                     logger.error("Error getting price for %s : %s", name, str(e))
                     logger.debug("Data received: %s", content["data"][name])

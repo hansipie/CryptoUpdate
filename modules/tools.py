@@ -11,7 +11,6 @@ import glob
 import logging
 import os
 import shutil
-import sqlite3
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 
@@ -27,7 +26,7 @@ from modules.database.market import Market
 from modules.database.portfolios import Portfolios
 from modules.database.tokensdb import TokensDatabase
 from modules.token_metadata import TokenMetadataManager
-from modules.utils import debug_prefix, interpolate
+from modules.utils import debug_prefix, interpolate, db_connect
 
 logger = logging.getLogger(__name__)
 
@@ -67,7 +66,9 @@ def convert_price_to_target_currency(
                         Si None, utilise fiat_currency depuis settings.
 
     Returns:
-        Montant converti dans la devise cible
+        Montant converti dans la devise cible, ou None si la conversion est
+        impossible (taux indisponible ou devise non supportée) : renvoyer le
+        montant source ferait passer une valeur pour une autre devise.
     """
     if target_currency is None:
         target_currency = st.session_state.settings.get("fiat_currency", "EUR")
@@ -83,7 +84,7 @@ def convert_price_to_target_currency(
             source_currency,
             target_currency,
         )
-        return value
+        return None
 
     # Récupérer le taux USD→EUR depuis MarketRaccoon API
     try:
@@ -91,16 +92,16 @@ def convert_price_to_target_currency(
         df_rate = api_market.get_fiat_latest_rate_cached()
 
         if df_rate is None or df_rate.empty:
-            logger.warning("Taux de change non disponible, retour valeur originale")
-            return value
+            logger.warning("Taux de change non disponible, conversion impossible")
+            return None
 
         usd_to_eur_rate = df_rate["price"].iloc[-1]  # Ex: 0.85 (1 USD = 0.85 EUR)
 
         if not usd_to_eur_rate or usd_to_eur_rate < 0:
             logger.warning(
-                "Taux USD/EUR invalide: %s, retour valeur originale", usd_to_eur_rate
+                "Taux USD/EUR invalide: %s, conversion impossible", usd_to_eur_rate
             )
-            return value
+            return None
 
         # Conversion USD → EUR
         if source_currency == "USD" and target_currency == "EUR":
@@ -114,11 +115,11 @@ def convert_price_to_target_currency(
             logger.warning(
                 "Conversion %s→%s non supportée", source_currency, target_currency
             )
-            return value
+            return None
 
     except (requests.exceptions.RequestException, ValueError, KeyError) as e:
         logger.error("Erreur conversion devise: %s", e)
-        return value
+        return None
 
 
 def convert_dataframe_prices_historical(
@@ -490,7 +491,7 @@ def load_settings(settings: dict):
 
     try:
         # Attempt to open/create the database file
-        with sqlite3.connect(st.session_state.settings["dbfile"]) as _conn:
+        with db_connect(st.session_state.settings["dbfile"]) as _conn:
             pass
     except Exception as e:  # noqa: BLE001
         logger.error(
@@ -500,7 +501,7 @@ def load_settings(settings: dict):
         )
         fallback_db = os.path.join(os.getcwd(), "db.sqlite3")
         try:
-            with sqlite3.connect(fallback_db) as _conn:
+            with db_connect(fallback_db) as _conn:
                 pass
             st.session_state.settings["dbfile"] = fallback_db
             logger.info("Falling back to dbfile: %s", fallback_db)
@@ -1020,12 +1021,11 @@ def calc_perf_api(
                     )
                     return converted
                 else:
+                    # A USD price must not be shown as EUR: no value instead
                     logger.warning(
-                        "USD→EUR rate unavailable for %s, returning USD price", token
+                        "USD→EUR rate unavailable for %s, no EUR price", token
                     )
-                    return (
-                        token_price_usd  # Return USD price as fallback instead of None
-                    )
+                    return None
             else:
                 logger.warning(
                     "Unsupported currency: %s, returning USD price", currency

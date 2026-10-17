@@ -8,6 +8,8 @@ This module handles cryptocurrency portfolios including:
 
 import logging
 import sqlite3
+
+from modules.utils import db_connect
 from contextlib import contextmanager
 
 logging.getLogger("matplotlib").setLevel(logging.WARNING)
@@ -64,7 +66,7 @@ class Portfolios:
 
     def get_portfolio_names(self) -> list:
         logger.debug("Getting portfolios from database")
-        with sqlite3.connect(self.db_path) as conn:
+        with db_connect(self.db_path) as conn:
             cursor = conn.cursor()
             cursor.execute("SELECT name FROM Portfolios")
             # return sorted list of portfolios
@@ -75,7 +77,7 @@ class Portfolios:
 
     def get_portfolio(self, name: str) -> dict:
         logger.debug("Getting portfolio %s from database", name)
-        with sqlite3.connect(self.db_path) as conn:
+        with db_connect(self.db_path) as conn:
             cursor = conn.cursor()
             cursor.execute(
                 """
@@ -88,7 +90,7 @@ class Portfolios:
             return {row[0]: {"amount": row[1]} for row in cursor.fetchall()}
 
     def add_portfolio(self, name: str, bundle: int = 0):
-        with sqlite3.connect(self.db_path) as conn:
+        with db_connect(self.db_path) as conn:
             cursor = conn.cursor()
             cursor.execute(
                 "INSERT INTO Portfolios (name, bundle) VALUES (?, ?)", (name, bundle)
@@ -96,7 +98,7 @@ class Portfolios:
             conn.commit()
 
     def delete_portfolio(self, name: str):
-        with sqlite3.connect(self.db_path) as conn:
+        with db_connect(self.db_path) as conn:
             cursor = conn.cursor()
             cursor.execute("DELETE FROM Portfolios WHERE name = ?", (name,))
             conn.commit()
@@ -121,7 +123,7 @@ class Portfolios:
             )
 
     def get_tokens(self, name: str) -> dict:
-        with sqlite3.connect(self.db_path) as conn:
+        with db_connect(self.db_path) as conn:
             cursor = conn.cursor()
             cursor.execute(
                 """
@@ -134,7 +136,7 @@ class Portfolios:
             return {row[0]: row[1] for row in cursor.fetchall()}
 
     def get_token_by_portfolio(self, token: str) -> dict:
-        with sqlite3.connect(self.db_path) as conn:
+        with db_connect(self.db_path) as conn:
             cursor = conn.cursor()
             cursor.execute(
                 """
@@ -147,7 +149,7 @@ class Portfolios:
             return {row[0]: row[1] for row in cursor.fetchall()}
 
     def set_token(self, portfolio_name: str, token: str, amount: float):
-        with sqlite3.connect(self.db_path) as conn:
+        with db_connect(self.db_path) as conn:
             cursor = conn.cursor()
             cursor.execute(
                 """
@@ -167,7 +169,7 @@ class Portfolios:
             add_token_amount(conn, name, token, amount)
 
     def delete_token_by_name(self, name: str, token: str):
-        with sqlite3.connect(self.db_path) as conn:
+        with db_connect(self.db_path) as conn:
             cursor = conn.cursor()
             cursor.execute(
                 """
@@ -179,7 +181,7 @@ class Portfolios:
             conn.commit()
 
     def delete_token_by_id(self, portfolio_id: int, token: str):
-        with sqlite3.connect(self.db_path) as conn:
+        with db_connect(self.db_path) as conn:
             cursor = conn.cursor()
             cursor.execute(
                 "DELETE FROM Portfolios_Tokens WHERE portfolio_id = ? AND token = ?",
@@ -188,7 +190,7 @@ class Portfolios:
             conn.commit()
 
     def aggregate_portfolios(self) -> dict:
-        with sqlite3.connect(self.db_path) as conn:
+        with db_connect(self.db_path) as conn:
             cursor = conn.cursor()
             cursor.execute(
                 """

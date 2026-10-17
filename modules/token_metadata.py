@@ -3,6 +3,8 @@ Module pour gérer les métadonnées des tokens (tokens délistés, actifs, etc.
 """
 
 import sqlite3
+
+from modules.utils import db_connect
 from typing import Optional, List, Dict
 from enum import Enum
 from datetime import datetime
@@ -35,7 +37,7 @@ class TokenMetadataManager:
         Returns:
             TokenStatus si le token existe dans les métadonnées, None sinon
         """
-        with sqlite3.connect(self.db_path) as conn:
+        with db_connect(self.db_path) as conn:
             cursor = conn.cursor()
             cursor.execute(
                 """SELECT status
@@ -84,7 +86,7 @@ class TokenMetadataManager:
         Returns:
             Liste des symboles de tokens délistés
         """
-        with sqlite3.connect(self.db_path) as conn:
+        with db_connect(self.db_path) as conn:
             cursor = conn.cursor()
             cursor.execute(
                 "SELECT DISTINCT token FROM TokenMetadata WHERE status = ?",
@@ -99,7 +101,7 @@ class TokenMetadataManager:
         Returns:
             Liste des symboles de tokens actifs
         """
-        with sqlite3.connect(self.db_path) as conn:
+        with db_connect(self.db_path) as conn:
             cursor = conn.cursor()
             cursor.execute(
                 "SELECT DISTINCT token FROM TokenMetadata WHERE status = ?",
@@ -117,7 +119,7 @@ class TokenMetadataManager:
         Returns:
             Dictionnaire avec les informations du token, ou None si non trouvé
         """
-        with sqlite3.connect(self.db_path) as conn:
+        with db_connect(self.db_path) as conn:
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
             cursor.execute(
@@ -157,7 +159,7 @@ class TokenMetadataManager:
             last_valid_price_date: Date du dernier prix valide (si applicable)
             notes: Notes supplémentaires
         """
-        with sqlite3.connect(self.db_path) as conn:
+        with db_connect(self.db_path) as conn:
             cursor = conn.cursor()
 
             delisting_ts = int(delisting_date.timestamp()) if delisting_date else None
@@ -207,7 +209,7 @@ class TokenMetadataManager:
             last_valid_price_date: Date du dernier prix valide (si applicable)
             notes: Notes supplementaires
         """
-        with sqlite3.connect(self.db_path) as conn:
+        with db_connect(self.db_path) as conn:
             cursor = conn.cursor()
 
             delisting_ts = int(delisting_date.timestamp()) if delisting_date else None
@@ -251,7 +253,7 @@ class TokenMetadataManager:
         if not tokens:
             return []
         placeholders = ",".join(["?" for _ in tokens])
-        with sqlite3.connect(self.db_path) as conn:
+        with db_connect(self.db_path) as conn:
             cursor = conn.cursor()
             cursor.execute(
                 f"SELECT token FROM TokenMetadata WHERE token IN ({placeholders})"
@@ -270,7 +272,7 @@ class TokenMetadataManager:
         Returns:
             MarketRaccoon ID or None if not found / not set
         """
-        with sqlite3.connect(self.db_path) as conn:
+        with db_connect(self.db_path) as conn:
             cursor = conn.cursor()
             cursor.execute(
                 """SELECT mraccoon_id
@@ -289,7 +291,7 @@ class TokenMetadataManager:
         Returns:
             DataFrame with columns token, mraccoon_id, name or None if empty
         """
-        with sqlite3.connect(self.db_path) as conn:
+        with db_connect(self.db_path) as conn:
             df = pd.read_sql_query(
                 "SELECT token, mraccoon_id, name FROM TokenMetadata"
                 " WHERE mraccoon_id IS NOT NULL ORDER BY token",
@@ -307,7 +309,7 @@ class TokenMetadataManager:
             mraccoon_id: MarketRaccoon integer ID
             name: Full token name
         """
-        with sqlite3.connect(self.db_path) as conn:
+        with db_connect(self.db_path) as conn:
             cursor = conn.cursor()
             cursor.execute(
                 """UPDATE TokenMetadata
@@ -338,7 +340,7 @@ class TokenMetadataManager:
             token: Token symbol (used on insert)
             name: Full token name
         """
-        with sqlite3.connect(self.db_path) as conn:
+        with db_connect(self.db_path) as conn:
             cursor = conn.cursor()
             cursor.execute(
                 "SELECT token FROM TokenMetadata WHERE mraccoon_id = ?",
@@ -394,7 +396,7 @@ class TokenMetadataManager:
         Returns:
             True if the row was deleted, False if not found
         """
-        with sqlite3.connect(self.db_path) as conn:
+        with db_connect(self.db_path) as conn:
             cursor = conn.cursor()
             cursor.execute("DELETE FROM TokenMetadata WHERE token = ?", (token,))
             conn.commit()
@@ -410,7 +412,7 @@ class TokenMetadataManager:
         Returns:
             Dictionnaire avec les informations du token, ou None si non trouvé
         """
-        with sqlite3.connect(self.db_path) as conn:
+        with db_connect(self.db_path) as conn:
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
             cursor.execute(
@@ -439,7 +441,7 @@ class TokenMetadataManager:
         Returns:
             True if the row was deleted, False if not found
         """
-        with sqlite3.connect(self.db_path) as conn:
+        with db_connect(self.db_path) as conn:
             cursor = conn.cursor()
             cursor.execute("DELETE FROM TokenMetadata WHERE mraccoon_id = ?", (mr_id,))
             conn.commit()
@@ -452,7 +454,7 @@ class TokenMetadataManager:
         Returns:
             Liste de dictionnaires contenant les métadonnées de tous les tokens
         """
-        with sqlite3.connect(self.db_path) as conn:
+        with db_connect(self.db_path) as conn:
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
             cursor.execute(

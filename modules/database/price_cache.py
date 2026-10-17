@@ -10,6 +10,8 @@ import logging
 import os
 import sqlite3
 
+from modules.utils import db_connect
+
 logger = logging.getLogger(__name__)
 
 _SQLITE_TIMEOUT = 30
@@ -54,7 +56,7 @@ class PriceCache:
             )
 
     def _connect(self) -> sqlite3.Connection:
-        return sqlite3.connect(self.db_path, timeout=_SQLITE_TIMEOUT)
+        return db_connect(self.db_path, timeout=_SQLITE_TIMEOUT)
 
     def get_coverage(self, coin_id: int) -> tuple | None:
         """Return (from_ts, to_ts, fetched_at) for a coin, or None if unknown."""
@@ -73,6 +75,11 @@ class PriceCache:
         fetched_at: int,
     ) -> None:
         """Insert/replace data points and widen the coin's covered range.
+
+        The covered range is only widened when the fetched range overlaps or
+        touches it: a disjoint fetch (e.g. two sessions starting from an empty
+        cache on different periods) must not declare the gap between them as
+        covered. Its rows are kept, the gap is fetched on a later request.
 
         Args:
             coin_id: MarketRaccoon coin id
@@ -96,6 +103,7 @@ class PriceCache:
                     from_ts = MIN(from_ts, excluded.from_ts),
                     to_ts = MAX(to_ts, excluded.to_ts),
                     fetched_at = excluded.fetched_at
+                WHERE excluded.from_ts <= to_ts AND excluded.to_ts >= from_ts
                 """,
                 (coin_id, int(from_ts), int(to_ts), int(fetched_at)),
             )

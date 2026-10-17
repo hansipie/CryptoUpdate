@@ -9,6 +9,8 @@ This module handles cryptocurrency swap operations including:
 import logging
 import sqlite3
 
+from modules.utils import db_connect
+
 from modules.database.portfolios import add_token_amount, transaction
 
 logger = logging.getLogger(__name__)
@@ -19,7 +21,7 @@ class Swaps:
         logger.debug("Initializing swaps database")
         self.db_path = db_path
 
-        with sqlite3.connect(self.db_path) as conn:
+        with db_connect(self.db_path) as conn:
             cursor = conn.cursor()
             cursor.execute(
                 """
@@ -42,7 +44,7 @@ class Swaps:
 
     def get(self) -> list:
         logger.debug("Getting swaps")
-        with sqlite3.connect(self.db_path) as conn:
+        with db_connect(self.db_path) as conn:
             cursor = conn.cursor()
             cursor.execute(
                 """
@@ -55,7 +57,7 @@ class Swaps:
     def get_by_tag(self, tag: str) -> list:
         logger.debug("Getting swaps by tag")
 
-        with sqlite3.connect(self.db_path) as conn:
+        with db_connect(self.db_path) as conn:
             cursor = conn.cursor()
             _sql = (
                 "SELECT id, timestamp, token_from, amount_from, wallet_from,"
@@ -183,7 +185,7 @@ class Swaps:
 
     def is_portfolio_adjusted(self, entry_id: int) -> bool:
         """Return True if the swap was applied to the portfolios holdings."""
-        with sqlite3.connect(self.db_path) as conn:
+        with db_connect(self.db_path) as conn:
             row = conn.execute(
                 "SELECT portfolio_adjusted FROM Swaps WHERE id = ?", (entry_id,)
             ).fetchone()
@@ -192,7 +194,7 @@ class Swaps:
     def delete(self, entry_id: int):
         logger.debug("Deleting swap")
         try:
-            with sqlite3.connect(self.db_path) as conn:
+            with db_connect(self.db_path) as conn:
                 cursor = conn.cursor()
                 cursor.execute("DELETE FROM Swaps WHERE id = ?", (entry_id,))
                 conn.commit()
@@ -203,7 +205,7 @@ class Swaps:
     def update_note(self, entry_id: int, note: str):
         logger.debug("Updating swap note")
         try:
-            with sqlite3.connect(self.db_path) as conn:
+            with db_connect(self.db_path) as conn:
                 conn.execute(
                     "UPDATE Swaps SET note = ? WHERE id = ?", (note or None, entry_id)
                 )
@@ -215,7 +217,7 @@ class Swaps:
     def update_tag(self, entry_id: int, tag: str):
         logger.debug("Updating swap tag")
         try:
-            with sqlite3.connect(self.db_path) as conn:
+            with db_connect(self.db_path) as conn:
                 cursor = conn.cursor()
                 if not tag:
                     cursor.execute(

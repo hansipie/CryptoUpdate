@@ -14,6 +14,8 @@ Do NOT delete or flag these as invalid.
 import logging
 import sqlite3
 
+from modules.utils import db_connect
+
 from modules.database.portfolios import add_token_amount, transaction
 
 logger = logging.getLogger(__name__)
@@ -24,7 +26,7 @@ class Operations:
         self.db_path = db_path
 
         # Créer les tables si elles n'existent pas
-        with sqlite3.connect(self.db_path) as conn:
+        with db_connect(self.db_path) as conn:
             cursor = conn.cursor()
             cursor.execute(
                 """
@@ -165,7 +167,7 @@ class Operations:
 
     def is_portfolio_adjusted(self, item_id: int) -> bool:
         """Return True if the operation was applied to the portfolios holdings."""
-        with sqlite3.connect(self.db_path) as conn:
+        with db_connect(self.db_path) as conn:
             return self._was_adjusted(conn, item_id)
 
     def delete(self, item_id, revert_portfolio: bool = False):
@@ -174,13 +176,13 @@ class Operations:
             self._delete(conn, item_id, revert_portfolio)
 
     def get_operations(self) -> list:
-        with sqlite3.connect(self.db_path) as conn:
+        with db_connect(self.db_path) as conn:
             cursor = conn.cursor()
             cursor.execute("SELECT * FROM Operations")
             return cursor.fetchall()
 
     def get_operations_by_type(self, op_type: str) -> list:
-        with sqlite3.connect(self.db_path) as conn:
+        with db_connect(self.db_path) as conn:
             cursor = conn.cursor()
             cursor.execute(
                 "SELECT id, type, source, destination, source_unit, destination_unit,"
@@ -191,7 +193,7 @@ class Operations:
             return cursor.fetchall()
 
     def sum_buyoperations(self) -> float:
-        with sqlite3.connect(self.db_path) as conn:
+        with db_connect(self.db_path) as conn:
             cursor = conn.cursor()
             cursor.execute("SELECT SUM(source) FROM Operations WHERE type = 'buy'")
             ret = cursor.fetchone()[0]
@@ -201,7 +203,7 @@ class Operations:
 
     def sum_buyoperations_by_unit(self) -> dict:
         """Total invested per source currency (ex: {"EUR": 1200.0, "USD": 300.0})."""
-        with sqlite3.connect(self.db_path) as conn:
+        with db_connect(self.db_path) as conn:
             cursor = conn.cursor()
             cursor.execute(
                 "SELECT source_unit, SUM(source) FROM Operations "
@@ -210,7 +212,7 @@ class Operations:
             return {unit: total or 0 for unit, total in cursor.fetchall()}
 
     def get_averages(self) -> list:
-        with sqlite3.connect(self.db_path) as conn:
+        with db_connect(self.db_path) as conn:
             cursor = conn.cursor()
             query = (
                 "SELECT destination_unit, SUM(source), source_unit, SUM(destination) "
