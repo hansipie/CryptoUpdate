@@ -8,7 +8,6 @@ This module handles cryptocurrency portfolios including:
 
 import logging
 import sqlite3
-
 from contextlib import contextmanager
 
 from modules.utils import db_connect

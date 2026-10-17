@@ -7,25 +7,27 @@ as well as displaying operation history and performance metrics.
 
 import logging
 import os
-import streamlit as st
+
 import pandas as pd
+import streamlit as st
 import tzlocal
+
 from modules.database.customdata import Customdata
-from modules.database.portfolios import Portfolios
-from modules.database.tokensdb import TokensDatabase
-from modules.database.operations import Operations
 from modules.database.market import Market
+from modules.database.operations import Operations
+from modules.database.portfolios import Portfolios
 from modules.database.swaps import Swaps
+from modules.database.tokensdb import TokensDatabase
 from modules.tools import (
+    _get_api_fiat_rate,
+    _get_api_latest_prices,
     batch_convert_historical,
     batch_convert_historical_api,
+    calc_perf_api,
     calculate_crypto_rate,
     calculate_crypto_rate_api,
-    calc_perf_api,
-    update,
     parse_last_update,
-    _get_api_latest_prices,
-    _get_api_fiat_rate,
+    update,
 )
 from modules.utils import to_timestamp_a as toTimestamp_A
 
@@ -87,7 +89,7 @@ def submit_swap(
     swap_token_to: str,
     swap_amount_to: float,
     swap_wallet_to: str,
-    note: str = None,
+    note: str | None = None,
     adjust_portfolios: bool = False,
 ) -> None:
     """Submit a swap operation to the database.
@@ -815,10 +817,10 @@ def _db_stamp() -> tuple:
 # API prices.
 @st.cache_data(ttl=600, show_spinner=False)
 def build_buy_dataframe(
-    convert_from: str = None,
-    convert_to: str = None,
+    convert_from: str | None = None,
+    convert_to: str | None = None,
     use_api: bool = False,
-    db_stamp: tuple = None,  # pylint: disable=unused-argument
+    db_stamp: tuple | None = None,  # pylint: disable=unused-argument
 ) -> pd.DataFrame:
     # Pre-load API data once for the entire function
     if use_api:
@@ -956,7 +958,7 @@ def build_buy_dataframe(
 def build_airdrop_dataframe(
     currency: str,
     use_api: bool = False,
-    db_stamp: tuple = None,  # pylint: disable=unused-argument
+    db_stamp: tuple | None = None,  # pylint: disable=unused-argument
 ) -> pd.DataFrame:
     """Build the airdrop table: buy operations whose source amount is 0.
 
@@ -1004,7 +1006,7 @@ def build_airdrop_dataframe(
 @st.cache_data(ttl=600, show_spinner=False)
 def build_buy_avg_table(
     use_api: bool = False,
-    db_stamp: tuple = None,  # pylint: disable=unused-argument
+    db_stamp: tuple | None = None,  # pylint: disable=unused-argument
 ):
     """Build a table showing average purchase metrics per token.
 
@@ -1048,10 +1050,10 @@ def build_buy_avg_table(
 @st.cache_data(ttl=600, show_spinner=False)
 def build_swap_dataframes(
     db_file: str,
-    convert_from: str = None,
-    convert_to: str = None,
+    convert_from: str | None = None,
+    convert_to: str | None = None,
     use_api: bool = False,
-    db_stamp: tuple = None,  # pylint: disable=unused-argument
+    db_stamp: tuple | None = None,  # pylint: disable=unused-argument
 ) -> pd.DataFrame:
     swaps = Swaps(db_file)
     columns = [
@@ -1080,8 +1082,8 @@ def build_swap_dataframes(
 def build_swap_dataframe(
     df: pd.DataFrame,
     db_file: str,
-    convert_from: str = None,
-    convert_to: str = None,
+    convert_from: str | None = None,
+    convert_to: str | None = None,
     use_api: bool = False,
 ) -> pd.DataFrame:
     # Pre-load API data once for the entire function
@@ -1199,8 +1201,8 @@ def _draw_swap_table(
     df: pd.DataFrame,
     selection_key: str,
     empty_message: str,
-    convert_from: str = None,
-    convert_to: str = None,
+    convert_from: str | None = None,
+    convert_to: str | None = None,
 ):
     if df.empty:
         st.info(empty_message)
@@ -1269,13 +1271,17 @@ def _draw_swap_table(
         )
 
 
-def draw_swap(df: pd.DataFrame, convert_from: str = None, convert_to: str = None):
+def draw_swap(
+    df: pd.DataFrame, convert_from: str | None = None, convert_to: str | None = None
+):
     _draw_swap_table(
         df, "swapselection", "No swap operations", convert_from, convert_to
     )
 
 
-def draw_swap_arch(df: pd.DataFrame, convert_from: str = None, convert_to: str = None):
+def draw_swap_arch(
+    df: pd.DataFrame, convert_from: str | None = None, convert_to: str | None = None
+):
     _draw_swap_table(
         df, "swapachselection", "No archived swaps", convert_from, convert_to
     )

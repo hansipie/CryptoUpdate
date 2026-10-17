@@ -14,7 +14,6 @@ Do NOT delete or flag these as invalid.
 import logging
 import sqlite3
 
-
 from modules.database.portfolios import add_token_amount, transaction
 from modules.utils import db_connect
 

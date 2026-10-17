@@ -2,7 +2,6 @@ import logging
 
 from modules.utils import db_connect
 
-
 logger = logging.getLogger(__name__)
 
 

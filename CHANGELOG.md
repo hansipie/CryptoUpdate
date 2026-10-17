@@ -64,6 +64,9 @@ The project has no tagged release yet: entries are grouped by date, newest first
 
 ### Changed
 
+- Code style: `ruff check` is clean (sorted imports, modern type annotations,
+  explicit `Optional` defaults, fewer blind `except`) and `pylint` is back to
+  10/10.
 - Operations tables (buys, averages, swaps, airdrops) are cached and keyed on
   the database state, so selecting a row no longer recomputes them; an edit or
   "Update prices" refreshes them. This also removes the stale swap performance

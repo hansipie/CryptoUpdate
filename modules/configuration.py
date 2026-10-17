@@ -53,8 +53,7 @@ class Configuration:
         def _strip_debug_prefix(path: str) -> str:
             """Remove debug_ prefix only from final filename component."""
             directory, filename = os.path.split(path)
-            if filename.startswith("debug_"):
-                filename = filename[len("debug_") :]
+            filename = filename.removeprefix("debug_")
             return os.path.join(directory, filename) if directory else filename
 
         data_path = _project_relative(settings["data_path"])

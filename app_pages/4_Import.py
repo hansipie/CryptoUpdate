@@ -10,7 +10,6 @@ from PIL import Image
 from modules import aiprocessing
 from modules.database import portfolios as pf
 
-
 logging.getLogger("PIL").setLevel(logging.WARNING)
 logger = logging.getLogger(__name__)
 
@@ -83,7 +82,7 @@ def extract(input_data: any) -> pd.DataFrame:
                     model=st.session_state.settings.get("ai_model"),
                 )
             else:
-                raise ValueError("Invalid input type")
+                raise TypeError("Invalid input type")
             # call_ai logs API failures and returns None instead of raising
             if message_json is None:
                 raise ValueError("The AI service returned no usable answer")
@@ -112,7 +111,7 @@ def _is_valid_amount(symbol: str, amount: float, action: str) -> bool:
     return action != "Set" or amount >= 0
 
 
-def save_data(df: pd.DataFrame, portfolio: str = None, action: str = "Set"):
+def save_data(df: pd.DataFrame, portfolio: str | None = None, action: str = "Set"):
     """Save imported data to selected portfolio.
 
     Args:

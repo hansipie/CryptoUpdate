@@ -1,7 +1,7 @@
+import logging
 import math
 from datetime import datetime
-import logging
-import pytz
+
 import requests
 
 logger = logging.getLogger(__name__)
@@ -12,7 +12,7 @@ class CMC:
         self.coinmarketcap_token = coinmarketcap_token
 
     def get_current_fiat_prices(
-        self, converts: list = None, symbol="EUR", amount=1, debug=False
+        self, converts: list | None = None, symbol="EUR", amount=1, debug=False
     ) -> dict:
         """
         Get the price of the fiat currencies from the Coinmarketcap API
@@ -22,7 +22,7 @@ class CMC:
             converts = ["USD"]
 
         logger.debug("Get current maket prices form Coinmarketcap for:\n%s", converts)
-        names = str(",").join(converts)
+        names = ",".join(converts)
         logger.info("Request fiat current prices for %s", names)
         if debug:
             logger.info(
@@ -70,11 +70,11 @@ class CMC:
                         logger.error("No valid rate for %s: %r", fiat, price_data)
                         continue
                     utc_time = datetime.strptime(
-                        timestamp_data, "%Y-%m-%dT%H:%M:%S.%fZ"
+                        timestamp_data, "%Y-%m-%dT%H:%M:%S.%f%z"
                     )
                     fiat_prices[fiat] = {
                         "price": price_data,
-                        "timestamp": utc_time.replace(tzinfo=pytz.UTC).timestamp(),
+                        "timestamp": utc_time.timestamp(),
                     }
 
                 except (KeyError, IndexError, TypeError) as e:
@@ -96,7 +96,7 @@ class CMC:
         """
         logger.debug("Get current maket prices form Coinmarketcap for:\n%s", tokens)
 
-        names = str(",").join(tokens)
+        names = ",".join(tokens)
         logger.info("Request tokens current prices for %s", names)
         if debug:
             logger.info(

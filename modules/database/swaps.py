@@ -9,7 +9,6 @@ This module handles cryptocurrency swap operations including:
 import logging
 import sqlite3
 
-
 from modules.database.portfolios import add_token_amount, transaction
 from modules.utils import db_connect
 
@@ -117,7 +116,7 @@ class Swaps:
         token_to,
         amount_to,
         wallet_to,
-        note: str = None,
+        note: str | None = None,
         portfolio_adjusted: bool = False,
     ):
         """Insert a swap; if portfolio_adjusted, move the amounts between wallets.
@@ -150,7 +149,7 @@ class Swaps:
         token_to,
         amount_to,
         wallet_to,
-        note: str = None,
+        note: str | None = None,
         portfolio_adjusted: bool = False,
     ):
         """Edit a swap: undo the old effect (if it was applied), insert the new.

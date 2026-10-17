@@ -37,7 +37,7 @@ def get_image_type(image: bytes):
         image_file = io.BytesIO(image)
         with Image.open(image_file) as img:
             return img.format.lower()
-    except IOError as e:
+    except OSError as e:
         logger.debug(e)
         return None
 
@@ -149,7 +149,9 @@ def extract_from_img(bytes_data: bytes, api_key: str, model: str | None = None):
     return call_ai(messages, api_key, system_prompt, model=model)
 
 
-def call_ai(messages: list, api_key: str, system_prompt: str = "", model: str | None = None):
+def call_ai(
+    messages: list, api_key: str, system_prompt: str = "", model: str | None = None
+):
     client = _get_client(api_key)
     claude_model = model or _DEFAULT_CLAUDE_MODEL
     total_tokens = 0

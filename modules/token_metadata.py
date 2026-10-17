@@ -3,10 +3,8 @@ Module pour gérer les métadonnées des tokens (tokens délistés, actifs, etc.
 """
 
 import sqlite3
-
-from typing import Optional, List, Dict
-from enum import Enum
 from datetime import datetime
+from enum import Enum
 
 import pandas as pd
 
@@ -28,7 +26,7 @@ class TokenMetadataManager:
     def __init__(self, db_path: str):
         self.db_path = db_path
 
-    def get_token_status(self, token: str) -> Optional[TokenStatus]:
+    def get_token_status(self, token: str) -> TokenStatus | None:
         """
         Récupère le statut d'un token.
 
@@ -80,7 +78,7 @@ class TokenMetadataManager:
         status = self.get_token_status(token)
         return status == TokenStatus.DELISTED
 
-    def get_delisted_tokens(self) -> List[str]:
+    def get_delisted_tokens(self) -> list[str]:
         """
         Récupère la liste de tous les tokens délistés.
 
@@ -95,7 +93,7 @@ class TokenMetadataManager:
             )
             return [row[0] for row in cursor.fetchall()]
 
-    def get_active_tokens(self) -> List[str]:
+    def get_active_tokens(self) -> list[str]:
         """
         Récupère la liste de tous les tokens actifs.
 
@@ -110,7 +108,7 @@ class TokenMetadataManager:
             )
             return [row[0] for row in cursor.fetchall()]
 
-    def get_token_info(self, token: str) -> Optional[Dict]:
+    def get_token_info(self, token: str) -> dict | None:
         """
         Récupère toutes les informations d'un token.
 
@@ -146,9 +144,9 @@ class TokenMetadataManager:
         self,
         token: str,
         status: TokenStatus,
-        delisting_date: Optional[datetime] = None,
-        last_valid_price_date: Optional[datetime] = None,
-        notes: Optional[str] = None,
+        delisting_date: datetime | None = None,
+        last_valid_price_date: datetime | None = None,
+        notes: str | None = None,
     ) -> None:
         """
         Ajoute ou met à jour les métadonnées d'un token.
@@ -195,9 +193,9 @@ class TokenMetadataManager:
         mr_id: int,
         token: str,
         status: TokenStatus,
-        delisting_date: Optional[datetime] = None,
-        last_valid_price_date: Optional[datetime] = None,
-        notes: Optional[str] = None,
+        delisting_date: datetime | None = None,
+        last_valid_price_date: datetime | None = None,
+        notes: str | None = None,
     ) -> None:
         """
         Ajoute ou met a jour les metadonnees d'un token via mraccoon_id.
@@ -241,7 +239,7 @@ class TokenMetadataManager:
 
             conn.commit()
 
-    def filter_active_tokens(self, tokens: List[str]) -> List[str]:
+    def filter_active_tokens(self, tokens: list[str]) -> list[str]:
         """
         Filtre une liste de tokens pour ne garder que les actifs.
 
@@ -264,7 +262,7 @@ class TokenMetadataManager:
             delisted = {row[0] for row in cursor.fetchall()}
         return [token for token in tokens if token not in delisted]
 
-    def get_mr_id(self, token: str) -> Optional[int]:
+    def get_mr_id(self, token: str) -> int | None:
         """Get MarketRaccoon ID for a token symbol.
 
         Args:
@@ -286,7 +284,7 @@ class TokenMetadataManager:
             result = cursor.fetchone()
             return result[0] if result and result[0] is not None else None
 
-    def get_all_tokens_df(self) -> Optional[pd.DataFrame]:
+    def get_all_tokens_df(self) -> pd.DataFrame | None:
         """Get all tokens that have a MarketRaccoon ID, as a DataFrame.
 
         Returns:
@@ -403,7 +401,7 @@ class TokenMetadataManager:
             conn.commit()
             return cursor.rowcount > 0
 
-    def get_token_info_by_mr_id(self, mr_id: int) -> Optional[Dict]:
+    def get_token_info_by_mr_id(self, mr_id: int) -> dict | None:
         """
         Récupère toutes les informations d'un token par son mraccoon_id.
 
@@ -448,7 +446,7 @@ class TokenMetadataManager:
             conn.commit()
             return cursor.rowcount > 0
 
-    def get_all_metadata(self) -> List[Dict]:
+    def get_all_metadata(self) -> list[dict]:
         """
         Récupère toutes les métadonnées de tous les tokens.
 

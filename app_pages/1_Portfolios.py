@@ -3,16 +3,16 @@ import logging
 import pandas as pd
 import streamlit as st
 
+from modules.configuration import Configuration
 from modules.database.customdata import Customdata
 from modules.database.portfolios import Portfolios
 from modules.tools import (
     create_portfolio_dataframe,
-    update,
-    parse_last_update,
     get_currency_symbol,
+    parse_last_update,
+    update,
 )
 from modules.utils import dataframe_diff
-from modules.configuration import Configuration
 
 logger = logging.getLogger(__name__)
 
@@ -125,7 +125,6 @@ def portfolio_ui(tabs: list):
 
     for i, tab in enumerate(tabs_widget):
         with tab:
-
             pf = g_portfolios.get_portfolio(tabs[i])
             df = create_portfolio_dataframe(pf)
             if not df.empty:  # Only create DataFrame if data exists
@@ -330,5 +329,5 @@ else:
     try:
         portfolio_ui(tabs)
     except Exception as e:
-        st.error(f"UI Error: {str(e)}")
+        st.error(f"UI Error: {e!s}")
         logger.exception("Portfolio UI rendering failed")

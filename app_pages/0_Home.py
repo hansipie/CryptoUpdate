@@ -8,8 +8,8 @@ and synchronizing with Notion database.
 import logging
 
 import pandas as pd
-import streamlit as st
 import plotly.graph_objects as go
+import streamlit as st
 
 from modules.database.customdata import Customdata
 from modules.database.operations import Operations
@@ -48,7 +48,7 @@ def plot_total_value(df: pd.DataFrame):
             mode="lines",
             name="Total Portfolio Value",
             fill="tozeroy",
-            line=dict(width=2),
+            line={"width": 2},
         )
     )
 

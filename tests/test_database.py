@@ -208,10 +208,9 @@ def test_db_connect_commits_closes_and_rolls_back(tmp_path):
     with pytest.raises(sqlite3.ProgrammingError):
         conn.execute("SELECT 1")
 
-    with pytest.raises(KeyError):
-        with db_connect(path) as conn:
-            conn.execute("INSERT INTO t VALUES (1)")
-            raise KeyError
+    with pytest.raises(KeyError), db_connect(path) as conn:
+        conn.execute("INSERT INTO t VALUES (1)")
+        raise KeyError
     with db_connect(path) as conn:
         assert conn.execute("SELECT COUNT(*) FROM t").fetchone()[0] == 0
 

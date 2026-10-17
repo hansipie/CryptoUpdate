@@ -7,7 +7,6 @@ import pandas as pd
 import tzlocal
 from dateutil import parser
 
-
 logger = logging.getLogger(__name__)
 
 

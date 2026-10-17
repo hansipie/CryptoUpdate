@@ -12,7 +12,6 @@ import sqlite3
 
 from modules.utils import db_connect
 
-
 logger = logging.getLogger(__name__)
 
 _SQLITE_TIMEOUT = 30

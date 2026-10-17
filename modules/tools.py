@@ -26,7 +26,7 @@ from modules.database.market import Market
 from modules.database.portfolios import Portfolios
 from modules.database.tokensdb import TokensDatabase
 from modules.token_metadata import TokenMetadataManager
-from modules.utils import debug_prefix, interpolate, db_connect
+from modules.utils import db_connect, debug_prefix, interpolate
 
 logger = logging.getLogger(__name__)
 

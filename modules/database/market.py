@@ -7,7 +7,6 @@ This module handles cryptocurrency market data including:
 """
 
 import logging
-
 import time
 
 import pandas as pd
@@ -107,7 +106,10 @@ class Market:
             return df_market
 
     def get_token_market(
-        self, token: str, from_timestamp: int = None, to_timestamp: int = None
+        self,
+        token: str,
+        from_timestamp: int | None = None,
+        to_timestamp: int | None = None,
     ) -> pd.DataFrame:
         """Get historical market data for a token.
 
@@ -166,7 +168,7 @@ class Market:
             logger.debug("Last Market get:\n%s", market_df)
             return market_df
 
-    def update_market(self, tokens: list = None, debug: bool = False) -> int:
+    def update_market(self, tokens: list | None = None, debug: bool = False) -> int:
         """Update market data with current prices and add new tokens.
 
         Args:
@@ -213,7 +215,7 @@ class Market:
             )
             return df["timestamp"][0]
 
-    def get_price(self, token: str, timestamp: int = None) -> float:
+    def get_price(self, token: str, timestamp: int | None = None) -> float:
         """Get price of a token at given timestamp.
 
         Args:
@@ -274,7 +276,7 @@ class Market:
             if dupcount > 0:
                 logger.debug("Found %d duplicated rows. Dropping...", dupcount)
                 df.drop_duplicates(inplace=True)
-                con.execute(f"DELETE FROM {table}")  # noqa: S608
+                con.execute(f"DELETE FROM {table}")
                 df.to_sql(table, con, if_exists="append", index=False)
 
     def __find_missing_timestamps(self) -> pd.DataFrame:

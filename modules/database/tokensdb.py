@@ -1,6 +1,5 @@
 import logging
 
-
 import pandas as pd
 import tzlocal
 
@@ -98,7 +97,10 @@ class TokensDatabase:
             return df_balance
 
     def get_token_counts(
-        self, token: str, from_timestamp: int = None, to_timestamp: int = None
+        self,
+        token: str,
+        from_timestamp: int | None = None,
+        to_timestamp: int | None = None,
     ) -> pd.DataFrame:
         """Get the token counts (quantities held) through time.
 
@@ -140,7 +142,10 @@ class TokensDatabase:
             return df
 
     def get_token_balances(
-        self, token: str, from_timestamp: int = None, to_timestamp: int = None
+        self,
+        token: str,
+        from_timestamp: int | None = None,
+        to_timestamp: int | None = None,
     ) -> pd.DataFrame:
         """Get the balances of a token through time"""
         logger.debug("Get balances for token %s", token)
