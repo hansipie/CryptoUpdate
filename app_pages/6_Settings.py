@@ -1,4 +1,5 @@
 import logging
+from urllib.parse import urlparse
 
 import requests
 import streamlit as st
@@ -11,6 +12,7 @@ st.title("Settings")
 
 if "settings" not in st.session_state:
     st.session_state.settings = {}
+
 
 @st.cache_data(ttl=30, show_spinner=False)
 def _check_marketraccoon(url: str, api_key: str) -> str:
@@ -155,6 +157,27 @@ with st.form(key="settings_form"):
 
     if submitted:
         logger.debug("Submitted")
+        marketraccoon_url = marketraccoon_url.strip().rstrip("/")
+        ratesdb_url = ratesdb_url.strip().rstrip("/")
+        errors = [
+            f"{label} must be a valid http(s) URL"
+            for label, url in (
+                ("MarketRaccoon URL", marketraccoon_url),
+                ("RatesDB URL", ratesdb_url),
+            )
+            if urlparse(url).scheme not in ("http", "https") or not urlparse(url).netloc
+        ]
+        if not (
+            operations_green_threshold
+            >= operations_orange_threshold
+            >= operations_red_threshold
+        ):
+            errors.append("Thresholds must satisfy green >= orange >= red")
+        if errors:
+            for message in errors:
+                st.error(message)
+            st.stop()
+
         st.session_state.settings["marketraccoon_url"] = marketraccoon_url
         st.session_state.settings["marketraccoon_token"] = marketraccoon_token
         st.session_state.settings["ratesdb_url"] = ratesdb_url

@@ -5,9 +5,29 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 The project has no tagged release yet: entries are grouped by date, newest first.
 
-## [Unreleased]
+## 2026-10-17
+
+### Added
+
+- Test suite (`pytest`, 28 tests) covering transactions, migrations, the price
+  cache, CoinMarketCap parsing, currency conversion, DST handling and
+  configuration saving, with a `Tests` GitHub Actions workflow.
 
 ### Fixed
+
+- Add/Edit Swap: tokens are trimmed and uppercased, and both tokens and
+  strictly positive amounts are required.
+- Settings: URLs are trimmed and must be valid http(s) URLs, and the colour
+  thresholds must satisfy green >= orange >= red; invalid input is not saved.
+- `settings.json` is written to a temporary file then renamed, so a failure can
+  no longer truncate it; a new file is created with `0600` permissions and an
+  existing one keeps its permissions.
+- Import: the AI answer is checked (no answer, no assets, missing columns),
+  extracted symbols are uppercased and rows with an invalid amount are skipped
+  with a warning, uploads are limited to 10 MB and unreadable files give an
+  error instead of a traceback.
+- `Swaps.delete`, `update_tag` and `update_note` no longer swallow database
+  errors, so the interface cannot report a success that did not happen.
 
 - Local currency conversion inverted the USD rate: `Currency` stores
   "1 EUR = x USD" while a price in EUR was expected (100 USD became 120 EUR
@@ -44,6 +64,10 @@ The project has no tagged release yet: entries are grouped by date, newest first
 
 ### Changed
 
+- Operations tables (buys, averages, swaps, airdrops) are cached and keyed on
+  the database state, so selecting a row no longer recomputes them; an edit or
+  "Update prices" refreshes them. This also removes the stale swap performance
+  (previously cached for an hour) and the full-file hash on every rerun.
 - `Operations.insert/delete` and `Swaps.insert` apply the portfolio change
   themselves; new `Operations.replace` and `Swaps.replace` edit a row and undo
   its previous effect atomically.

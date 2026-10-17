@@ -192,42 +192,24 @@ class Swaps:
         return bool(row and row[0])
 
     def delete(self, entry_id: int):
+        """Delete a swap (errors propagate: the caller must not report a success)."""
         logger.debug("Deleting swap")
-        try:
-            with db_connect(self.db_path) as conn:
-                cursor = conn.cursor()
-                cursor.execute("DELETE FROM Swaps WHERE id = ?", (entry_id,))
-                conn.commit()
-                logger.debug("Entry with id %s deleted successfully.", entry_id)
-        except Exception as e:
-            logger.exception("Error deleting swap: %s", e)
+        with db_connect(self.db_path) as conn:
+            conn.execute("DELETE FROM Swaps WHERE id = ?", (entry_id,))
+        logger.debug("Entry with id %s deleted successfully.", entry_id)
 
     def update_note(self, entry_id: int, note: str):
         logger.debug("Updating swap note")
-        try:
-            with db_connect(self.db_path) as conn:
-                conn.execute(
-                    "UPDATE Swaps SET note = ? WHERE id = ?", (note or None, entry_id)
-                )
-                conn.commit()
-                logger.debug("Note updated for entry with id %s", entry_id)
-        except Exception as e:
-            logger.exception("Error updating note: %s", e)
+        with db_connect(self.db_path) as conn:
+            conn.execute(
+                "UPDATE Swaps SET note = ? WHERE id = ?", (note or None, entry_id)
+            )
+        logger.debug("Note updated for entry with id %s", entry_id)
 
     def update_tag(self, entry_id: int, tag: str):
         logger.debug("Updating swap tag")
-        try:
-            with db_connect(self.db_path) as conn:
-                cursor = conn.cursor()
-                if not tag:
-                    cursor.execute(
-                        "UPDATE Swaps SET tag = NULL WHERE id = ?", (entry_id,)
-                    )
-                else:
-                    cursor.execute(
-                        "UPDATE Swaps SET tag = ? WHERE id = ?", (tag, entry_id)
-                    )
-                conn.commit()
-                logger.debug("Tag updated for entry with id %s", entry_id)
-        except Exception as e:
-            logger.exception("Error updating tag: %s", e)
+        with db_connect(self.db_path) as conn:
+            conn.execute(
+                "UPDATE Swaps SET tag = ? WHERE id = ?", (tag or None, entry_id)
+            )
+        logger.debug("Tag updated for entry with id %s", entry_id)

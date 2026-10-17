@@ -789,9 +789,7 @@ def _interpolate_from_series(series: pd.Series, timestamp: int) -> float:
             ambiguous=np.ones(len(index), dtype=bool),
             nonexistent="shift_forward",
         )
-    ts_array = (
-        (index - pd.Timestamp(0, tz="UTC")) // pd.Timedelta(seconds=1)
-    ).to_numpy()
+    ts_array = (index - pd.Timestamp("1970-01-01", tz="UTC")).total_seconds().to_numpy()
     return float(np.interp(timestamp, ts_array, series.values))
 
 
