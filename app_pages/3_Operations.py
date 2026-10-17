@@ -1325,7 +1325,7 @@ with st.sidebar:
     else:
         st.caption("💾 SQLite local")
 
-buy_tab, swap_tab, airdrop_tab = st.tabs(["Buy", "Swap", "Airdrop"])
+buy_tab, swap_tab, airdrop_tab = st.tabs(["Buy", "Swap", "Airdrops"])
 with buy_tab:
     # Conversion selectboxes for Buy
     g_convert_options = ["Original", "EUR", "USD"] + g_tokens
