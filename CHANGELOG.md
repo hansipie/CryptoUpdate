@@ -64,6 +64,10 @@ The project has no tagged release yet: entries are grouped by date, newest first
 
 ### Changed
 
+- Dependencies updated within their constraints (`uv lock --upgrade`): streamlit
+  1.66, anthropic 1.15, pyarrow 26, filelock 4, ruff 0.17, pylint 4.1 and others.
+  `pip-audit` reports no known vulnerability; pandas stays below 3.
+- Replaced the deprecated `use_container_width=True` with `width="stretch"`.
 - Code style: `ruff check` is clean (sorted imports, modern type annotations,
   explicit `Optional` defaults, fewer blind `except`) and `pylint` is back to
   10/10.
