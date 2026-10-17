@@ -37,7 +37,11 @@ def to_timestamp_a(date, time):
     datetime_local = pd.to_datetime(f"{date} {time}")
     local_timezone = tzlocal.get_localzone()
     logger.debug("Timezone locale: %s", local_timezone)
-    datetime_utc = datetime_local.tz_localize(local_timezone).tz_convert("UTC")
+    # DST: pick the first occurrence of an ambiguous hour and shift a
+    # nonexistent one forward instead of raising
+    datetime_utc = datetime_local.tz_localize(
+        local_timezone, ambiguous=True, nonexistent="shift_forward"
+    ).tz_convert("UTC")
     timestamp = datetime_utc.timestamp()
     logger.debug(
         "timestamp=%s [local_time=%s, utc_time=%s]",

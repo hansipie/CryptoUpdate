@@ -52,7 +52,8 @@ def submit_buy(
         to_amount: Amount in target token
         to_token: Target token symbol
         to_wallet: Destination wallet name
-        adjust_portfolios: If True, add to_amount of to_token to the wallet's holdings
+        adjust_portfolios: If True, add to_amount of to_token to the wallet's
+            holdings (same transaction as the operation)
     """
     logger.debug(
         "submitbuy: timestamp=%d from_amount=%f, form_currency=%s, to_amount=%f, to_token=%s, to_wallet=%s",
@@ -75,28 +76,7 @@ def submit_buy(
         portfolio_adjusted=adjust_portfolios,
     )
 
-    if adjust_portfolios:
-        Portfolios(st.session_state.settings["dbfile"]).set_token_add(
-            to_wallet, to_token, to_amount
-        )
-
     st.toast("Operation submitted", icon=":material/check:")
-
-
-def apply_swap_to_portfolios(
-    wallet_from: str,
-    token_from: str,
-    amount_from: float,
-    wallet_to: str,
-    token_to: str,
-    amount_to: float,
-    reverse: bool = False,
-) -> None:
-    """Move a swap's amounts between wallets holdings (or undo it if reverse)."""
-    sign = -1 if reverse else 1
-    portfolios = Portfolios(st.session_state.settings["dbfile"])
-    portfolios.set_token_add(wallet_from, token_from, -sign * amount_from)
-    portfolios.set_token_add(wallet_to, token_to, sign * amount_to)
 
 
 def submit_swap(
@@ -148,16 +128,6 @@ def submit_swap(
         note=note,
         portfolio_adjusted=adjust_portfolios,
     )
-
-    if adjust_portfolios:
-        apply_swap_to_portfolios(
-            swap_wallet_from,
-            swap_token_from,
-            swap_amount_from,
-            swap_wallet_to,
-            swap_token_to,
-            swap_amount_to,
-        )
 
 
 def rows_selected(selectable, max_len: int) -> list:
@@ -221,8 +191,8 @@ def buy_add() -> None:
         "Synchronize portfolios", value=False, key="buy_adjust_portfolios"
     )
     if st.button("Submit", width="stretch"):
-        if to_wallet is None:
-            st.error("Portfolio is required")
+        if to_wallet is None or to_token is None:
+            st.error("Token and portfolio are required")
             return
         timestamp = toTimestamp_A(date, time)
         submit_buy(
@@ -349,24 +319,23 @@ def buy_edit_dialog(data: dict) -> None:
         "Synchronize portfolios", value=was_adjusted, key="buy_adjust_portfolios"
     )
     if st.button("Submit", width="stretch"):
-        if to_wallet is None:
-            st.error("Portfolio is required")
+        if to_wallet is None or to_token is None:
+            st.error("Token and portfolio are required")
             return
         timestamp = toTimestamp_A(date, time)
-        if was_adjusted:
-            Portfolios(st.session_state.settings["dbfile"]).set_token_add(
-                data["Portfolio"], data["Token"], -float(data["To"])
-            )
-        g_operation.delete(data["id"])
-        submit_buy(
-            timestamp,
+        # old effect undone + new row inserted in a single transaction
+        g_operation.replace(
+            data["id"],
+            "buy",
             from_amount,
-            form_currency,
             to_amount,
+            form_currency,
             to_token,
+            timestamp,
             to_wallet,
-            adjust_portfolios=adjust_portfolios,
+            portfolio_adjusted=adjust_portfolios,
         )
+        st.toast("Operation submitted", icon=":material/check:")
         st.rerun()
 
 
@@ -436,18 +405,9 @@ def swap_edit_dialog(data: dict):
             st.error("From Wallet and To Wallet are required")
             return
         timestamp = toTimestamp_A(date, time)
-        if was_adjusted:
-            apply_swap_to_portfolios(
-                data["From Wallet"],
-                data["From Token"],
-                float(data["From Amount"]),
-                data["To Wallet"],
-                data["To Token"],
-                float(data["To Amount"]),
-                reverse=True,
-            )
-        g_swaps.delete(data["id"])
-        submit_swap(
+        # old effect undone + new row inserted in a single transaction
+        g_swaps.replace(
+            data["id"],
             timestamp,
             swap_token_from,
             swap_amount_from,
@@ -456,7 +416,7 @@ def swap_edit_dialog(data: dict):
             swap_amount_to,
             swap_wallet_to,
             note=swap_note,
-            adjust_portfolios=adjust_portfolios,
+            portfolio_adjusted=adjust_portfolios,
         )
         st.rerun()
 
@@ -483,11 +443,7 @@ def buy_delete_dialog(data: dict):
     )
     if st.button("Confirm"):
         logger.debug("Delete row: %s - %s", data, type(data["id"]))
-        if sync_portfolios:
-            Portfolios(st.session_state.settings["dbfile"]).set_token_add(
-                data["Portfolio"], data["Token"], -float(data["To"])
-            )
-        g_operation.delete(data["id"])
+        g_operation.delete(data["id"], revert_portfolio=sync_portfolios)
         st.rerun()
 
 
@@ -758,20 +714,18 @@ def airdrop_edit_dialog(data: dict) -> None:
         if wallet is None or token is None:
             st.error("Token and portfolio are required")
             return
-        if was_adjusted:
-            Portfolios(st.session_state.settings["dbfile"]).set_token_add(
-                data["Portfolio"], data["Token"], -float(data["Amount"])
-            )
-        g_operation.delete(data["id"])
-        submit_buy(
-            toTimestamp_A(date, time),
+        g_operation.replace(
+            data["id"],
+            "buy",
             0.0,
-            "EUR",
             amount,
+            "EUR",
             token,
+            toTimestamp_A(date, time),
             wallet,
-            adjust_portfolios=adjust_portfolios,
+            portfolio_adjusted=adjust_portfolios,
         )
+        st.toast("Operation submitted", icon=":material/check:")
         st.rerun()
 
 

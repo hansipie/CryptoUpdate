@@ -19,6 +19,7 @@ import numpy as np
 import pandas as pd
 import requests
 import streamlit as st
+import tzlocal
 
 from modules.database.apimarket import ApiMarket
 from modules.database.customdata import Customdata
@@ -295,7 +296,7 @@ def update_database(dbfile: str, cmc_apikey: str, debug: bool):
     logger.debug("Tokens after clean up: %s", str(tokens))
 
     try:
-        market.update_market(tokens, debug=debug)
+        update_timestamp = market.update_market(tokens, debug=debug)
         market.update_currencies(debug=debug)
     except Exception as e:
         logger.error("Error updating market data: %s", str(e))
@@ -311,6 +312,11 @@ def update_database(dbfile: str, cmc_apikey: str, debug: bool):
     for token in tokens:
         if token not in tokens_prices.index:
             logger.warning("Pas de prix disponible pour %s, token ignoré", token)
+            continue
+        if tokens_prices.loc[token]["timestamp"] != update_timestamp:
+            # Absent de la réponse CMC courante : son dernier prix date d'une
+            # mise à jour précédente, ne pas le réinsérer comme snapshot
+            logger.warning("Prix de %s absent de cette mise à jour, ignoré", token)
             continue
         new_entries[token] = {
             "amount": aggregated[token],
@@ -562,7 +568,7 @@ def __interpolate_token(token: str, timestamp: int, dbfile: str) -> float:
         dbfile: Path to database file
 
     Returns:
-        Price in EUR (for crypto) or exchange rate (for fiat)
+        Price of 1 token in EUR (crypto or fiat)
         EUR returns 1.0 as it's the base currency
     """
     logger.debug(
@@ -581,9 +587,12 @@ def __interpolate_token(token: str, timestamp: int, dbfile: str) -> float:
     if is_fiat(token):
         logger.debug("Token %s is a fiat currency, querying Currency table", token)
         df_low, df_high = market.get_currency_lowhigh(token, timestamp)
-    else:
-        logger.debug("Token %s is a cryptocurrency, querying Market table", token)
-        df_low, df_high = market.get_token_lowhigh(token, timestamp)
+        rate = interpolate_price(df_low, df_high, timestamp, token)
+        # Currency stores "1 EUR = rate token" : the price of 1 token in EUR
+        # is its inverse
+        return 1.0 / rate if rate else None
+    logger.debug("Token %s is a cryptocurrency, querying Market table", token)
+    df_low, df_high = market.get_token_lowhigh(token, timestamp)
 
     return interpolate_price(df_low, df_high, timestamp, token)
 
@@ -770,8 +779,18 @@ def _interpolate_from_series(series: pd.Series, timestamp: int) -> float:
     if series is None or series.empty:
         return None
 
-    # Convert DatetimeIndex to Unix timestamps
-    ts_array = series.index.astype(np.int64) // 10**9
+    # ApiMarket series are indexed in naive local time: restore the timezone
+    # (ambiguous/nonexistent DST hours resolved) before computing epochs
+    index = series.index
+    if index.tz is None:
+        index = index.tz_localize(
+            tzlocal.get_localzone(),
+            ambiguous=np.ones(len(index), dtype=bool),
+            nonexistent="shift_forward",
+        )
+    ts_array = (
+        (index - pd.Timestamp(0, tz="UTC")) // pd.Timedelta(seconds=1)
+    ).to_numpy()
     return float(np.interp(timestamp, ts_array, series.values))
 
 

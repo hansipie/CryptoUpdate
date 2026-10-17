@@ -277,6 +277,46 @@ MIGRATIONS: dict = {
 }
 
 
+def _apply_migration(db_path: str, version: int) -> bool:
+    """Applique une migration et enregistre sa version dans une seule transaction.
+
+    La transaction est ouverte avec BEGIN IMMEDIATE et la version est relue
+    sous verrou : deux sessions démarrant en même temps n'appliquent pas la
+    même migration, et une interruption laisse la base à sa version précédente.
+
+    Returns:
+        True si la migration a été appliquée, False si déjà faite.
+    """
+    # isolation_level=None : la transaction est pilotée explicitement
+    conn = sqlite3.connect(db_path, isolation_level=None, timeout=30)
+    try:
+        conn.execute("BEGIN IMMEDIATE")
+        try:
+            row = conn.execute(
+                "SELECT value FROM Customdata WHERE name = 'db_version'"
+            ).fetchone()
+            try:
+                current_version = int(row[0]) if row else 0
+            except ValueError:
+                current_version = 0
+            if version <= current_version:
+                conn.execute("ROLLBACK")
+                return False
+            MIGRATIONS[version](conn)
+            conn.execute(
+                "INSERT OR REPLACE INTO Customdata (name, value, type) VALUES ('db_version', ?, 'int')",
+                (str(version),),
+            )
+            conn.execute("COMMIT")
+        except BaseException:
+            if conn.in_transaction:
+                conn.execute("ROLLBACK")
+            raise
+    finally:
+        conn.close()
+    return True
+
+
 def run_migrations(db_path: str) -> None:
     """Point d'entrée public : applique toutes les migrations en attente.
 
@@ -291,10 +331,7 @@ def run_migrations(db_path: str) -> None:
         if version <= current_version:
             continue
         logger.info("Application de la migration v%d…", version)
-        with sqlite3.connect(db_path) as conn:
-            MIGRATIONS[version](conn)
-            conn.execute(
-                "INSERT OR REPLACE INTO Customdata (name, value, type) VALUES ('db_version', ?, 'int')",
-                (str(version),),
-            )
-        logger.info("Migration v%d appliquée — db_version = %d", version, version)
+        if _apply_migration(db_path, version):
+            logger.info("Migration v%d appliquée — db_version = %d", version, version)
+        else:
+            logger.info("Migration v%d déjà appliquée par une autre session", version)

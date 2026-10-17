@@ -163,11 +163,14 @@ class Market:
             logger.debug("Last Market get:\n%s", market_df)
             return market_df
 
-    def update_market(self, tokens: list = None, debug: bool = False):
+    def update_market(self, tokens: list = None, debug: bool = False) -> int:
         """Update market data with current prices and add new tokens.
 
         Args:
             tokens: Optional list of token symbols to add/update
+
+        Returns:
+            Timestamp stamped on the rows inserted by this update
         """
         logger.debug("Add tokens")
 
@@ -193,6 +196,7 @@ class Market:
                     (timestamp, token, tokens_prices[token]["price"]),
                 )
             con.commit()
+        return timestamp
 
     def get_last_timestamp(self) -> int:
         """Get timestamp of most recent market data.

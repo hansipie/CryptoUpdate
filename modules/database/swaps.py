@@ -9,6 +9,8 @@ This module handles cryptocurrency swap operations including:
 import logging
 import sqlite3
 
+from modules.database.portfolios import add_token_amount, transaction
+
 logger = logging.getLogger(__name__)
 
 
@@ -68,6 +70,42 @@ class Swaps:
                 )
             return cursor.fetchall()
 
+    @staticmethod
+    def _insert(
+        conn: sqlite3.Connection,
+        timestamp,
+        token_from,
+        amount_from,
+        wallet_from,
+        token_to,
+        amount_to,
+        wallet_to,
+        note,
+        portfolio_adjusted: bool,
+    ) -> None:
+        """Insert a swap (and move the amounts between wallets if adjusted)."""
+        conn.execute(
+            "INSERT INTO Swaps"
+            " (timestamp, token_from, amount_from, wallet_from,"
+            " token_to, amount_to, wallet_to, tag, note, portfolio_adjusted)"
+            " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                timestamp,
+                token_from,
+                amount_from,
+                wallet_from,
+                token_to,
+                amount_to,
+                wallet_to,
+                None,
+                note or None,
+                int(portfolio_adjusted),
+            ),
+        )
+        if portfolio_adjusted:
+            add_token_amount(conn, wallet_from, token_from, -amount_from)
+            add_token_amount(conn, wallet_to, token_to, amount_to)
+
     def insert(
         self,
         timestamp,
@@ -80,29 +118,68 @@ class Swaps:
         note: str = None,
         portfolio_adjusted: bool = False,
     ):
+        """Insert a swap; if portfolio_adjusted, move the amounts between wallets.
+
+        The row, its flag and both holdings changes are one transaction.
+        """
         logger.debug("Inserting swap")
-        with sqlite3.connect(self.db_path) as conn:
-            cursor = conn.cursor()
-            cursor.execute(
-                "INSERT INTO Swaps"
-                " (timestamp, token_from, amount_from, wallet_from,"
-                " token_to, amount_to, wallet_to, tag, note, portfolio_adjusted)"
-                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                (
-                    timestamp,
-                    token_from,
-                    amount_from,
-                    wallet_from,
-                    token_to,
-                    amount_to,
-                    wallet_to,
-                    None,
-                    note or None,
-                    int(portfolio_adjusted),
-                ),
+        with transaction(self.db_path) as conn:
+            self._insert(
+                conn,
+                timestamp,
+                token_from,
+                amount_from,
+                wallet_from,
+                token_to,
+                amount_to,
+                wallet_to,
+                note,
+                portfolio_adjusted,
             )
-            conn.commit()
-            logger.debug("Swap inserted")
+        logger.debug("Swap inserted")
+
+    def replace(
+        self,
+        entry_id,
+        timestamp,
+        token_from,
+        amount_from,
+        wallet_from,
+        token_to,
+        amount_to,
+        wallet_to,
+        note: str = None,
+        portfolio_adjusted: bool = False,
+    ):
+        """Edit a swap: undo the old effect (if it was applied), insert the new.
+
+        Everything happens in one transaction: a failure leaves the old swap
+        and the holdings untouched.
+        """
+        with transaction(self.db_path) as conn:
+            row = conn.execute(
+                "SELECT token_from, amount_from, wallet_from, token_to, amount_to,"
+                " wallet_to, portfolio_adjusted FROM Swaps WHERE id = ?",
+                (entry_id,),
+            ).fetchone()
+            if row is not None:
+                old_tf, old_af, old_wf, old_tt, old_at, old_wt, adjusted = row
+                if adjusted:
+                    add_token_amount(conn, old_wf, old_tf, float(old_af))
+                    add_token_amount(conn, old_wt, old_tt, -float(old_at))
+                conn.execute("DELETE FROM Swaps WHERE id = ?", (entry_id,))
+            self._insert(
+                conn,
+                timestamp,
+                token_from,
+                amount_from,
+                wallet_from,
+                token_to,
+                amount_to,
+                wallet_to,
+                note,
+                portfolio_adjusted,
+            )
 
     def is_portfolio_adjusted(self, entry_id: int) -> bool:
         """Return True if the swap was applied to the portfolios holdings."""
