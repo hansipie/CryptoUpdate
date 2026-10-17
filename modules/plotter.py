@@ -1,8 +1,9 @@
 import logging
-import streamlit as st
+
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
+import streamlit as st
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +34,7 @@ def plot_as_pie(df: pd.DataFrame, column):
         logger.debug("Dataframe more than 1%% sum with Others:\n%s", dffinal)
 
     fig = px.pie(dffinal, dffinal.index, column, width=700, height=700)
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width="stretch")
 
 
 def plot_as_graph(df: pd.DataFrame):
@@ -64,4 +65,4 @@ def plot_as_graph(df: pd.DataFrame):
     # Définir le titre de l'axe y par défaut pour la première colonne
     fig.update_layout(yaxis={"title": df.columns[0]})
 
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width="stretch")

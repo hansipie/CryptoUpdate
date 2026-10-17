@@ -1,11 +1,11 @@
 import hashlib
 import logging
 import os
+import sqlite3
 
 import pandas as pd
 import tzlocal
 from dateutil import parser
-
 
 logger = logging.getLogger(__name__)
 
@@ -30,6 +30,25 @@ def interpolate(x1, y1, x2, y2, x):
     return a * x + b
 
 
+class ClosingConnection(sqlite3.Connection):  # pylint: disable=too-few-public-methods
+    """SQLite connection whose `with` block also closes it.
+
+    The stock context manager only commits/rolls back and leaves the
+    connection open until garbage collection.
+    """
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        try:
+            return super().__exit__(exc_type, exc_value, traceback)
+        finally:
+            self.close()
+
+
+def db_connect(db_path: str, **kwargs) -> sqlite3.Connection:
+    """Open a SQLite connection to use as `with db_connect(path) as conn:`."""
+    return sqlite3.connect(db_path, factory=ClosingConnection, **kwargs)
+
+
 def to_timestamp_a(date, time):
     # date if formated as yyyy-mm-dd, time as hh:mm:00
     # merge them to a datetime object, convert to UTC and then to epoch timestamp
@@ -37,7 +56,11 @@ def to_timestamp_a(date, time):
     datetime_local = pd.to_datetime(f"{date} {time}")
     local_timezone = tzlocal.get_localzone()
     logger.debug("Timezone locale: %s", local_timezone)
-    datetime_utc = datetime_local.tz_localize(local_timezone).tz_convert("UTC")
+    # DST: pick the first occurrence of an ambiguous hour and shift a
+    # nonexistent one forward instead of raising
+    datetime_utc = datetime_local.tz_localize(
+        local_timezone, ambiguous=True, nonexistent="shift_forward"
+    ).tz_convert("UTC")
     timestamp = datetime_utc.timestamp()
     logger.debug(
         "timestamp=%s [local_time=%s, utc_time=%s]",

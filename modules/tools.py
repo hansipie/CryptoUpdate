@@ -11,7 +11,6 @@ import glob
 import logging
 import os
 import shutil
-import sqlite3
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 
@@ -19,6 +18,7 @@ import numpy as np
 import pandas as pd
 import requests
 import streamlit as st
+import tzlocal
 
 from modules.database.apimarket import ApiMarket
 from modules.database.customdata import Customdata
@@ -26,7 +26,7 @@ from modules.database.market import Market
 from modules.database.portfolios import Portfolios
 from modules.database.tokensdb import TokensDatabase
 from modules.token_metadata import TokenMetadataManager
-from modules.utils import debug_prefix, interpolate
+from modules.utils import db_connect, debug_prefix, interpolate
 
 logger = logging.getLogger(__name__)
 
@@ -66,7 +66,9 @@ def convert_price_to_target_currency(
                         Si None, utilise fiat_currency depuis settings.
 
     Returns:
-        Montant converti dans la devise cible
+        Montant converti dans la devise cible, ou None si la conversion est
+        impossible (taux indisponible ou devise non supportée) : renvoyer le
+        montant source ferait passer une valeur pour une autre devise.
     """
     if target_currency is None:
         target_currency = st.session_state.settings.get("fiat_currency", "EUR")
@@ -82,7 +84,7 @@ def convert_price_to_target_currency(
             source_currency,
             target_currency,
         )
-        return value
+        return None
 
     # Récupérer le taux USD→EUR depuis MarketRaccoon API
     try:
@@ -90,16 +92,16 @@ def convert_price_to_target_currency(
         df_rate = api_market.get_fiat_latest_rate_cached()
 
         if df_rate is None or df_rate.empty:
-            logger.warning("Taux de change non disponible, retour valeur originale")
-            return value
+            logger.warning("Taux de change non disponible, conversion impossible")
+            return None
 
         usd_to_eur_rate = df_rate["price"].iloc[-1]  # Ex: 0.85 (1 USD = 0.85 EUR)
 
         if not usd_to_eur_rate or usd_to_eur_rate < 0:
             logger.warning(
-                "Taux USD/EUR invalide: %s, retour valeur originale", usd_to_eur_rate
+                "Taux USD/EUR invalide: %s, conversion impossible", usd_to_eur_rate
             )
-            return value
+            return None
 
         # Conversion USD → EUR
         if source_currency == "USD" and target_currency == "EUR":
@@ -113,11 +115,11 @@ def convert_price_to_target_currency(
             logger.warning(
                 "Conversion %s→%s non supportée", source_currency, target_currency
             )
-            return value
+            return None
 
     except (requests.exceptions.RequestException, ValueError, KeyError) as e:
         logger.error("Erreur conversion devise: %s", e)
-        return value
+        return None
 
 
 def convert_dataframe_prices_historical(
@@ -295,7 +297,7 @@ def update_database(dbfile: str, cmc_apikey: str, debug: bool):
     logger.debug("Tokens after clean up: %s", str(tokens))
 
     try:
-        market.update_market(tokens, debug=debug)
+        update_timestamp = market.update_market(tokens, debug=debug)
         market.update_currencies(debug=debug)
     except Exception as e:
         logger.error("Error updating market data: %s", str(e))
@@ -311,6 +313,11 @@ def update_database(dbfile: str, cmc_apikey: str, debug: bool):
     for token in tokens:
         if token not in tokens_prices.index:
             logger.warning("Pas de prix disponible pour %s, token ignoré", token)
+            continue
+        if tokens_prices.loc[token]["timestamp"] != update_timestamp:
+            # Absent de la réponse CMC courante : son dernier prix date d'une
+            # mise à jour précédente, ne pas le réinsérer comme snapshot
+            logger.warning("Prix de %s absent de cette mise à jour, ignoré", token)
             continue
         new_entries[token] = {
             "amount": aggregated[token],
@@ -484,7 +491,7 @@ def load_settings(settings: dict):
 
     try:
         # Attempt to open/create the database file
-        with sqlite3.connect(st.session_state.settings["dbfile"]) as _conn:
+        with db_connect(st.session_state.settings["dbfile"]) as _conn:
             pass
     except Exception as e:  # noqa: BLE001
         logger.error(
@@ -494,7 +501,7 @@ def load_settings(settings: dict):
         )
         fallback_db = os.path.join(os.getcwd(), "db.sqlite3")
         try:
-            with sqlite3.connect(fallback_db) as _conn:
+            with db_connect(fallback_db) as _conn:
                 pass
             st.session_state.settings["dbfile"] = fallback_db
             logger.info("Falling back to dbfile: %s", fallback_db)
@@ -562,7 +569,7 @@ def __interpolate_token(token: str, timestamp: int, dbfile: str) -> float:
         dbfile: Path to database file
 
     Returns:
-        Price in EUR (for crypto) or exchange rate (for fiat)
+        Price of 1 token in EUR (crypto or fiat)
         EUR returns 1.0 as it's the base currency
     """
     logger.debug(
@@ -581,9 +588,12 @@ def __interpolate_token(token: str, timestamp: int, dbfile: str) -> float:
     if is_fiat(token):
         logger.debug("Token %s is a fiat currency, querying Currency table", token)
         df_low, df_high = market.get_currency_lowhigh(token, timestamp)
-    else:
-        logger.debug("Token %s is a cryptocurrency, querying Market table", token)
-        df_low, df_high = market.get_token_lowhigh(token, timestamp)
+        rate = interpolate_price(df_low, df_high, timestamp, token)
+        # Currency stores "1 EUR = rate token" : the price of 1 token in EUR
+        # is its inverse
+        return 1.0 / rate if rate else None
+    logger.debug("Token %s is a cryptocurrency, querying Market table", token)
+    df_low, df_high = market.get_token_lowhigh(token, timestamp)
 
     return interpolate_price(df_low, df_high, timestamp, token)
 
@@ -770,8 +780,16 @@ def _interpolate_from_series(series: pd.Series, timestamp: int) -> float:
     if series is None or series.empty:
         return None
 
-    # Convert DatetimeIndex to Unix timestamps
-    ts_array = series.index.astype(np.int64) // 10**9
+    # ApiMarket series are indexed in naive local time: restore the timezone
+    # (ambiguous/nonexistent DST hours resolved) before computing epochs
+    index = series.index
+    if index.tz is None:
+        index = index.tz_localize(
+            tzlocal.get_localzone(),
+            ambiguous=np.ones(len(index), dtype=bool),
+            nonexistent="shift_forward",
+        )
+    ts_array = (index - pd.Timestamp("1970-01-01", tz="UTC")).total_seconds().to_numpy()
     return float(np.interp(timestamp, ts_array, series.values))
 
 
@@ -1001,12 +1019,11 @@ def calc_perf_api(
                     )
                     return converted
                 else:
+                    # A USD price must not be shown as EUR: no value instead
                     logger.warning(
-                        "USD→EUR rate unavailable for %s, returning USD price", token
+                        "USD→EUR rate unavailable for %s, no EUR price", token
                     )
-                    return (
-                        token_price_usd  # Return USD price as fallback instead of None
-                    )
+                    return None
             else:
                 logger.warning(
                     "Unsupported currency: %s, returning USD price", currency

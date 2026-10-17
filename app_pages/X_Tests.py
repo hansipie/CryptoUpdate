@@ -1,5 +1,4 @@
 import logging
-import sqlite3
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 
@@ -7,6 +6,7 @@ import pandas as pd
 import requests
 import streamlit as st
 
+from modules.utils import db_connect
 
 logger = logging.getLogger(__name__)
 
@@ -22,7 +22,7 @@ def find_missing_dates(dbfile: str) -> list:
     Returns:
         List of dates (as strings) with no data
     """
-    with sqlite3.connect(dbfile) as con:
+    with db_connect(dbfile) as con:
         # Get all unique dates from the database
         query = """
         SELECT DISTINCT date(timestamp, 'unixepoch') as date
@@ -45,7 +45,7 @@ def find_missing_dates(dbfile: str) -> list:
 
         # Generate all dates between first and last
         all_dates = pd.date_range(start=first_date, end=last_date, freq="D")
-        all_dates_set = set(d.date() for d in all_dates)
+        all_dates_set = {d.date() for d in all_dates}
 
         # Find missing dates
         missing_dates = sorted(all_dates_set - existing_dates)
@@ -112,8 +112,8 @@ def check_api_data_for_date(api_url: str, api_key: str, date) -> bool:
             )
             return False
 
-    except Exception as e:
-        logger.error("Error checking API for date %s: %s", date, str(e))
+    except Exception:
+        logger.exception("Error checking API for date %s", date)
         return False
 
 
@@ -167,8 +167,7 @@ if missing_dates:
             }
 
             # Process completed tasks
-            completed = 0
-            for future in as_completed(future_to_date):
+            for completed, future in enumerate(as_completed(future_to_date), start=1):
                 date = future_to_date[future]
                 try:
                     has_data = future.result()
@@ -177,7 +176,6 @@ if missing_dates:
                     logger.exception("Error checking date %s", date)
                     api_status_dict[date] = "❌"
 
-                completed += 1
                 status_text.text(f"Checking dates: {completed}/{len(missing_dates)}")
                 progress_bar.progress(completed / len(missing_dates))
 

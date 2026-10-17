@@ -8,7 +8,7 @@ This module provides a UI for managing token metadata including:
 """
 
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pandas as pd
 import streamlit as st
@@ -50,7 +50,7 @@ def _select_coin_dialog():
             "Confirmer",
             type="primary",
             icon=":material/check:",
-            use_container_width=True,
+            width="stretch",
         ):
             row = coins_df.iloc[selected_idx]
             st.session_state["checked_mr_id"] = int(row["id"])
@@ -61,7 +61,7 @@ def _select_coin_dialog():
             del st.session_state["pending_token_symbol"]
             st.rerun()
     with col2:
-        if st.button("Ignorer", icon=":material/cancel:", use_container_width=True):
+        if st.button("Ignorer", icon=":material/cancel:", width="stretch"):
             del st.session_state["pending_coins"]
             del st.session_state["pending_token_symbol"]
             st.rerun()
@@ -95,7 +95,7 @@ def _delete_confirmation_dialog():
             "Supprimer",
             type="primary",
             icon=":material/delete_forever:",
-            use_container_width=True,
+            width="stretch",
         ):
             deleted = manager.delete_token_by_mr_id(mr_id)
             if deleted:
@@ -108,7 +108,7 @@ def _delete_confirmation_dialog():
                 del st.session_state["token_to_delete_id"]
             st.rerun()
     with col2:
-        if st.button("Annuler", icon=":material/close:", use_container_width=True):
+        if st.button("Annuler", icon=":material/close:", width="stretch"):
             del st.session_state["token_to_delete"]
             if "token_to_delete_id" in st.session_state:
                 del st.session_state["token_to_delete_id"]
@@ -145,7 +145,7 @@ with st.sidebar:
         .upper()
     )
 
-    if st.button("Check", icon=":material/search:", use_container_width=True):
+    if st.button("Check", icon=":material/search:", width="stretch"):
         if not token_symbol:
             st.warning("Veuillez saisir un symbole.")
         else:
@@ -172,7 +172,7 @@ with st.sidebar:
                     st.session_state["pending_coins"] = coins_df
                     st.session_state["pending_token_symbol"] = token_symbol
                     st.rerun()
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 - any API failure falls back to the DB
                 logger.warning(
                     "Could not fetch MarketRaccoon info for %s: %s", token_symbol, e
                 )
@@ -225,7 +225,7 @@ with st.sidebar:
     if st.button(
         "Submit",
         icon=":material/cloud_upload:",
-        use_container_width=True,
+        width="stretch",
         disabled=submit_disabled,
     ):
         manager.upsert_token_info_by_mr_id(
@@ -269,7 +269,7 @@ with st.sidebar:
             "Save Metadata",
             icon=":material/save:",
             disabled=not has_checked,
-            use_container_width=True,
+            width="stretch",
         )
 
         if submitted:
@@ -283,13 +283,13 @@ with st.sidebar:
                     if delisting_date:
                         delisting_dt = datetime.combine(
                             delisting_date, datetime.min.time()
-                        ).replace(tzinfo=timezone.utc)
+                        ).replace(tzinfo=UTC)
 
                     last_price_dt = None
                     if last_valid_price_date:
                         last_price_dt = datetime.combine(
                             last_valid_price_date, datetime.min.time()
-                        ).replace(tzinfo=timezone.utc)
+                        ).replace(tzinfo=UTC)
 
                     manager.add_or_update_token_by_mr_id(
                         mr_id=checked_mr_id,
@@ -303,7 +303,7 @@ with st.sidebar:
                     _clear_checked_state()
                     st.rerun()
                 except Exception as e:
-                    logger.exception("Error saving token metadata: %s", e)
+                    logger.exception("Error saving token metadata")
                     st.error(f"Error saving metadata: {e}")
 
     st.divider()
@@ -312,7 +312,7 @@ with st.sidebar:
     if st.button(
         "Danger Zone",
         icon=":material/destruction:",
-        use_container_width=True,
+        width="stretch",
         disabled=not has_checked,
         type="primary",
     ):
@@ -435,12 +435,13 @@ with tab2:
                         mr_id=token_to_delist["mraccoon_id"],
                         token=token_to_delist["token"],
                         status=TokenStatus.DELISTED,
-                        delisting_date=datetime.now(timezone.utc),
+                        delisting_date=datetime.now(UTC),
                         notes="Marked as delisted via UI",
                     )
                     st.success(f"✅ {token_to_delist['token']} marked as delisted")
                     st.rerun()
                 except Exception as e:
+                    logger.exception("Error marking token as delisted")
                     st.error(f"Error: {e}")
 
 # Tab 3: Delisted Tokens
@@ -572,7 +573,7 @@ with tab4:
             st.download_button(
                 label="Download CSV",
                 data=csv,
-                file_name=f"token_metadata_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                file_name=f"token_metadata_{datetime.now().astimezone().strftime('%Y%m%d_%H%M%S')}.csv",
                 mime="text/csv",
                 width="stretch",
             )

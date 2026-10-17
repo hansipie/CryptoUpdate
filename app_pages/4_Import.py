@@ -1,5 +1,6 @@
 import io
 import logging
+import math
 from json import loads
 
 import pandas as pd
@@ -9,9 +10,10 @@ from PIL import Image
 from modules import aiprocessing
 from modules.database import portfolios as pf
 
-
 logging.getLogger("PIL").setLevel(logging.WARNING)
 logger = logging.getLogger(__name__)
+
+MAX_UPLOAD_BYTES = 10 * 1024 * 1024
 
 
 @st.cache_data
@@ -73,16 +75,23 @@ def extract(input_data: any) -> pd.DataFrame:
                     st.session_state.settings["ai_apitoken"],
                     model=st.session_state.settings.get("ai_model"),
                 )
-                output = pd.DataFrame(loads(message_json).get("assets"))
             elif isinstance(input_data, pd.DataFrame):
                 message_json, _ = aiprocessing.extract_from_df(
                     input_data,
                     st.session_state.settings["ai_apitoken"],
                     model=st.session_state.settings.get("ai_model"),
                 )
-                output = pd.DataFrame(loads(message_json).get("assets"))
             else:
-                raise ValueError("Invalid input type")
+                raise TypeError("Invalid input type")
+            # call_ai logs API failures and returns None instead of raising
+            if message_json is None:
+                raise ValueError("The AI service returned no usable answer")
+            assets = loads(message_json).get("assets")
+            if not assets:
+                raise ValueError("No asset found in the AI answer")
+            output = pd.DataFrame(assets)
+            if not {"symbol", "amount"} <= set(output.columns):
+                raise ValueError("The AI answer has no symbol/amount columns")
         except (ValueError, KeyError, TypeError) as e:
             st.error("Unexpected error: " + str(e))
             logger.exception("Extraction failed")
@@ -92,7 +101,17 @@ def extract(input_data: any) -> pd.DataFrame:
     return output
 
 
-def save_data(df: pd.DataFrame, portfolio: str = None, action: str = "Set"):
+def _is_valid_amount(symbol: str, amount: float, action: str) -> bool:
+    """Check an extracted row: a model produced it, never trust it blindly.
+
+    Only an "Add" may be negative (a manual correction in the editor).
+    """
+    if not symbol or symbol == "NAN" or pd.isna(amount) or not math.isfinite(amount):
+        return False
+    return action != "Set" or amount >= 0
+
+
+def save_data(df: pd.DataFrame, portfolio: str | None = None, action: str = "Set"):
     """Save imported data to selected portfolio.
 
     Args:
@@ -106,16 +125,26 @@ def save_data(df: pd.DataFrame, portfolio: str = None, action: str = "Set"):
     if not action:
         st.error("Please select an action")
         return
-    tokens = {}
+    saved = 0
+    skipped = []
     for _, row in df.iterrows():
-        if row["select"]:
-            data = row.to_dict()
-            logger.debug("Saving data: %s", data)
-            tokens[data["symbol"]] = {"amount": data["amount"]}
-            if action == "Set":
-                g_portfolio.set_token(portfolio, data["symbol"], data["amount"])
-            elif action == "Add":
-                g_portfolio.set_token_add(portfolio, data["symbol"], data["amount"])
+        if not row["select"]:
+            continue
+        symbol = str(row["symbol"]).strip().upper()
+        amount = pd.to_numeric(row["amount"], errors="coerce")
+        if not _is_valid_amount(symbol, amount, action):
+            skipped.append(f"{row['symbol']} ({row['amount']})")
+            continue
+        logger.debug("Saving data: %s %s", symbol, amount)
+        if action == "Set":
+            g_portfolio.set_token(portfolio, symbol, float(amount))
+        elif action == "Add":
+            g_portfolio.set_token_add(portfolio, symbol, float(amount))
+        saved += 1
+    if skipped:
+        st.warning("Skipped invalid rows: " + ", ".join(skipped))
+    if not saved:
+        return
     st.toast("Data successfully saved", icon=":material/check:")
 
 
@@ -223,12 +252,26 @@ if file is None:
 else:
     logger.debug("File: %s - file type: %s", file.name, file.type)
 
-    if file.type == "text/csv" or file.name.endswith(".csv"):
-        logger.debug("CSV file detected")
-        input_file = process_csv(file)
-    else:
-        logger.debug("Image file detected")
-        input_file = process_img(file)
+    if file.size > MAX_UPLOAD_BYTES:
+        st.error(f"File too large (max {MAX_UPLOAD_BYTES // (1024 * 1024)} MB)")
+        st.stop()
+    try:
+        if file.type == "text/csv" or file.name.endswith(".csv"):
+            logger.debug("CSV file detected")
+            input_file = process_csv(file)
+        else:
+            logger.debug("Image file detected")
+            input_file = process_img(file)
+    except (
+        OSError,
+        ValueError,
+        pd.errors.ParserError,
+        pd.errors.EmptyDataError,
+        Image.DecompressionBombError,
+    ) as e:
+        logger.exception("Unreadable upload")
+        st.error(f"Cannot read this file: {e}")
+        st.stop()
     st.session_state.import_page["type"] = file.type
     st.session_state.import_page["input"] = input_file
     draw_ui()

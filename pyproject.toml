@@ -29,6 +29,7 @@ dependencies = [
 dev = [
     "pip-audit>=2.9.0",
     "pylint>=3.3.8",
+    "pytest>=9.1.1",
 ]
 
 [tool.pylint.main]
@@ -61,3 +62,7 @@ disable = [
     "no-else-return",
     "use-dict-literal",
 ]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]

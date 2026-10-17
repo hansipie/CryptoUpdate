@@ -7,27 +7,29 @@ as well as displaying operation history and performance metrics.
 
 import logging
 import os
-import streamlit as st
+
 import pandas as pd
+import streamlit as st
 import tzlocal
+
 from modules.database.customdata import Customdata
-from modules.database.portfolios import Portfolios
-from modules.database.tokensdb import TokensDatabase
-from modules.database.operations import Operations
 from modules.database.market import Market
+from modules.database.operations import Operations
+from modules.database.portfolios import Portfolios
 from modules.database.swaps import Swaps
+from modules.database.tokensdb import TokensDatabase
 from modules.tools import (
+    _get_api_fiat_rate,
+    _get_api_latest_prices,
     batch_convert_historical,
     batch_convert_historical_api,
+    calc_perf_api,
     calculate_crypto_rate,
     calculate_crypto_rate_api,
-    calc_perf_api,
-    update,
     parse_last_update,
-    _get_api_latest_prices,
-    _get_api_fiat_rate,
+    update,
 )
-from modules.utils import get_file_hash, to_timestamp_a as toTimestamp_A
+from modules.utils import to_timestamp_a as toTimestamp_A
 
 logger = logging.getLogger(__name__)
 
@@ -52,7 +54,8 @@ def submit_buy(
         to_amount: Amount in target token
         to_token: Target token symbol
         to_wallet: Destination wallet name
-        adjust_portfolios: If True, add to_amount of to_token to the wallet's holdings
+        adjust_portfolios: If True, add to_amount of to_token to the wallet's
+            holdings (same transaction as the operation)
     """
     logger.debug(
         "submitbuy: timestamp=%d from_amount=%f, form_currency=%s, to_amount=%f, to_token=%s, to_wallet=%s",
@@ -75,28 +78,7 @@ def submit_buy(
         portfolio_adjusted=adjust_portfolios,
     )
 
-    if adjust_portfolios:
-        Portfolios(st.session_state.settings["dbfile"]).set_token_add(
-            to_wallet, to_token, to_amount
-        )
-
     st.toast("Operation submitted", icon=":material/check:")
-
-
-def apply_swap_to_portfolios(
-    wallet_from: str,
-    token_from: str,
-    amount_from: float,
-    wallet_to: str,
-    token_to: str,
-    amount_to: float,
-    reverse: bool = False,
-) -> None:
-    """Move a swap's amounts between wallets holdings (or undo it if reverse)."""
-    sign = -1 if reverse else 1
-    portfolios = Portfolios(st.session_state.settings["dbfile"])
-    portfolios.set_token_add(wallet_from, token_from, -sign * amount_from)
-    portfolios.set_token_add(wallet_to, token_to, sign * amount_to)
 
 
 def submit_swap(
@@ -107,7 +89,7 @@ def submit_swap(
     swap_token_to: str,
     swap_amount_to: float,
     swap_wallet_to: str,
-    note: str = None,
+    note: str | None = None,
     adjust_portfolios: bool = False,
 ) -> None:
     """Submit a swap operation to the database.
@@ -148,16 +130,6 @@ def submit_swap(
         note=note,
         portfolio_adjusted=adjust_portfolios,
     )
-
-    if adjust_portfolios:
-        apply_swap_to_portfolios(
-            swap_wallet_from,
-            swap_token_from,
-            swap_amount_from,
-            swap_wallet_to,
-            swap_token_to,
-            swap_amount_to,
-        )
 
 
 def rows_selected(selectable, max_len: int) -> list:
@@ -221,8 +193,8 @@ def buy_add() -> None:
         "Synchronize portfolios", value=False, key="buy_adjust_portfolios"
     )
     if st.button("Submit", width="stretch"):
-        if to_wallet is None:
-            st.error("Portfolio is required")
+        if to_wallet is None or to_token is None:
+            st.error("Token and portfolio are required")
             return
         timestamp = toTimestamp_A(date, time)
         submit_buy(
@@ -235,6 +207,23 @@ def buy_add() -> None:
             adjust_portfolios=adjust_portfolios,
         )
         st.rerun()
+
+
+def clean_swap_form(
+    token_from: str, token_to: str, amount_from: float, amount_to: float
+) -> tuple:
+    """Normalize the swap form tokens (trim + uppercase) and validate it.
+
+    Returns:
+        (token_from, token_to, error): error is None when the form is valid
+    """
+    token_from = (token_from or "").strip().upper()
+    token_to = (token_to or "").strip().upper()
+    if not token_from or not token_to:
+        return token_from, token_to, "From Token and To Token are required"
+    if amount_from <= 0 or amount_to <= 0:
+        return token_from, token_to, "Amounts must be greater than 0"
+    return token_from, token_to, None
 
 
 @st.dialog("Add Swap")
@@ -276,6 +265,12 @@ def swap_add() -> None:
     if st.button("Submit", width="stretch"):
         if swap_wallet_from is None or swap_wallet_to is None:
             st.error("From Wallet and To Wallet are required")
+            return
+        swap_token_from, swap_token_to, error = clean_swap_form(
+            swap_token_from, swap_token_to, swap_amount_from, swap_amount_to
+        )
+        if error:
+            st.error(error)
             return
         timestamp = toTimestamp_A(date, time)
         submit_swap(
@@ -349,24 +344,23 @@ def buy_edit_dialog(data: dict) -> None:
         "Synchronize portfolios", value=was_adjusted, key="buy_adjust_portfolios"
     )
     if st.button("Submit", width="stretch"):
-        if to_wallet is None:
-            st.error("Portfolio is required")
+        if to_wallet is None or to_token is None:
+            st.error("Token and portfolio are required")
             return
         timestamp = toTimestamp_A(date, time)
-        if was_adjusted:
-            Portfolios(st.session_state.settings["dbfile"]).set_token_add(
-                data["Portfolio"], data["Token"], -float(data["To"])
-            )
-        g_operation.delete(data["id"])
-        submit_buy(
-            timestamp,
+        # old effect undone + new row inserted in a single transaction
+        g_operation.replace(
+            data["id"],
+            "buy",
             from_amount,
-            form_currency,
             to_amount,
+            form_currency,
             to_token,
+            timestamp,
             to_wallet,
-            adjust_portfolios=adjust_portfolios,
+            portfolio_adjusted=adjust_portfolios,
         )
+        st.toast("Operation submitted", icon=":material/check:")
         st.rerun()
 
 
@@ -435,19 +429,16 @@ def swap_edit_dialog(data: dict):
         if swap_wallet_from is None or swap_wallet_to is None:
             st.error("From Wallet and To Wallet are required")
             return
+        swap_token_from, swap_token_to, error = clean_swap_form(
+            swap_token_from, swap_token_to, swap_amount_from, swap_amount_to
+        )
+        if error:
+            st.error(error)
+            return
         timestamp = toTimestamp_A(date, time)
-        if was_adjusted:
-            apply_swap_to_portfolios(
-                data["From Wallet"],
-                data["From Token"],
-                float(data["From Amount"]),
-                data["To Wallet"],
-                data["To Token"],
-                float(data["To Amount"]),
-                reverse=True,
-            )
-        g_swaps.delete(data["id"])
-        submit_swap(
+        # old effect undone + new row inserted in a single transaction
+        g_swaps.replace(
+            data["id"],
             timestamp,
             swap_token_from,
             swap_amount_from,
@@ -456,7 +447,7 @@ def swap_edit_dialog(data: dict):
             swap_amount_to,
             swap_wallet_to,
             note=swap_note,
-            adjust_portfolios=adjust_portfolios,
+            portfolio_adjusted=adjust_portfolios,
         )
         st.rerun()
 
@@ -483,11 +474,7 @@ def buy_delete_dialog(data: dict):
     )
     if st.button("Confirm"):
         logger.debug("Delete row: %s - %s", data, type(data["id"]))
-        if sync_portfolios:
-            Portfolios(st.session_state.settings["dbfile"]).set_token_add(
-                data["Portfolio"], data["Token"], -float(data["To"])
-            )
-        g_operation.delete(data["id"])
+        g_operation.delete(data["id"], revert_portfolio=sync_portfolios)
         st.rerun()
 
 
@@ -758,20 +745,18 @@ def airdrop_edit_dialog(data: dict) -> None:
         if wallet is None or token is None:
             st.error("Token and portfolio are required")
             return
-        if was_adjusted:
-            Portfolios(st.session_state.settings["dbfile"]).set_token_add(
-                data["Portfolio"], data["Token"], -float(data["Amount"])
-            )
-        g_operation.delete(data["id"])
-        submit_buy(
-            toTimestamp_A(date, time),
+        g_operation.replace(
+            data["id"],
+            "buy",
             0.0,
-            "EUR",
             amount,
+            "EUR",
             token,
+            toTimestamp_A(date, time),
             wallet,
-            adjust_portfolios=adjust_portfolios,
+            portfolio_adjusted=adjust_portfolios,
         )
+        st.toast("Operation submitted", icon=":material/check:")
         st.rerun()
 
 
@@ -820,8 +805,22 @@ def swap_perf(rate_swap, rate_now) -> float:
     return ((rate_swap * 100) / rate_now) - 100
 
 
+def _db_stamp() -> tuple:
+    """Cache key reflecting the database state: it changes on every write."""
+    stat = os.stat(st.session_state.settings["dbfile"])
+    return (stat.st_mtime_ns, stat.st_size)
+
+
+# The tables below are rebuilt on every rerun (each row selection is one), so
+# they are cached. `db_stamp` is only there to key the cache on the database
+# state (an "Update prices" or an edit invalidates it); `ttl` bounds the age of
+# API prices.
+@st.cache_data(ttl=600, show_spinner=False)
 def build_buy_dataframe(
-    convert_from: str = None, convert_to: str = None, use_api: bool = False
+    convert_from: str | None = None,
+    convert_to: str | None = None,
+    use_api: bool = False,
+    db_stamp: tuple | None = None,  # pylint: disable=unused-argument
 ) -> pd.DataFrame:
     # Pre-load API data once for the entire function
     if use_api:
@@ -955,7 +954,12 @@ def build_buy_dataframe(
     return df
 
 
-def build_airdrop_dataframe(currency: str, use_api: bool = False) -> pd.DataFrame:
+@st.cache_data(ttl=600, show_spinner=False)
+def build_airdrop_dataframe(
+    currency: str,
+    use_api: bool = False,
+    db_stamp: tuple | None = None,  # pylint: disable=unused-argument
+) -> pd.DataFrame:
     """Build the airdrop table: buy operations whose source amount is 0.
 
     The "Value" column is the airdropped amount priced in `currency` at the
@@ -999,7 +1003,11 @@ def build_airdrop_dataframe(currency: str, use_api: bool = False) -> pd.DataFram
     return df
 
 
-def build_buy_avg_table(use_api: bool = False):
+@st.cache_data(ttl=600, show_spinner=False)
+def build_buy_avg_table(
+    use_api: bool = False,
+    db_stamp: tuple | None = None,  # pylint: disable=unused-argument
+):
     """Build a table showing average purchase metrics per token.
 
     Calculates average rates and performance metrics for each token
@@ -1039,18 +1047,13 @@ def build_buy_avg_table(use_api: bool = False):
     return df
 
 
-@st.cache_data(
-    hash_funcs={
-        str: lambda x: (
-            get_file_hash(x) if (os.path.sep in x and os.path.isfile(x)) else hash(x)
-        )
-    },
-)
+@st.cache_data(ttl=600, show_spinner=False)
 def build_swap_dataframes(
     db_file: str,
-    convert_from: str = None,
-    convert_to: str = None,
+    convert_from: str | None = None,
+    convert_to: str | None = None,
     use_api: bool = False,
+    db_stamp: tuple | None = None,  # pylint: disable=unused-argument
 ) -> pd.DataFrame:
     swaps = Swaps(db_file)
     columns = [
@@ -1076,12 +1079,11 @@ def build_swap_dataframes(
     return df1, df2
 
 
-@st.cache_data(ttl=3600)
 def build_swap_dataframe(
     df: pd.DataFrame,
     db_file: str,
-    convert_from: str = None,
-    convert_to: str = None,
+    convert_from: str | None = None,
+    convert_to: str | None = None,
     use_api: bool = False,
 ) -> pd.DataFrame:
     # Pre-load API data once for the entire function
@@ -1199,8 +1201,8 @@ def _draw_swap_table(
     df: pd.DataFrame,
     selection_key: str,
     empty_message: str,
-    convert_from: str = None,
-    convert_to: str = None,
+    convert_from: str | None = None,
+    convert_to: str | None = None,
 ):
     if df.empty:
         st.info(empty_message)
@@ -1269,13 +1271,17 @@ def _draw_swap_table(
         )
 
 
-def draw_swap(df: pd.DataFrame, convert_from: str = None, convert_to: str = None):
+def draw_swap(
+    df: pd.DataFrame, convert_from: str | None = None, convert_to: str | None = None
+):
     _draw_swap_table(
         df, "swapselection", "No swap operations", convert_from, convert_to
     )
 
 
-def draw_swap_arch(df: pd.DataFrame, convert_from: str = None, convert_to: str = None):
+def draw_swap_arch(
+    df: pd.DataFrame, convert_from: str | None = None, convert_to: str | None = None
+):
     _draw_swap_table(
         df, "swapachselection", "No archived swaps", convert_from, convert_to
     )
@@ -1319,7 +1325,7 @@ with st.sidebar:
     else:
         st.caption("💾 SQLite local")
 
-buy_tab, swap_tab, airdrop_tab = st.tabs(["Buy", "Swap", "Airdrop"])
+buy_tab, swap_tab, airdrop_tab = st.tabs(["Buy", "Swap", "Airdrops"])
 with buy_tab:
     # Conversion selectboxes for Buy
     g_convert_options = ["Original", "EUR", "USD"] + g_tokens
@@ -1337,7 +1343,7 @@ with buy_tab:
 
     # build buy table with performance metrics
     df_buy = build_buy_dataframe(
-        convert_from=buy_cf, convert_to=buy_ct, use_api=use_api
+        convert_from=buy_cf, convert_to=buy_ct, use_api=use_api, db_stamp=_db_stamp()
     )
 
     col_buylist, col_buybtns = st.columns([8, 1])
@@ -1406,7 +1412,7 @@ with buy_tab:
 
     # aquisition average table
     st.title("Aquisition Averages")
-    df_avg = build_buy_avg_table(use_api=use_api)
+    df_avg = build_buy_avg_table(use_api=use_api, db_stamp=_db_stamp())
     if df_avg.empty:
         st.info("No data available")
     else:
@@ -1466,6 +1472,7 @@ with swap_tab:
         convert_from=swap_cf,
         convert_to=swap_ct,
         use_api=use_api,
+        db_stamp=_db_stamp(),
     )
 
     col_swaplist, col_swapbtns = st.columns([8, 1])
@@ -1528,31 +1535,36 @@ with swap_tab:
 
 with airdrop_tab:
     airdrop_currency = st.session_state.settings.get("fiat_currency", "EUR")
-    df_airdrop_all = build_airdrop_dataframe(airdrop_currency, use_api=use_api)
+    df_airdrop_all = build_airdrop_dataframe(
+        airdrop_currency, use_api=use_api, db_stamp=_db_stamp()
+    )
     # df_airdrop = displayed rows: airdrop_edit() maps the selected row to it
     df_airdrop = df_airdrop_all
+
+    if not df_airdrop_all.empty:
+        airdrop_token_options = sorted(df_airdrop_all["Token"].dropna().unique())
+        # Drop filtered tokens that no longer have an airdrop (edit/delete)
+        st.session_state["airdrop_token_filter"] = [
+            t
+            for t in st.session_state.get("airdrop_token_filter", [])
+            if t in airdrop_token_options
+        ]
+        airdrop_token_filter = st.multiselect(
+            "Filter tokens",
+            airdrop_token_options,
+            key="airdrop_token_filter",
+            placeholder="All tokens",
+        )
+        if airdrop_token_filter:
+            df_airdrop = df_airdrop_all[
+                df_airdrop_all["Token"].isin(airdrop_token_filter)
+            ].reset_index(drop=True)
+
     col_airdroplist, col_airdropbtns = st.columns([8, 1])
     with col_airdroplist:
         if df_airdrop_all.empty:
             st.info("No airdrops")
         else:
-            airdrop_token_options = sorted(df_airdrop_all["Token"].dropna().unique())
-            # Drop filtered tokens that no longer have an airdrop (edit/delete)
-            st.session_state["airdrop_token_filter"] = [
-                t
-                for t in st.session_state.get("airdrop_token_filter", [])
-                if t in airdrop_token_options
-            ]
-            airdrop_token_filter = st.multiselect(
-                "Filter tokens",
-                airdrop_token_options,
-                key="airdrop_token_filter",
-                placeholder="All tokens",
-            )
-            if airdrop_token_filter:
-                df_airdrop = df_airdrop_all[
-                    df_airdrop_all["Token"].isin(airdrop_token_filter)
-                ].reset_index(drop=True)
             st.dataframe(
                 df_airdrop,
                 width="stretch",

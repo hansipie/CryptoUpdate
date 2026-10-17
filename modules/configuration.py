@@ -3,6 +3,7 @@
 import json
 import logging
 import os
+import shutil
 
 logger = logging.getLogger(__name__)
 
@@ -52,8 +53,7 @@ class Configuration:
         def _strip_debug_prefix(path: str) -> str:
             """Remove debug_ prefix only from final filename component."""
             directory, filename = os.path.split(path)
-            if filename.startswith("debug_"):
-                filename = filename[len("debug_") :]
+            filename = filename.removeprefix("debug_")
             return os.path.join(directory, filename) if directory else filename
 
         data_path = _project_relative(settings["data_path"])
@@ -72,9 +72,7 @@ class Configuration:
                 "token": settings.get("marketraccoon_token", ""),
             },
             "RatesDB": {
-                "url": settings.get(
-                    "ratesdb_url", "https://free.ratesdb.com/v1/rates"
-                )
+                "url": settings.get("ratesdb_url", "https://free.ratesdb.com/v1/rates")
             },
             "Notion": {
                 "token": settings["notion_token"],
@@ -103,11 +101,21 @@ class Configuration:
             },
         }
 
+        # Write to a temporary file then rename it: a failure while dumping
+        # cannot truncate the existing settings (which hold the API keys).
+        # The file is created 0600; an existing file keeps its permissions.
+        tmp_file = f"{self.config_file}.tmp"
         try:
-            with open(self.config_file, "w", encoding="utf-8") as f:
+            fd = os.open(tmp_file, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+            with os.fdopen(fd, "w", encoding="utf-8") as f:
                 json.dump(config, f, indent=4)
+            if os.path.exists(self.config_file):
+                shutil.copymode(self.config_file, tmp_file)
+            os.replace(tmp_file, self.config_file)
         except Exception as e:
             logger.error(
                 "Error saving configuration: %s - %s", type(e).__name__, str(e)
             )
+            if os.path.exists(tmp_file):
+                os.remove(tmp_file)
             raise

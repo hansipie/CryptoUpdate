@@ -113,7 +113,8 @@ def main():
         safe_session_state = {
             k: v
             for k, v in st.session_state.items()
-            if k not in ["settings"] and not k.endswith("_token")
+            if k not in ["settings"]
+            and not any(s in k.lower() for s in ("token", "password"))
         }
         # Add non-sensitive settings
         if "settings" in st.session_state:

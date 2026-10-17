@@ -11,7 +11,7 @@ import os
 import shutil
 import tempfile
 import time
-from typing import Callable, Optional
+from collections.abc import Callable
 
 logger = logging.getLogger(__name__)
 
@@ -52,7 +52,7 @@ class FiatCacheManager:
             os.makedirs(cache_dir, exist_ok=True)
             logger.info("Created cache directory: %s", cache_dir)
 
-    def get(self, key: str) -> Optional[dict]:
+    def get(self, key: str) -> dict | None:
         """Get cached value if it exists and is not expired.
 
         Args:
@@ -77,7 +77,7 @@ class FiatCacheManager:
         logger.debug("Cache HIT for key: %s", key)
         return entry["data"]
 
-    def set(self, key: str, value: dict, ttl_override: Optional[int] = None):
+    def set(self, key: str, value: dict, ttl_override: int | None = None):
         """Set cache value with optional TTL override.
 
         Args:
@@ -127,9 +127,9 @@ class FiatCacheManager:
     def get_or_fetch(
         self,
         key: str,
-        fetch_func: Callable[[], Optional[dict]],
+        fetch_func: Callable[[], dict | None],
         allow_expired_fallback: bool = True,
-    ) -> Optional[dict]:
+    ) -> dict | None:
         """Get from cache or fetch from source with fallback to expired cache.
 
         This is the main method for cache-aware data retrieval. It implements
@@ -163,8 +163,8 @@ class FiatCacheManager:
                 return fresh_data
             else:
                 logger.warning("Fetch returned None for key: %s", key)
-        except Exception as e:
-            logger.error("Failed to fetch data for key %s: %s", key, e)
+        except Exception:
+            logger.exception("Failed to fetch data for key %s", key)
 
         # Strategy 3: Fallback to expired cache if allowed
         if allow_expired_fallback:
@@ -196,7 +196,7 @@ class FiatCacheManager:
         else:
             logger.debug("No expired entries to clean")
 
-    def _get_expired(self, key: str) -> Optional[dict]:
+    def _get_expired(self, key: str) -> dict | None:
         """Get cache entry even if expired (for fallback).
 
         Args:
@@ -227,7 +227,7 @@ class FiatCacheManager:
                 cache_data = json.load(f)
             logger.debug("Loaded cache with %d entries", len(cache_data))
             return cache_data
-        except (json.JSONDecodeError, IOError) as e:
+        except (OSError, json.JSONDecodeError) as e:
             logger.error("Cache file corrupted: %s, resetting cache", e)
 
             # Backup corrupted file for debugging
@@ -236,7 +236,7 @@ class FiatCacheManager:
             try:
                 shutil.copy(self.cache_file, backup_file)
                 logger.info("Corrupted cache backed up to: %s", backup_file)
-            except Exception as backup_error:
+            except OSError as backup_error:
                 logger.error("Failed to backup corrupted cache: %s", backup_error)
 
             return {}
@@ -273,8 +273,8 @@ class FiatCacheManager:
             if temp_path is not None and os.path.exists(temp_path):
                 try:
                     os.unlink(temp_path)
-                except Exception:
-                    pass
+                except OSError:
+                    logger.debug("Could not remove temp file %s", temp_path)
             raise
 
     def _cleanup_expired_entries(self, cache_data: dict) -> dict:

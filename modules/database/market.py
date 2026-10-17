@@ -7,7 +7,6 @@ This module handles cryptocurrency market data including:
 """
 
 import logging
-import sqlite3
 import time
 
 import pandas as pd
@@ -16,6 +15,7 @@ import requests
 import tzlocal
 
 from modules.cmc import CMC
+from modules.utils import db_connect
 
 logger = logging.getLogger(__name__)
 
@@ -51,7 +51,7 @@ class Market:
     def __init_database(self):
         """Initialize database tables and indexes if they don't exist."""
         logger.debug("Init database")
-        with sqlite3.connect(self.db_path) as con:
+        with db_connect(self.db_path) as con:
             cur = con.cursor()
             cur.execute(
                 "CREATE TABLE IF NOT EXISTS Market (timestamp INTEGER, token TEXT, price REAL)"
@@ -70,7 +70,7 @@ class Market:
         Returns:
             List of token symbols
         """
-        with sqlite3.connect(self.db_path) as con:
+        with db_connect(self.db_path) as con:
             df = pd.read_sql_query(
                 "SELECT DISTINCT token from Market ORDER BY token", con
             )
@@ -83,7 +83,7 @@ class Market:
             DataFrame with token prices over time or None if empty
         """
         logger.debug("Get market")
-        with sqlite3.connect(self.db_path) as con:
+        with db_connect(self.db_path) as con:
             df_all = pd.read_sql_query(
                 "SELECT timestamp, token, price FROM Market ORDER BY timestamp", con
             )
@@ -106,7 +106,10 @@ class Market:
             return df_market
 
     def get_token_market(
-        self, token: str, from_timestamp: int = None, to_timestamp: int = None
+        self,
+        token: str,
+        from_timestamp: int | None = None,
+        to_timestamp: int | None = None,
     ) -> pd.DataFrame:
         """Get historical market data for a token.
 
@@ -119,8 +122,10 @@ class Market:
             DataFrame with token prices over time or None if empty
         """
         logger.debug("Get token market")
-        with sqlite3.connect(self.db_path) as con:
-            query = "SELECT timestamp AS Date, price AS Price FROM Market WHERE token = ?"
+        with db_connect(self.db_path) as con:
+            query = (
+                "SELECT timestamp AS Date, price AS Price FROM Market WHERE token = ?"
+            )
             params = [token]
             if from_timestamp is not None:
                 query += " AND timestamp >= ?"
@@ -147,7 +152,7 @@ class Market:
             DataFrame with latest token prices or None if empty
         """
         logger.debug("Get last market")
-        with sqlite3.connect(self.db_path) as con:
+        with db_connect(self.db_path) as con:
             market_df = pd.read_sql_query(
                 "SELECT m.token, m.timestamp, m.price AS value "
                 "FROM Market m "
@@ -163,11 +168,14 @@ class Market:
             logger.debug("Last Market get:\n%s", market_df)
             return market_df
 
-    def update_market(self, tokens: list = None, debug: bool = False):
+    def update_market(self, tokens: list | None = None, debug: bool = False) -> int:
         """Update market data with current prices and add new tokens.
 
         Args:
             tokens: Optional list of token symbols to add/update
+
+        Returns:
+            Timestamp stamped on the rows inserted by this update
         """
         logger.debug("Add tokens")
 
@@ -185,7 +193,7 @@ class Market:
 
         logger.debug("Adding %d tokens to database", len(tokens_prices))
 
-        with sqlite3.connect(self.db_path) as con:
+        with db_connect(self.db_path) as con:
             for token in tokens_prices:
                 cur = con.cursor()
                 cur.execute(
@@ -193,6 +201,7 @@ class Market:
                     (timestamp, token, tokens_prices[token]["price"]),
                 )
             con.commit()
+        return timestamp
 
     def get_last_timestamp(self) -> int:
         """Get timestamp of most recent market data.
@@ -200,13 +209,13 @@ class Market:
         Returns:
             Unix timestamp of latest market data
         """
-        with sqlite3.connect(self.db_path) as con:
+        with db_connect(self.db_path) as con:
             df = pd.read_sql_query(
                 "SELECT MAX(timestamp) as timestamp from Market;", con
             )
             return df["timestamp"][0]
 
-    def get_price(self, token: str, timestamp: int = None) -> float:
+    def get_price(self, token: str, timestamp: int | None = None) -> float:
         """Get price of a token at given timestamp.
 
         Args:
@@ -216,7 +225,7 @@ class Market:
         Returns:
             Token price or 0.0 if not found
         """
-        with sqlite3.connect(self.db_path) as con:
+        with db_connect(self.db_path) as con:
             if timestamp is not None:
                 df = pd.read_sql_query(
                     "SELECT price FROM Market WHERE token = ? AND timestamp <= ? ORDER BY timestamp DESC LIMIT 1",
@@ -243,7 +252,7 @@ class Market:
         Returns:
             DataFrame with token prices over time
         """
-        with sqlite3.connect(self.db_path) as con:
+        with db_connect(self.db_path) as con:
             df = pd.read_sql_query(
                 "SELECT timestamp, price FROM Market WHERE token = ? ORDER BY timestamp",
                 con,
@@ -260,14 +269,14 @@ class Market:
         logger.debug("Drop duplicate from %s", table)
         if table not in _DROP_DUPLICATE_QUERIES:
             raise ValueError(f"Table non autorisée : {table}")
-        with sqlite3.connect(self.db_path) as con:
+        with db_connect(self.db_path) as con:
             df = pd.read_sql_query(_DROP_DUPLICATE_QUERIES[table], con)
             dupcount = df.duplicated().sum()
             logger.debug("Found %d rows with %d duplicated rows", len(df), dupcount)
             if dupcount > 0:
                 logger.debug("Found %d duplicated rows. Dropping...", dupcount)
                 df.drop_duplicates(inplace=True)
-                con.execute(f"DELETE FROM {table}")  # noqa: S608
+                con.execute(f"DELETE FROM {table}")
                 df.to_sql(table, con, if_exists="append", index=False)
 
     def __find_missing_timestamps(self) -> pd.DataFrame:
@@ -276,7 +285,7 @@ class Market:
         Returns:
             DataFrame with missing timestamps
         """
-        with sqlite3.connect(self.db_path) as con:
+        with db_connect(self.db_path) as con:
             df_timestamps = pd.read_sql_query(
                 "SELECT DISTINCT timestamp from Market",
                 con,
@@ -333,7 +342,9 @@ class Market:
             rows_to_insert: list[tuple[int, str, float]] = []
             session = requests.Session()
             dates = sorted(date_to_rate_ts.keys())
-            logger.debug("Missing timestamps: %d, unique dates to fetch: %d", count, len(dates))
+            logger.debug(
+                "Missing timestamps: %d, unique dates to fetch: %d", count, len(dates)
+            )
 
             for idx, date in enumerate(dates, start=1):
                 rate_timestamp = date_to_rate_ts[date]
@@ -406,14 +417,16 @@ class Market:
                 rows_to_insert.append((rate_timestamp, "USD", float(usd_rate)))
 
             if rows_to_insert:
-                with sqlite3.connect(self.db_path) as con:
+                with db_connect(self.db_path) as con:
                     cur = con.cursor()
                     cur.executemany(
                         "INSERT INTO Currency (timestamp, currency, price) VALUES (?, ?, ?)",
                         rows_to_insert,
                     )
                     con.commit()
-                logger.info("Inserted %d historical currency rates", len(rows_to_insert))
+                logger.info(
+                    "Inserted %d historical currency rates", len(rows_to_insert)
+                )
             else:
                 logger.warning("No historical currency rates inserted")
 
@@ -439,7 +452,7 @@ class Market:
             price: Currency rate
         """
         logger.debug("Add currency: %s - %f", currency, price)
-        with sqlite3.connect(self.db_path) as con:
+        with db_connect(self.db_path) as con:
             cur = con.cursor()
             cur.execute(
                 "INSERT INTO Currency (timestamp, currency, price) VALUES (?, ?, ?)",
@@ -457,7 +470,7 @@ class Market:
         Returns:
             DataFrame with low and high values
         """
-        with sqlite3.connect(self.db_path) as con:
+        with db_connect(self.db_path) as con:
             df_low = pd.read_sql_query(
                 "SELECT timestamp, price FROM Market"
                 " WHERE token = ? AND timestamp <= ? ORDER BY timestamp DESC LIMIT 1",
@@ -482,7 +495,7 @@ class Market:
         Returns:
             Tuple of (df_low, df_high) DataFrames with low and high values
         """
-        with sqlite3.connect(self.db_path) as con:
+        with db_connect(self.db_path) as con:
             df_low = pd.read_sql_query(
                 "SELECT timestamp, price FROM Currency"
                 " WHERE currency = ? AND timestamp <= ? ORDER BY timestamp DESC LIMIT 1",
