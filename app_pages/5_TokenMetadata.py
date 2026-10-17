@@ -50,7 +50,7 @@ def _select_coin_dialog():
             "Confirmer",
             type="primary",
             icon=":material/check:",
-            use_container_width=True,
+            width="stretch",
         ):
             row = coins_df.iloc[selected_idx]
             st.session_state["checked_mr_id"] = int(row["id"])
@@ -61,7 +61,7 @@ def _select_coin_dialog():
             del st.session_state["pending_token_symbol"]
             st.rerun()
     with col2:
-        if st.button("Ignorer", icon=":material/cancel:", use_container_width=True):
+        if st.button("Ignorer", icon=":material/cancel:", width="stretch"):
             del st.session_state["pending_coins"]
             del st.session_state["pending_token_symbol"]
             st.rerun()
@@ -95,7 +95,7 @@ def _delete_confirmation_dialog():
             "Supprimer",
             type="primary",
             icon=":material/delete_forever:",
-            use_container_width=True,
+            width="stretch",
         ):
             deleted = manager.delete_token_by_mr_id(mr_id)
             if deleted:
@@ -108,7 +108,7 @@ def _delete_confirmation_dialog():
                 del st.session_state["token_to_delete_id"]
             st.rerun()
     with col2:
-        if st.button("Annuler", icon=":material/close:", use_container_width=True):
+        if st.button("Annuler", icon=":material/close:", width="stretch"):
             del st.session_state["token_to_delete"]
             if "token_to_delete_id" in st.session_state:
                 del st.session_state["token_to_delete_id"]
@@ -145,7 +145,7 @@ with st.sidebar:
         .upper()
     )
 
-    if st.button("Check", icon=":material/search:", use_container_width=True):
+    if st.button("Check", icon=":material/search:", width="stretch"):
         if not token_symbol:
             st.warning("Veuillez saisir un symbole.")
         else:
@@ -225,7 +225,7 @@ with st.sidebar:
     if st.button(
         "Submit",
         icon=":material/cloud_upload:",
-        use_container_width=True,
+        width="stretch",
         disabled=submit_disabled,
     ):
         manager.upsert_token_info_by_mr_id(
@@ -269,7 +269,7 @@ with st.sidebar:
             "Save Metadata",
             icon=":material/save:",
             disabled=not has_checked,
-            use_container_width=True,
+            width="stretch",
         )
 
         if submitted:
@@ -312,7 +312,7 @@ with st.sidebar:
     if st.button(
         "Danger Zone",
         icon=":material/destruction:",
-        use_container_width=True,
+        width="stretch",
         disabled=not has_checked,
         type="primary",
     ):

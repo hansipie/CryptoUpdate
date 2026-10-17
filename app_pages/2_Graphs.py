@@ -179,7 +179,7 @@ def plot_modern_graph(
 
     fig.update_layout(**layout_config)
 
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width="stretch")
 
 
 def plot_dual_axis_graph(
@@ -285,7 +285,7 @@ def plot_dual_axis_graph(
         },
     )
 
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width="stretch")
 
 
 def load_portfolios(dbfile: str) -> Portfolios:
