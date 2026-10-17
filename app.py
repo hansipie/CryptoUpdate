@@ -82,6 +82,12 @@ def setup_navigation():
     )
 
 
+def save_privacy_mode():
+    """Persist the privacy mode toggle in settings.json."""
+    st.session_state.settings["privacy_mode"] = st.session_state.privacy_mode
+    cfg().save_config(st.session_state.settings)
+
+
 def main():
     """Main application entry point."""
     # Setup application
@@ -101,6 +107,19 @@ def main():
 
         run_migrations(st.session_state.settings["dbfile"])
         st.session_state["db_migrations_applied"] = True
+
+    # Privacy mode toggle (all pages): masks amounts, persisted in settings
+    if "privacy_mode" not in st.session_state:
+        st.session_state["privacy_mode"] = st.session_state.settings.get(
+            "privacy_mode", False
+        )
+    with st.sidebar:
+        st.toggle(
+            "Mode confidentialité",
+            key="privacy_mode",
+            help="Masque les montants affichés (valeurs, quantités, totaux).",
+            on_change=save_privacy_mode,
+        )
 
     # Setup and run navigation
     navigator = setup_navigation()

@@ -9,6 +9,9 @@ from modules.database.portfolios import Portfolios
 from modules.tools import (
     create_portfolio_dataframe,
     get_currency_symbol,
+    is_privacy_mode,
+    mask_amount,
+    mask_dataframe,
     parse_last_update,
     update,
 )
@@ -137,22 +140,33 @@ def portfolio_ui(tabs: list):
 
                 # Display total with appropriate currency symbol
                 currency_symbol = get_currency_symbol(target_currency)
-                st.write(f"Total value: {currency_symbol}{round(balance, 2)}")
+                st.write(
+                    f"Total value: {mask_amount(f'{currency_symbol}{round(balance, 2)}')}"
+                )
 
                 height = (len(df) * 35) + 38
                 logger.debug("Dataframe:\n%s", df)
-                updated_data = st.data_editor(
-                    df,
-                    width="stretch",
-                    height=height,
-                    column_config={
-                        "token": st.column_config.TextColumn(disabled=True),
-                        "amount": st.column_config.NumberColumn(format="%.8g"),
-                        value_column: st.column_config.NumberColumn(
-                            format=f"%.2f {currency_symbol}", disabled=True
-                        ),
-                    },
-                )
+                if is_privacy_mode():
+                    # Read-only masked view: the editor would expose/alter amounts
+                    st.dataframe(
+                        mask_dataframe(df, ["amount", value_column]),
+                        width="stretch",
+                        height=height,
+                    )
+                    updated_data = df
+                else:
+                    updated_data = st.data_editor(
+                        df,
+                        width="stretch",
+                        height=height,
+                        column_config={
+                            "token": st.column_config.TextColumn(disabled=True),
+                            "amount": st.column_config.NumberColumn(format="%.8g"),
+                            value_column: st.column_config.NumberColumn(
+                                format=f"%.2f {currency_symbol}", disabled=True
+                            ),
+                        },
+                    )
                 df_diff = dataframe_diff(df, updated_data)
                 if not df_diff.empty:
                     g_portfolios.update_portfolio(
@@ -227,7 +241,7 @@ def execute_search():
     )
     df_search.sort_index(inplace=True)
     logger.debug("Search result:\n%s", df_search)
-    st.dataframe(df_search, width="stretch")
+    st.dataframe(mask_dataframe(df_search), width="stretch")
 
 
 g_portfolios = load_portfolios(st.session_state.settings["dbfile"])

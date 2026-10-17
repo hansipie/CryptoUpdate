@@ -98,6 +98,7 @@ class Configuration:
             "UIPreferences": {
                 "show_empty_portfolios": settings.get("show_empty_portfolios", True),
                 "graphs_selected_tokens": settings.get("graphs_selected_tokens", []),
+                "privacy_mode": settings.get("privacy_mode", False),
             },
         }
 

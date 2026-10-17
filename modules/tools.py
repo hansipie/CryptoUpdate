@@ -34,6 +34,43 @@ logger = logging.getLogger(__name__)
 _API_MAX_WORKERS = 4
 
 
+PRIVACY_MASK = "••••"
+
+
+def is_privacy_mode() -> bool:
+    """Indique si le mode confidentialité (masquage des montants) est actif."""
+    return bool(st.session_state.get("privacy_mode", False))
+
+
+def mask_amount(value) -> str:
+    """Retourne la valeur en texte, ou un masque si le mode confidentialité est actif."""
+    return PRIVACY_MASK if is_privacy_mode() else str(value)
+
+
+def mask_dataframe(df: pd.DataFrame | None, columns=None) -> pd.DataFrame | None:
+    """Masque l'affichage des colonnes de montants si le mode confidentialité est actif.
+
+    Retourne une copie (le DataFrame d'origine n'est jamais modifié) ; les
+    colonnes absentes sont ignorées. columns=None masque toutes les colonnes.
+    """
+    if df is None or not is_privacy_mode():
+        return df
+    cols = [c for c in (df.columns if columns is None else columns) if c in df.columns]
+    if not cols:
+        return df
+    masked = df.copy()
+    for col in cols:
+        masked[col] = PRIVACY_MASK
+    return masked
+
+
+def amount_column(label: str | None = None, **kwargs):
+    """Colonne st.dataframe de montant : numérique, ou texte si les montants sont masqués."""
+    if is_privacy_mode():
+        return st.column_config.TextColumn(label)
+    return st.column_config.NumberColumn(label, **kwargs)
+
+
 def get_currency_symbol(currency_code: str | None = None) -> str:
     """Obtient le symbole pour un code devise donné.
 
@@ -520,6 +557,9 @@ def load_settings(settings: dict):
     st.session_state.settings["graphs_selected_tokens"] = settings.get(
         "UIPreferences", {}
     ).get("graphs_selected_tokens", [])
+    st.session_state.settings["privacy_mode"] = settings.get("UIPreferences", {}).get(
+        "privacy_mode", False
+    )
 
 
 def interpolate_price(
