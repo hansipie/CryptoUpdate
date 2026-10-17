@@ -31,7 +31,7 @@ def interpolate(x1, y1, x2, y2, x):
     return a * x + b
 
 
-class ClosingConnection(sqlite3.Connection):
+class ClosingConnection(sqlite3.Connection):  # pylint: disable=too-few-public-methods
     """SQLite connection whose `with` block also closes it.
 
     The stock context manager only commits/rolls back and leaves the

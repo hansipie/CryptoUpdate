@@ -1,9 +1,10 @@
 import logging
 
-from modules.utils import db_connect
 
 import pandas as pd
 import tzlocal
+
+from modules.utils import db_connect
 
 logger = logging.getLogger(__name__)
 
@@ -121,7 +122,10 @@ class TokensDatabase:
             if to_timestamp is not None:
                 conditions += " AND timestamp <= ?"
                 params.append(to_timestamp)
-            query = "SELECT timestamp AS Date, count AS Count FROM TokensDatabase " + conditions
+            query = (
+                "SELECT timestamp AS Date, count AS Count FROM TokensDatabase "
+                + conditions
+            )
             df = pd.read_sql_query(query, con, params=params)
             if df.empty:
                 logger.warning("No count data found for token %s in database", token)

@@ -8,7 +8,6 @@ This module handles cryptocurrency market data including:
 
 import logging
 
-from modules.utils import db_connect
 import time
 
 import pandas as pd
@@ -17,6 +16,7 @@ import requests
 import tzlocal
 
 from modules.cmc import CMC
+from modules.utils import db_connect
 
 logger = logging.getLogger(__name__)
 
@@ -121,7 +121,9 @@ class Market:
         """
         logger.debug("Get token market")
         with db_connect(self.db_path) as con:
-            query = "SELECT timestamp AS Date, price AS Price FROM Market WHERE token = ?"
+            query = (
+                "SELECT timestamp AS Date, price AS Price FROM Market WHERE token = ?"
+            )
             params = [token]
             if from_timestamp is not None:
                 query += " AND timestamp >= ?"
@@ -338,7 +340,9 @@ class Market:
             rows_to_insert: list[tuple[int, str, float]] = []
             session = requests.Session()
             dates = sorted(date_to_rate_ts.keys())
-            logger.debug("Missing timestamps: %d, unique dates to fetch: %d", count, len(dates))
+            logger.debug(
+                "Missing timestamps: %d, unique dates to fetch: %d", count, len(dates)
+            )
 
             for idx, date in enumerate(dates, start=1):
                 rate_timestamp = date_to_rate_ts[date]
@@ -418,7 +422,9 @@ class Market:
                         rows_to_insert,
                     )
                     con.commit()
-                logger.info("Inserted %d historical currency rates", len(rows_to_insert))
+                logger.info(
+                    "Inserted %d historical currency rates", len(rows_to_insert)
+                )
             else:
                 logger.warning("No historical currency rates inserted")
 

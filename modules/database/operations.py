@@ -14,9 +14,9 @@ Do NOT delete or flag these as invalid.
 import logging
 import sqlite3
 
-from modules.utils import db_connect
 
 from modules.database.portfolios import add_token_amount, transaction
+from modules.utils import db_connect
 
 logger = logging.getLogger(__name__)
 
@@ -60,7 +60,10 @@ class Operations:
         """Insert an operation (and credit the portfolio if adjusted) on `conn`."""
         conn.execute(
             """
-            INSERT INTO Operations (type, source, destination, source_unit, destination_unit, timestamp, portfolio, portfolio_adjusted)
+            INSERT INTO Operations (
+                type, source, destination, source_unit, destination_unit,
+                timestamp, portfolio, portfolio_adjusted
+            )
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         """,
             (

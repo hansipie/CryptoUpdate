@@ -1,12 +1,13 @@
 import logging
 
-from modules.utils import db_connect
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 
 import pandas as pd
 import requests
 import streamlit as st
+
+from modules.utils import db_connect
 
 
 logger = logging.getLogger(__name__)

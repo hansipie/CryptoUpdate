@@ -9,9 +9,9 @@ This module handles cryptocurrency swap operations including:
 import logging
 import sqlite3
 
-from modules.utils import db_connect
 
 from modules.database.portfolios import add_token_amount, transaction
+from modules.utils import db_connect
 
 logger = logging.getLogger(__name__)
 

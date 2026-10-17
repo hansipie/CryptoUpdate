@@ -4,12 +4,13 @@ Module pour gérer les métadonnées des tokens (tokens délistés, actifs, etc.
 
 import sqlite3
 
-from modules.utils import db_connect
 from typing import Optional, List, Dict
 from enum import Enum
 from datetime import datetime
 
 import pandas as pd
+
+from modules.utils import db_connect
 
 
 class TokenStatus(Enum):
