@@ -10,12 +10,15 @@ from modules.database.apimarket import ApiMarket
 from modules.database.market import Market
 from modules.database.portfolios import Portfolios
 from modules.database.tokensdb import TokensDatabase
-from modules.plotter import plot_as_pie
+from modules.plotter import mask_figure_amounts, plot_as_pie
 from modules.token_metadata import TokenMetadataManager
 from modules.tools import (
     convert_dataframe_prices_historical,
     create_portfolio_dataframe,
     get_currency_symbol,
+    is_privacy_mode,
+    mask_amount,
+    mask_dataframe,
 )
 from modules.utils import to_timestamp_a as toTimestamp_A
 from modules.utils import to_timestamp_b as toTimestamp_B
@@ -285,6 +288,7 @@ def plot_dual_axis_graph(
         },
     )
 
+    mask_figure_amounts(fig)
     st.plotly_chart(fig, width="stretch")
 
 
@@ -328,13 +332,20 @@ def aggregater_ui():
                 columns={"amount": "Amount", value_column: f"Value({target_currency})"}
             )
             df = df.sort_values(by="Repartition(%)", ascending=False)
-            st.dataframe(df, width="stretch", height=height)
+            st.dataframe(
+                mask_dataframe(df, ["Amount", f"Value({target_currency})"]),
+                width="stretch",
+                height=height,
+            )
 
             # Display total with appropriate currency symbol
             currency_symbol = get_currency_symbol(target_currency)
             st.write(
-                f"Total value: {currency_symbol}"
-                + str(round(df[f"Value({target_currency})"].sum(), 2))
+                "Total value: "
+                + mask_amount(
+                    f"{currency_symbol}"
+                    + str(round(df[f"Value({target_currency})"].sum(), 2))
+                )
             )
         else:
             st.info("No data available")
@@ -538,6 +549,9 @@ def draw_tab_content(
         target_currency = st.session_state.settings.get("fiat_currency", "EUR")
         currency_symbol = get_currency_symbol(target_currency)
 
+        # Balances are the user's amounts; market prices are public data
+        hide = is_privacy_mode() and section == "Assets Balances"
+
         mcol1, mcol2, mcol3, mcol4 = st.columns(4)
         with mcol1:
             nbr_days = df_view.index[-1] - df_view.index[0]
@@ -552,7 +566,11 @@ def draw_tab_content(
             current_price = df_view[actual_column].iloc[-1]
             st.metric(
                 label,
-                value=f"{round(current_price, 2)} {currency_symbol}",
+                value=(
+                    mask_amount(f"{round(current_price, 2)} {currency_symbol}")
+                    if hide
+                    else f"{round(current_price, 2)} {currency_symbol}"
+                ),
                 delta=(
                     f"{round(((last - first) / first) * 100, 2)} %"
                     if first != 0
@@ -568,7 +586,11 @@ def draw_tab_content(
             ]
             st.metric(
                 "Timeframe Low",
-                value=f"{round(min_price, 2)} {currency_symbol}",
+                value=(
+                    mask_amount(f"{round(min_price, 2)} {currency_symbol}")
+                    if hide
+                    else f"{round(min_price, 2)} {currency_symbol}"
+                ),
                 help=f"Date: {min_price_date[0]}",
                 delta=(
                     f"{round(((current_price - min_price) / min_price) * 100, 2)} %"
@@ -583,7 +605,11 @@ def draw_tab_content(
             ]
             st.metric(
                 "Timeframe High",
-                value=f"{round(max_price, 2)} {currency_symbol}",
+                value=(
+                    mask_amount(f"{round(max_price, 2)} {currency_symbol}")
+                    if hide
+                    else f"{round(max_price, 2)} {currency_symbol}"
+                ),
                 help=f"Date: {max_price_date[0]}",
                 delta=(
                     f"{round(((current_price - max_price) / max_price) * 100, 2)} %"
@@ -602,7 +628,9 @@ def draw_tab_content(
                 chart_title = f"{token} - {label} Over Time"
                 plot_modern_graph(df_view, title=chart_title, optimize_y_range=True)
         with col2:
-            col2.dataframe(df_view, width="stretch")
+            col2.dataframe(
+                mask_dataframe(df_view) if hide else df_view, width="stretch"
+            )
 
     else:
         st.info("No data available")

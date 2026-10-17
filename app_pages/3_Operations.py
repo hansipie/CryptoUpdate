@@ -21,11 +21,14 @@ from modules.database.tokensdb import TokensDatabase
 from modules.tools import (
     _get_api_fiat_rate,
     _get_api_latest_prices,
+    amount_column,
     batch_convert_historical,
     batch_convert_historical_api,
     calc_perf_api,
     calculate_crypto_rate,
     calculate_crypto_rate_api,
+    is_privacy_mode,
+    mask_dataframe,
     parse_last_update,
     update,
 )
@@ -463,7 +466,16 @@ def buy_delete_dialog(data: dict):
     On confirm, deletes the operation.
     """
     logger.debug("Dialog Delete row: %s", data["id"])
-    st.dataframe(data, width="stretch")
+    shown = data
+    if is_privacy_mode():
+        # From / To (optionally "From (EUR)") hold the bought amounts
+        shown = {
+            k: (
+                "••••" if k in ("From", "To") or k.startswith(("From (", "To (")) else v
+            )
+            for k, v in data.items()
+        }
+    st.dataframe(shown, width="stretch")
     st.write("Are you sure you want to delete this buy operation?")
     was_adjusted = g_operation.is_portfolio_adjusted(data["id"])
     sync_portfolios = st.checkbox(
@@ -1228,13 +1240,15 @@ def _draw_swap_table(
             else:
                 return [""] * len(row)
 
-        styled_df = df.style.apply(color_rows, axis=1)
-
         # Build dynamic column order and config
         col_from_amount = (
             f"From Amount ({convert_from})" if convert_from else "From Amount"
         )
         col_to_amount = f"To Amount ({convert_to})" if convert_to else "To Amount"
+
+        styled_df = mask_dataframe(df, [col_from_amount, col_to_amount]).style.apply(
+            color_rows, axis=1
+        )
         rate_col = "Swap Rate"
 
         column_order = [
@@ -1252,8 +1266,8 @@ def _draw_swap_table(
         ]
 
         column_config = {
-            col_from_amount: st.column_config.NumberColumn(format="%.8g"),
-            col_to_amount: st.column_config.NumberColumn(format="%.8g"),
+            col_from_amount: amount_column(format="%.8g"),
+            col_to_amount: amount_column(format="%.8g"),
             rate_col: st.column_config.NumberColumn(format="%.8g"),
             "Current Rate": st.column_config.NumberColumn(format="%.8g"),
             "Perf.": st.column_config.NumberColumn(format="%.2f%%"),
@@ -1369,15 +1383,15 @@ with buy_tab:
             ]
 
             column_config = {
-                COL_FROM: st.column_config.NumberColumn(format="%.8g"),
-                COL_TO: st.column_config.NumberColumn(format="%.8g"),
+                COL_FROM: amount_column(format="%.8g"),
+                COL_TO: amount_column(format="%.8g"),
                 RATE_COL: st.column_config.NumberColumn(format="%.8g"),
                 "Current Rate": st.column_config.NumberColumn(format="%.8g"),
                 "Perf.": st.column_config.NumberColumn(format="%.2f%%"),
             }
 
             st.dataframe(
-                df_buy,
+                mask_dataframe(df_buy, [COL_FROM, COL_TO]),
                 width="stretch",
                 height=600,
                 hide_index=True,
@@ -1427,7 +1441,9 @@ with buy_tab:
             else:
                 return ["background-color: #FFFF99"] * len(row)  # Light yellow
 
-        styled_df_avg = df_avg.style.apply(color_avg_rows, axis=1)
+        styled_df_avg = mask_dataframe(
+            df_avg, ["Total Bought", "Tokens Obtained"]
+        ).style.apply(color_avg_rows, axis=1)
 
         height = (len(df_avg) * 35) + 38
         st.dataframe(
@@ -1566,14 +1582,14 @@ with airdrop_tab:
             st.info("No airdrops")
         else:
             st.dataframe(
-                df_airdrop,
+                mask_dataframe(df_airdrop, ["Amount", "Value"]),
                 width="stretch",
                 height=600,
                 hide_index=True,
                 column_order=["Date", "Amount", "Token", "Value", "Portfolio"],
                 column_config={
-                    "Amount": st.column_config.NumberColumn(format="%.8g"),
-                    "Value": st.column_config.NumberColumn(
+                    "Amount": amount_column(format="%.8g"),
+                    "Value": amount_column(
                         f"Value ({airdrop_currency})", format="%.2f"
                     ),
                 },

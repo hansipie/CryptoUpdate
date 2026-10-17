@@ -9,6 +9,7 @@ from PIL import Image
 
 from modules import aiprocessing
 from modules.database import portfolios as pf
+from modules.tools import amount_column, mask_dataframe
 
 logging.getLogger("PIL").setLevel(logging.WARNING)
 logger = logging.getLogger(__name__)
@@ -186,9 +187,9 @@ def draw_ui():
     with col_input:
         if isinstance(st.session_state.import_page["input"], pd.DataFrame):
             st.dataframe(
-                st.session_state.import_page["input"],
+                mask_dataframe(st.session_state.import_page["input"], ["amount"]),
                 column_config={
-                    "amount": st.column_config.NumberColumn(format="%.8g"),
+                    "amount": amount_column(format="%.8g"),
                 },
                 width="stretch",
             )

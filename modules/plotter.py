@@ -5,7 +5,19 @@ import plotly.express as px
 import plotly.graph_objects as go
 import streamlit as st
 
+from modules.tools import PRIVACY_MASK, is_privacy_mode
+
 logger = logging.getLogger(__name__)
+
+
+def mask_figure_amounts(fig: go.Figure) -> go.Figure:
+    """Hide absolute amounts (y tick labels and hover values) in privacy mode."""
+    if is_privacy_mode():
+        fig.update_yaxes(showticklabels=False)
+        fig.update_traces(
+            hovertemplate="%{fullData.name}: " + PRIVACY_MASK + "<extra></extra>"
+        )
+    return fig
 
 
 def plot_as_pie(df: pd.DataFrame, column):
@@ -34,6 +46,12 @@ def plot_as_pie(df: pd.DataFrame, column):
         logger.debug("Dataframe more than 1%% sum with Others:\n%s", dffinal)
 
     fig = px.pie(dffinal, dffinal.index, column, width=700, height=700)
+    if is_privacy_mode():
+        # Keep the allocation percentages, hide absolute values
+        fig.update_traces(
+            textinfo="label+percent",
+            hovertemplate="%{label}<br>%{percent}<extra></extra>",
+        )
     st.plotly_chart(fig, width="stretch")
 
 

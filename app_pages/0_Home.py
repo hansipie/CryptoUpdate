@@ -14,10 +14,13 @@ import streamlit as st
 from modules.database.customdata import Customdata
 from modules.database.operations import Operations
 from modules.database.tokensdb import TokensDatabase
+from modules.plotter import mask_figure_amounts
 from modules.tools import (
     convert_dataframe_to_target_currency,
     convert_price_to_target_currency,
     get_currency_symbol,
+    mask_amount,
+    mask_dataframe,
     parse_last_update,
     update,
 )
@@ -60,6 +63,7 @@ def plot_total_value(df: pd.DataFrame):
         height=400,
     )
 
+    mask_figure_amounts(fig)
     st.plotly_chart(fig, width="stretch")
 
 
@@ -111,7 +115,7 @@ with st.container(border=True):
     with col1:
         st.metric(
             "Invested",
-            value="n/a" if total is None else f"{total} {currency_symbol}",
+            value="n/a" if total is None else mask_amount(f"{total} {currency_symbol}"),
         )
     with col2:
         # get last values
@@ -119,14 +123,14 @@ with st.container(border=True):
             0 if df_balance is None or df_balance.empty else df_balance.iloc[-1].sum()
         )
         balance = round(balance, 2)
-        st.metric("Total value", value=f"{balance} {currency_symbol}")
+        st.metric("Total value", value=mask_amount(f"{balance} {currency_symbol}"))
     with col3:
         if total is None:
             st.metric("Profit", value="n/a")
         else:
             st.metric(
                 "Profit",
-                value=f"{round(balance - total, 2)} {currency_symbol}",
+                value=mask_amount(f"{round(balance - total, 2)} {currency_symbol}"),
                 delta=f"{round((((balance - total) / total) * 100) if total != 0 else 0, 2)} %",
             )
 
@@ -144,4 +148,4 @@ else:
     last_V = round(last_V, 2)
     currency_symbol = get_currency_symbol()
     last_V = last_V.astype(str) + f" {currency_symbol}"
-    st.dataframe(last_V)
+    st.dataframe(mask_dataframe(last_V))
