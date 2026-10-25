@@ -25,9 +25,7 @@ def test_push_refuses_plain_http(tmp_path, monkeypatch):
 def test_write_pushes_all_swaps(tmp_path, monkeypatch):
     db = str(tmp_path / "db.sqlite3")
     calls = []
-    monkeypatch.setattr(
-        "modules.database.swaps.push_swaps", lambda path: calls.append(path)
-    )
+    monkeypatch.setattr("modules.database.swaps.push_swaps", calls.append)
     swaps = Swaps(db)
     swaps.insert(1, "ETH", 1, "A", "BTC", 1, "A")
     swaps.delete(swaps.get()[0][0])
