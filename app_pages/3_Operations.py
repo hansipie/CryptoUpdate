@@ -18,6 +18,8 @@ from modules.database.operations import Operations
 from modules.database.portfolios import Portfolios
 from modules.database.swaps import Swaps
 from modules.database.tokensdb import TokensDatabase
+from modules.swap_push import is_enabled as swap_push_enabled
+from modules.swap_push import push_swaps_now
 from modules.tools import (
     _get_api_fiat_rate,
     _get_api_latest_prices,
@@ -27,7 +29,9 @@ from modules.tools import (
     calc_perf_api,
     calculate_crypto_rate,
     calculate_crypto_rate_api,
+    compute_cost_basis,
     is_privacy_mode,
+    mask_amount,
     mask_dataframe,
     parse_last_update,
     update,
@@ -650,6 +654,20 @@ def swap_delete(df_swaps_active: pd.DataFrame):
         st.toast("Please select a row", icon=":material/warning:")
     else:
         swap_delete_dialog(rowidx, df_swaps_active)
+
+
+def swap_push() -> None:
+    """Manually push all swaps to the tradbot service and report the result."""
+    logger.debug("Push swaps")
+    if not swap_push_enabled():
+        st.toast(
+            "Tradbot push is not configured (settings.json > Tradbot)",
+            icon=":material/warning:",
+        )
+    elif push_swaps_now(st.session_state.settings["dbfile"]):
+        st.toast("Swaps pushed to tradbot", icon=":material/check:")
+    else:
+        st.toast("Push to tradbot failed, see the logs", icon=":material/error:")
 
 
 def swap_archive(df_swaps_active: pd.DataFrame):
@@ -1431,15 +1449,29 @@ with buy_tab:
         st.info("No data available")
     else:
         # Apply styling based on Perf. column values (same logic as icons)
+        # Tokens no longer held in any portfolio are written in red
+        held_tokens = {
+            token
+            for token, amount in Portfolios(st.session_state.settings["dbfile"])
+            .aggregate_portfolios()
+            .items()
+            if amount and amount > 0
+        }
+
         def color_avg_rows(row):
             if pd.isna(row["Perf."]):
-                return [""] * len(row)
+                style = ""
             elif row["Perf."] > 0:
-                return ["background-color: #90EE90"] * len(row)  # Light green
+                style = "background-color: #90EE90"  # Light green
             elif row["Perf."] < -50:
-                return ["background-color: #FFB6C1"] * len(row)  # Light red
+                style = "background-color: #FFB6C1"  # Light red
             else:
-                return ["background-color: #FFFF99"] * len(row)  # Light yellow
+                style = "background-color: #FFFF99"  # Light yellow
+            if row["Token"] in held_tokens:
+                style += "; font-weight: bold"
+            else:
+                style += "; color: #D00000"
+            return [style] * len(row)
 
         styled_df_avg = mask_dataframe(
             df_avg, ["Total Bought", "Tokens Obtained"]
@@ -1468,6 +1500,80 @@ with buy_tab:
             key="avgselection",
         )
 
+    # current holdings and latest prices (EUR) used by the P&L section below
+    _holdings = Portfolios(st.session_state.settings["dbfile"]).aggregate_portfolios()
+    _market = Market(
+        st.session_state.settings["dbfile"],
+        st.session_state.settings["coinmarketcap_token"],
+    ).get_last_market()
+    _prices = {} if _market is None else _market["value"].to_dict()
+
+    # real P&L per token: purchase cost carried through swaps, scaled to the
+    # quantity actually held in the portfolios
+    st.title("Cost Basis & P&L")
+    _swaps = Swaps(st.session_state.settings["dbfile"])
+    df_basis = compute_cost_basis(
+        g_operation.get_operations_by_type("buy"),
+        _swaps.get_by_tag("") + _swaps.get_by_tag("archived"),
+    ).set_index("Token")
+    _held = {
+        t: a for t, a in _holdings.items() if a and a > 0 and t not in ("EUR", "USD")
+    }
+    df_pnl = pd.DataFrame(
+        {
+            "Token": token,
+            "Quantity": amount,
+            "Cost": (
+                df_basis.at[token, "Cost"]
+                * min(1.0, amount / df_basis.at[token, "Quantity"])
+                if token in df_basis.index
+                else 0.0
+            ),
+        }
+        for token, amount in _held.items()
+        if _prices.get(token)
+    )
+    if df_pnl.empty:
+        st.info("No data available")
+    else:
+        df_pnl["Avg. Cost"] = df_pnl["Cost"] / df_pnl["Quantity"]
+        df_pnl["Current Rate"] = df_pnl["Token"].map(_prices)
+        df_pnl["Value"] = df_pnl["Quantity"] * df_pnl["Current Rate"]
+        df_pnl["P&L"] = df_pnl["Value"] - df_pnl["Cost"]
+        df_pnl["P&L %"] = (
+            df_pnl["Value"] / df_pnl["Cost"].where(df_pnl["Cost"] != 0) - 1
+        ) * 100
+        df_pnl = df_pnl.sort_values("P&L", ascending=False)
+        _exited = df_basis["Cost"].sum() - df_pnl["Cost"].sum()
+        _value, _cost = df_pnl["Value"].sum(), df_pnl["Cost"].sum()
+        col_val, col_cost, col_pnl = st.columns(3)
+        col_val.metric("Crypto value (EUR)", mask_amount(f"{_value:,.0f}"))
+        col_cost.metric("Cost of held tokens", mask_amount(f"{_cost:,.0f}"))
+        col_pnl.metric(
+            "Unrealized P&L",
+            mask_amount(f"{_value - _cost:+,.0f}"),
+            f"{(_value / _cost - 1) * 100:+.1f}%" if _cost > 0 else None,
+        )
+        st.caption(
+            "Cost of purchases carried through swaps (a swap realizes no gain), "
+            "scaled to the quantity held in the portfolios; airdrops cost 0. "
+            f"Cost of tokens no longer held: {mask_amount(f'{_exited:,.0f}')} "
+            "(sale proceeds are not tracked)."
+        )
+        st.dataframe(
+            mask_dataframe(df_pnl, ["Quantity", "Cost", "Value", "P&L"]),
+            width="stretch",
+            hide_index=True,
+            column_config={
+                "Cost": st.column_config.NumberColumn(format="%.0f"),
+                "Value": st.column_config.NumberColumn(format="%.0f"),
+                "P&L": st.column_config.NumberColumn(format="%+.0f"),
+                "Avg. Cost": st.column_config.NumberColumn(format="%.8f"),
+                "Current Rate": st.column_config.NumberColumn(format="%.8f"),
+                "P&L %": st.column_config.NumberColumn(format="%.1f%%"),
+            },
+        )
+
 with swap_tab:
     # Conversion selectboxes for Swap
     col_sconv_from, col_sconv_to = st.columns(2)
@@ -1475,6 +1581,7 @@ with swap_tab:
         swap_convert_from_sel = st.selectbox(
             "Convert From to:", g_convert_options, key="swap_convert_from"
         )
+
     with col_sconv_to:
         swap_convert_to_sel = st.selectbox(
             "Convert To to:", g_convert_options, key="swap_convert_to"
@@ -1525,6 +1632,14 @@ with swap_tab:
             width="stretch",
             icon=":material/delete:",
             key="swap_delete",
+        )
+        st.button(
+            "Push",
+            on_click=swap_push,
+            width="stretch",
+            icon=":material/cloud_upload:",
+            help="Send all swaps to the tradbot service",
+            key="swap_push",
         )
 
     st.title("Archived Swaps")

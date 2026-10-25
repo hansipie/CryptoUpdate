@@ -5,6 +5,8 @@ import requests
 import streamlit as st
 
 from modules.configuration import Configuration
+from modules.swap_push import check_status as check_tradbot
+from modules.swap_push import is_allowed_url
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +33,30 @@ def _check_marketraccoon(url: str, api_key: str) -> str:
         return "request_error"
 
 
+@st.cache_data(ttl=30, show_spinner=False)
+def _check_tradbot(url: str, token: str) -> str:
+    """Probe the tradbot service without side effects (cached for 30s)."""
+    return check_tradbot(url, token)
+
+
+# state -> (streamlit level, icon, caption)
+_TRADBOT_STATES = {
+    "ok": ("success", ":material/check_circle:", None),
+    "no_token": ("warning", ":material/key_off:", "No token set"),
+    "unauthorized": ("error", ":material/lock:", "Token rejected by the bot"),
+    "push_disabled": (
+        "warning",
+        ":material/block:",
+        "Push disabled on the bot (SWAPS_API_TOKEN not set)",
+    ),
+    "blocked": ("error", ":material/shield:", "Blocked by a proxy/firewall (403)"),
+    "down": ("error", ":material/cancel:", "The bot does not respond correctly"),
+    "timeout": ("error", ":material/timer_off:", "Timed out"),
+    "connection_error": ("error", ":material/link_off:", "Cannot reach the bot"),
+    "invalid_url": ("error", ":material/error:", "The URL must be https"),
+}
+
+
 with st.sidebar:
     st.subheader("Status")
     _status = _check_marketraccoon(  # pylint: disable=invalid-name
@@ -53,6 +79,22 @@ with st.sidebar:
     elif _status == "request_error":
         st.error("MarketRaccoon :material/warning:")
         logger.error("Unhandled request error during API healthcheck.")
+
+    _tradbot_state = _check_tradbot(  # pylint: disable=invalid-name
+        st.session_state.settings.get("tradbot_url", ""),
+        st.session_state.settings.get("tradbot_token", ""),
+    )
+    if _tradbot_state == "not_configured":
+        st.info("Tradbot :material/remove_circle_outline:")
+    else:
+        _level, _icon, _caption = _TRADBOT_STATES.get(
+            _tradbot_state, ("error", ":material/warning:", _tradbot_state)
+        )
+        getattr(st, _level)(f"Tradbot {_icon}")
+        if _caption:
+            st.caption(_caption)
+        if _level == "error":
+            logger.error("Tradbot status check failed: %s", _tradbot_state)
 
 with st.form(key="settings_form"):
     st.subheader("MarketRaccoon")
@@ -83,6 +125,23 @@ with st.form(key="settings_form"):
         key="coinmarketcap_token",
         type="password",
         value=st.session_state.settings.get("coinmarketcap_token"),
+    )
+
+    st.subheader("Tradbot")
+    tradbot_url = st.text_input(
+        "Tradbot URL",
+        key="tradbot_url",
+        value=st.session_state.settings.get("tradbot_url", ""),
+        placeholder="https://bot.example.com",
+        help="Base URL of the tradbot service that receives the swaps. "
+        "Leave empty to disable the push.",
+    )
+    tradbot_token = st.text_input(
+        "Tradbot API token",
+        key="tradbot_token",
+        type="password",
+        value=st.session_state.settings.get("tradbot_token", ""),
+        help="Bearer secret, same value as SWAPS_API_TOKEN on the bot",
     )
 
     st.subheader("AI")
@@ -159,6 +218,8 @@ with st.form(key="settings_form"):
         logger.debug("Submitted")
         marketraccoon_url = marketraccoon_url.strip().rstrip("/")
         ratesdb_url = ratesdb_url.strip().rstrip("/")
+        tradbot_url = tradbot_url.strip().rstrip("/")
+        tradbot_token = tradbot_token.strip()
         errors = [
             f"{label} must be a valid http(s) URL"
             for label, url in (
@@ -167,6 +228,10 @@ with st.form(key="settings_form"):
             )
             if urlparse(url).scheme not in ("http", "https") or not urlparse(url).netloc
         ]
+        if tradbot_url and not is_allowed_url(tradbot_url):
+            errors.append("Tradbot URL must start with https://")
+        if bool(tradbot_url) != bool(tradbot_token):
+            errors.append("Tradbot URL and token must be set together (or both empty)")
         if not (
             operations_green_threshold
             >= operations_orange_threshold
@@ -183,6 +248,8 @@ with st.form(key="settings_form"):
         st.session_state.settings["ratesdb_url"] = ratesdb_url
         st.session_state.settings["coinmarketcap_token"] = coinmarketcap_token
         st.session_state.settings["ai_apitoken"] = ai_apitoken
+        st.session_state.settings["tradbot_url"] = tradbot_url
+        st.session_state.settings["tradbot_token"] = tradbot_token
         st.session_state.settings["debug_flag"] = debug_flag
         st.session_state.settings["operations_green_threshold"] = (
             operations_green_threshold
@@ -197,3 +264,4 @@ with st.form(key="settings_form"):
         conf.save_config(st.session_state.settings)
         st.success("Settings saved successfully!")
         _check_marketraccoon.clear()
+        _check_tradbot.clear()
