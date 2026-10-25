@@ -95,6 +95,10 @@ class Configuration:
             "FiatCurrency": {
                 "currency": settings.get("fiat_currency", "EUR"),
             },
+            "Tradbot": {
+                "url": settings.get("tradbot_url", ""),
+                "token": settings.get("tradbot_token", ""),
+            },
             "UIPreferences": {
                 "show_empty_portfolios": settings.get("show_empty_portfolios", True),
                 "graphs_selected_tokens": settings.get("graphs_selected_tokens", []),

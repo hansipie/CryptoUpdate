@@ -146,3 +146,24 @@ def test_failed_save_config_keeps_the_previous_settings(tmp_path):
         Configuration(str(target)).save_config(settings)
     assert json.loads(target.read_text()) == {"keep": "me"}
     assert not (tmp_path / "settings.json.tmp").exists()
+
+
+def test_compute_cost_basis_carries_cost_through_swaps():
+    buys = [
+        (1, "buy", 100.0, 100.0, "EUR", "USDC", 10, "w"),
+        (2, "buy", 0.0, 5.0, "EUR", "ABC", 20, "w"),  # airdrop
+    ]
+    swaps = [(1, 30, "USDC", 40.0, "w", "BTC", 0.001, "w", None, None)]
+    df = tools.compute_cost_basis(buys, swaps).set_index("Token")
+    assert df.loc["USDC", "Quantity"] == pytest.approx(60.0)
+    assert df.loc["USDC", "Cost"] == pytest.approx(60.0)
+    assert df.loc["BTC", "Cost"] == pytest.approx(40.0)
+    assert df.loc["ABC", "Cost"] == 0.0
+
+
+def test_compute_cost_basis_drops_fully_spent_token():
+    buys = [(1, "buy", 50.0, 50.0, "EUR", "USDC", 10, "w")]
+    swaps = [(1, 20, "USDC", 50.0, "w", "ETH", 0.02, "w", None, None)]
+    df = tools.compute_cost_basis(buys, swaps)
+    assert list(df["Token"]) == ["ETH"]
+    assert df.iloc[0]["Cost"] == pytest.approx(50.0)

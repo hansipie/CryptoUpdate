@@ -457,14 +457,21 @@ class TokenMetadataManager:
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
             cursor.execute(
-                """SELECT token, name, status,
-                          mraccoon_id,
-                          datetime(delisting_date, 'unixepoch') as delisting_date,
-                          datetime(last_valid_price_date, 'unixepoch') as last_valid_price_date,
-                          notes,
-                          datetime(created_at, 'unixepoch') as created_at,
-                          datetime(updated_at, 'unixepoch') as updated_at
-                   FROM TokenMetadata
-                   ORDER BY status, token"""
+                """SELECT m.token, m.name, m.status,
+                          m.mraccoon_id,
+                          datetime(m.delisting_date, 'unixepoch') as delisting_date,
+                          datetime(COALESCE(m.last_valid_price_date, p.last_valid),
+                                   'unixepoch') as last_valid_price_date,
+                          m.notes,
+                          datetime(m.created_at, 'unixepoch') as created_at,
+                          datetime(m.updated_at, 'unixepoch') as updated_at
+                   FROM TokenMetadata m
+                   LEFT JOIN (
+                       SELECT token,
+                              MAX(CASE WHEN price > 0 THEN timestamp END) as last_valid
+                       FROM TokensDatabase
+                       GROUP BY token
+                   ) p ON p.token = m.token
+                   ORDER BY m.status, m.token"""
             )
             return [dict(row) for row in cursor.fetchall()]

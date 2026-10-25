@@ -470,6 +470,12 @@ def load_settings(settings: dict):
         "token"
     ]
     st.session_state.settings["ai_apitoken"] = settings["AI"]["token"]
+    st.session_state.settings["tradbot_url"] = settings.get("Tradbot", {}).get(
+        "url", ""
+    )
+    st.session_state.settings["tradbot_token"] = settings.get("Tradbot", {}).get(
+        "token", ""
+    )
     st.session_state.settings["debug_flag"] = settings["Debug"]["flag"] == "True"
 
     st.session_state.settings["archive_path"] = os.path.join(
@@ -658,6 +664,59 @@ def calculate_crypto_rate(
     rate = value_a / value_b
     logger.debug("Calculate crypto rate - 1 %s = %f %s", token_a, rate, token_b)
     return rate
+
+
+def compute_cost_basis(buys: list, swaps: list, fiat: str = "EUR") -> pd.DataFrame:
+    """Compute remaining quantity and cost basis (in fiat) per token.
+
+    Average-cost method with carry-over: a swap moves the cost basis of the
+    token it spends (proportionally to the quantity spent) onto the token it
+    receives, so no gain or loss is realized by a swap. Buys paid in ``fiat``
+    add their price to the basis of the bought token; airdrops (source = 0)
+    add quantity at zero cost.
+
+    Args:
+        buys: Operations rows (id, type, source, destination, source_unit,
+            destination_unit, timestamp, portfolio)
+        swaps: Swaps rows (id, timestamp, token_from, amount_from, wallet_from,
+            token_to, amount_to, wallet_to, ...)
+        fiat: Currency in which the basis is expressed
+
+    Returns:
+        DataFrame with columns Token, Quantity, Cost (tokens fully spent are
+        dropped)
+    """
+    events = [(b[6], 0, b[4], b[2], b[5], b[3]) for b in buys] + [
+        (w[1], 1, w[2], w[3], w[5], w[6]) for w in swaps
+    ]
+    events.sort(key=lambda e: (e[0], e[1]))
+
+    pools: dict[str, list[float]] = {}  # token -> [quantity, cost]
+    for _, _, tok_from, amt_from, tok_to, amt_to in events:
+        amt_from = amt_from or 0.0
+        amt_to = amt_to or 0.0
+        if tok_from == fiat:
+            moved_cost = amt_from
+        else:
+            pool = pools.get(tok_from)
+            if not pool or pool[0] <= 0:
+                moved_cost = 0.0
+            else:
+                frac = min(1.0, amt_from / pool[0])
+                moved_cost = pool[1] * frac
+                pool[0] -= min(amt_from, pool[0])
+                pool[1] -= moved_cost
+        if tok_to != fiat:
+            dest = pools.setdefault(tok_to, [0.0, 0.0])
+            dest[0] += amt_to
+            dest[1] += moved_cost
+
+    rows = [
+        {"Token": tok, "Quantity": qty, "Cost": cost}
+        for tok, (qty, cost) in pools.items()
+        if qty > 1e-12
+    ]
+    return pd.DataFrame(rows, columns=["Token", "Quantity", "Cost"])
 
 
 def batch_convert_historical(

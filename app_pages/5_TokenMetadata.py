@@ -395,7 +395,16 @@ with tab2:
         st.write(f"**{len(active_tokens)} active tokens**")
 
         df_active = pd.DataFrame(active_tokens)
-        df_active = df_active[["token", "name", "notes", "created_at", "updated_at"]]
+        df_active = df_active[
+            [
+                "token",
+                "name",
+                "last_valid_price_date",
+                "notes",
+                "created_at",
+                "updated_at",
+            ]
+        ]
 
         st.dataframe(
             df_active,
@@ -404,6 +413,9 @@ with tab2:
             column_config={
                 "token": st.column_config.TextColumn("Token", width="small"),
                 "name": st.column_config.TextColumn("Name", width="medium"),
+                "last_valid_price_date": st.column_config.TextColumn(
+                    "Last Valid Price", width="medium"
+                ),
                 "notes": st.column_config.TextColumn("Notes", width="large"),
                 "created_at": st.column_config.TextColumn("Created", width="medium"),
                 "updated_at": st.column_config.TextColumn("Updated", width="medium"),
