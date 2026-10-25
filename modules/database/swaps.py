@@ -10,6 +10,7 @@ import logging
 import sqlite3
 
 from modules.database.portfolios import add_token_amount, transaction
+from modules.swap_push import push_swaps
 from modules.utils import db_connect
 
 logger = logging.getLogger(__name__)
@@ -138,6 +139,7 @@ class Swaps:
                 portfolio_adjusted,
             )
         logger.debug("Swap inserted")
+        push_swaps(self.db_path)
 
     def replace(
         self,
@@ -181,6 +183,7 @@ class Swaps:
                 note,
                 portfolio_adjusted,
             )
+        push_swaps(self.db_path)
 
     def is_portfolio_adjusted(self, entry_id: int) -> bool:
         """Return True if the swap was applied to the portfolios holdings."""
@@ -196,6 +199,7 @@ class Swaps:
         with db_connect(self.db_path) as conn:
             conn.execute("DELETE FROM Swaps WHERE id = ?", (entry_id,))
         logger.debug("Entry with id %s deleted successfully.", entry_id)
+        push_swaps(self.db_path)
 
     def update_note(self, entry_id: int, note: str):
         logger.debug("Updating swap note")
