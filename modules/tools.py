@@ -1050,6 +1050,118 @@ def batch_convert_historical_api(
     return amounts * rates
 
 
+def _epoch_series(series: pd.Series) -> pd.Series:
+    """Re-index a naive-local DatetimeIndex series by Unix timestamp."""
+    index = series.index
+    if index.tz is None:
+        index = index.tz_localize(
+            tzlocal.get_localzone(),
+            ambiguous=np.ones(len(index), dtype=bool),
+            nonexistent="shift_forward",
+        )
+    epochs = (index - pd.Timestamp("1970-01-01", tz="UTC")).total_seconds()
+    return pd.Series(series.to_numpy(dtype=float), index=epochs.to_numpy())
+
+
+def _price_history(
+    token: str, since_ts: int, now_ts: int, dbfile: str, use_api: bool
+) -> pd.Series | None:
+    """Price history of a token since ``since_ts`` indexed by Unix timestamp.
+
+    Prices are in USD with the API and in EUR with the local database; the
+    unit only matters through the ratio of two tokens of the same source.
+    """
+    base = "USD" if use_api else "EUR"
+    if token == base:
+        return pd.Series([1.0, 1.0], index=[since_ts, now_ts])
+
+    if use_api:
+        api = get_cached_api_market()
+        if token == "EUR":
+            fiat_df = api.get_currency_cached()
+            if fiat_df is None or fiat_df.empty:
+                return None
+            series = 1.0 / fiat_df["price"].replace(0, pd.NA).astype(float)
+        else:
+            coin_id = TokenMetadataManager(dbfile).get_mr_id(token)
+            if coin_id is None:
+                coins_df = api.get_coins_cached(symbols=[token])
+                if coins_df is None or coins_df.empty:
+                    return None
+                coin_id = int(coins_df.iloc[0]["id"])
+            df = api.get_cryptocurrency_market_cached(
+                coinid=coin_id, from_timestamp=since_ts, to_timestamp=now_ts
+            )
+            if df is None or df.empty:
+                return None
+            series = df["Price"]
+        return _epoch_series(series.dropna())
+
+    if token == "USD":
+        with db_connect(dbfile) as con:
+            df = pd.read_sql_query(
+                "SELECT timestamp, price FROM Currency"
+                " WHERE currency = 'USD' AND timestamp >= ? ORDER BY timestamp",
+                con,
+                params=(since_ts,),
+            )
+        df = df[df["price"] > 0]
+        if df.empty:
+            return None
+        return pd.Series(1.0 / df["price"].to_numpy(), index=df["timestamp"].to_numpy())
+
+    df = Market(dbfile, st.session_state.settings["coinmarketcap_token"]).get_prices(
+        token
+    )
+    df = df[df["timestamp"] >= since_ts]
+    if df.empty:
+        return None
+    return pd.Series(
+        df["price"].to_numpy(dtype=float), index=df["timestamp"].to_numpy()
+    )
+
+
+def swap_perf_history(
+    token_from: str,
+    token_to: str,
+    swap_rate: float,
+    since_ts: int,
+    dbfile: str,
+    use_api: bool = False,
+) -> pd.DataFrame:
+    """Evolution of a swap's performance since it was made.
+
+    Uses the same definition as the swaps table: ``Perf. = swap_rate / rate - 1``
+    where ``rate`` is the price of ``token_from`` in ``token_to`` at each date.
+
+    Returns:
+        DataFrame with columns Date (naive local time), Rate and Perf. (%),
+        empty when a price history is missing.
+    """
+    empty = pd.DataFrame(columns=["Date", "Rate", "Perf."])
+    if not swap_rate or pd.isna(swap_rate):
+        return empty
+    now_ts = int(pd.Timestamp.now(tz="UTC").timestamp())
+    series_from = _price_history(token_from, since_ts, now_ts, dbfile, use_api)
+    series_to = _price_history(token_to, since_ts, now_ts, dbfile, use_api)
+    if series_from is None or series_to is None:
+        return empty
+
+    stamps = np.union1d(series_from.index.to_numpy(), series_to.index.to_numpy())
+    stamps = stamps[(stamps >= since_ts) & (stamps <= now_ts)]
+    if len(stamps) == 0:
+        return empty
+    price_from = np.interp(stamps, series_from.index.to_numpy(), series_from.to_numpy())
+    price_to = np.interp(stamps, series_to.index.to_numpy(), series_to.to_numpy())
+    valid = price_to != 0
+    rate = price_from[valid] / price_to[valid]
+    dates = pd.to_datetime(stamps[valid], unit="s", utc=True)
+    dates = dates.tz_convert(tzlocal.get_localzone()).tz_localize(None)
+    return pd.DataFrame(
+        {"Date": dates, "Rate": rate, "Perf.": (swap_rate * 100 / rate) - 100}
+    )
+
+
 def calc_perf_api(
     df: pd.DataFrame,
     col_token: str,

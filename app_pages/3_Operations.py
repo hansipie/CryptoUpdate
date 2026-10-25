@@ -9,6 +9,7 @@ import logging
 import os
 
 import pandas as pd
+import plotly.graph_objects as go
 import streamlit as st
 import tzlocal
 
@@ -34,6 +35,7 @@ from modules.tools import (
     mask_amount,
     mask_dataframe,
     parse_last_update,
+    swap_perf_history,
     update,
 )
 from modules.utils import to_timestamp_a as toTimestamp_A
@@ -625,6 +627,86 @@ def buy_delete():
         st.toast("Please select a row", icon=":material/warning:")
     else:
         buy_delete_dialog(df_buy.iloc[rowidx].to_dict())
+
+
+@st.dialog("Swap performance", width="large")
+def swap_graph_dialog(
+    data: dict, convert_from: str | None, convert_to: str | None, use_api: bool
+):
+    """Display the evolution of a swap's performance since it was made.
+
+    Args:
+        data: Dictionary containing the swap row (as displayed in the table)
+        convert_from: Unit replacing the From token, or None
+        convert_to: Unit replacing the To token, or None
+        use_api: Read prices from MarketRaccoon instead of the local database
+    """
+    token_a = convert_from or data["From Token"]
+    token_b = convert_to or data["To Token"]
+    st.caption(
+        f"{data['From Token']} → {data['To Token']} · {data['Date']:%Y-%m-%d %H:%M}"
+    )
+    if token_a == token_b:
+        st.info("Both sides use the same unit: the performance is constant.")
+        return
+
+    with st.spinner("Loading price history..."):
+        df_hist = swap_perf_history(
+            token_a,
+            token_b,
+            data["Swap Rate"],
+            int(data["timestamp"]),
+            st.session_state.settings["dbfile"],
+            use_api=use_api,
+        )
+    if df_hist.empty:
+        st.warning("No price history available for this swap")
+        return
+
+    fig = go.Figure(
+        go.Scatter(
+            x=df_hist["Date"],
+            y=df_hist["Perf."],
+            mode="lines",
+            name="Perf.",
+            customdata=df_hist["Rate"],
+            hovertemplate="%{x|%Y-%m-%d %H:%M}<br>Perf.: %{y:.2f}%"
+            "<br>Rate: %{customdata:.8g}<extra></extra>",
+        )
+    )
+    fig.add_hline(y=0, line_dash="dot", line_color="gray")
+    fig.update_layout(
+        yaxis_title="Perf. (%)",
+        xaxis_title=None,
+        margin={"l": 0, "r": 0, "t": 10, "b": 0},
+    )
+    st.plotly_chart(fig, width="stretch")
+    last = df_hist["Perf."].iloc[-1]
+    st.metric(
+        "Current perf.",
+        f"{last:.2f}%",
+        help=f"Peak {df_hist['Perf.'].max():.2f}% · Low {df_hist['Perf.'].min():.2f}%",
+    )
+
+
+def swap_graph(df_swaps_active: pd.DataFrame, convert_from, convert_to, use_api):
+    """Handle the graph of the selected swap operation.
+
+    Shows the graph dialog if exactly one row is selected.
+    Otherwise displays a warning toast.
+    """
+    rowidx = rows_selected(st.session_state.swapselection, len(df_swaps_active))
+    if rowidx is None:
+        st.toast("Please select a row", icon=":material/warning:")
+    elif len(rowidx) > 1:
+        st.toast("Please select only one row", icon=":material/warning:")
+    else:
+        swap_graph_dialog(
+            df_swaps_active.iloc[rowidx[0]].to_dict(),
+            convert_from,
+            convert_to,
+            use_api,
+        )
 
 
 def swap_edit(df_swaps_active: pd.DataFrame):
@@ -1616,6 +1698,14 @@ with swap_tab:
             width="stretch",
             icon=":material/edit:",
             key="swap_edit",
+        )
+        st.button(
+            "Graph",
+            on_click=swap_graph,
+            args=(df_swaps_active, swap_cf, swap_ct, use_api),
+            width="stretch",
+            icon=":material/show_chart:",
+            key="swap_graph",
         )
         st.button(
             "Archive",
