@@ -323,9 +323,6 @@ def aggregater_ui():
     with col_tbl:
         st.header("Tokens")
         if not df.empty:
-            height = (len(df) * 35) + 38
-            height = min(height, 650)
-
             df = df.groupby("token").agg({"amount": "sum", value_column: "sum"})
             df["Repartition(%)"] = (df[value_column] / df[value_column].sum()) * 100
             df = df.rename(
@@ -335,7 +332,7 @@ def aggregater_ui():
             st.dataframe(
                 mask_dataframe(df, ["Amount", f"Value({target_currency})"]),
                 width="stretch",
-                height=height,
+                height="content",
             )
 
             # Display total with appropriate currency symbol
