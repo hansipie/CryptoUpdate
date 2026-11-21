@@ -141,6 +141,22 @@ def submit_swap(
     )
 
 
+def selection_key(name: str) -> str:
+    """Return the current widget key of a selectable table.
+
+    The key embeds a generation counter so that reset_selection() can drop the
+    stale row selection (indices would otherwise point at unrelated rows once
+    rows have been removed from the table).
+    """
+    return f"{name}_{st.session_state.get('selection_gen', {}).get(name, 0)}"
+
+
+def reset_selection(name: str) -> None:
+    """Clear the row selection of a table by changing its widget key."""
+    gen = st.session_state.setdefault("selection_gen", {})
+    gen[name] = gen.get(name, 0) + 1
+
+
 def rows_selected(selectable, max_len: int) -> list:
     """Get the selected row index in the swap table.
 
@@ -215,6 +231,7 @@ def buy_add() -> None:
             to_wallet,
             adjust_portfolios=adjust_portfolios,
         )
+        reset_selection("buyselection")
         st.rerun()
 
 
@@ -293,6 +310,7 @@ def swap_add() -> None:
             note=swap_note,
             adjust_portfolios=adjust_portfolios,
         )
+        reset_selection("swapselection")
         st.rerun()
 
 
@@ -370,6 +388,7 @@ def buy_edit_dialog(data: dict) -> None:
             portfolio_adjusted=adjust_portfolios,
         )
         st.toast("Operation submitted", icon=":material/check:")
+        reset_selection("buyselection")
         st.rerun()
 
 
@@ -458,6 +477,7 @@ def swap_edit_dialog(data: dict):
             note=swap_note,
             portfolio_adjusted=adjust_portfolios,
         )
+        reset_selection("swapselection")
         st.rerun()
 
 
@@ -493,6 +513,7 @@ def buy_delete_dialog(data: dict):
     if st.button("Confirm"):
         logger.debug("Delete row: %s - %s", data, type(data["id"]))
         g_operation.delete(data["id"], revert_portfolio=sync_portfolios)
+        reset_selection("buyselection")
         st.rerun()
 
 
@@ -518,6 +539,7 @@ def swap_delete_dialog(rows: list, df_swaps_active: pd.DataFrame):
         for data in todelete:
             logger.debug("Delete row: %s - %s", data, type(data["id"]))
             g_swaps.delete(data["id"])
+        reset_selection("swapselection")
         st.rerun()
 
 
@@ -543,6 +565,7 @@ def swap_archive_dialog(rows: list, df_swaps_active: pd.DataFrame):
         for data in toarchive:
             logger.debug("Archive row: %s - %s", data, type(data["id"]))
             g_swaps.update_tag(data["id"], "archived")
+        reset_selection("swapselection")
         st.rerun()
 
 
@@ -570,6 +593,7 @@ def swap_unarchive_dialog(rows: list, df_swaps_archived: pd.DataFrame):
         for data in tounarchive:
             logger.debug("Unarchive row: %s - %s", data, type(data["id"]))
             g_swaps.update_tag(data["id"], None)
+        reset_selection("swapachselection")
         st.rerun()
 
 
@@ -597,6 +621,7 @@ def swap_arch_delete_dialog(rows: list, df_swaps_archived: pd.DataFrame):
         for data in todelete:
             logger.debug("Delete archived row: %s - %s", data, type(data["id"]))
             g_swaps.delete(data["id"])
+        reset_selection("swapachselection")
         st.rerun()
 
 
@@ -606,7 +631,7 @@ def buy_edit():
     Shows edit dialog if a row is selected.
     Otherwise displays a warning toast.
     """
-    _sel = rows_selected(st.session_state.buyselection, len(df_buy))
+    _sel = rows_selected(st.session_state[selection_key("buyselection")], len(df_buy))
     rowidx = _sel[0] if _sel is not None else None
     if rowidx is None:
         st.toast("Please select a row", icon=":material/warning:")
@@ -621,7 +646,7 @@ def buy_delete():
     Otherwise displays a warning toast.
     """
     logger.debug("Delete row")
-    _sel = rows_selected(st.session_state.buyselection, len(df_buy))
+    _sel = rows_selected(st.session_state[selection_key("buyselection")], len(df_buy))
     rowidx = _sel[0] if _sel is not None else None
     if rowidx is None:
         st.toast("Please select a row", icon=":material/warning:")
@@ -695,7 +720,9 @@ def swap_graph(df_swaps_active: pd.DataFrame, convert_from, convert_to, use_api)
     Shows the graph dialog if exactly one row is selected.
     Otherwise displays a warning toast.
     """
-    rowidx = rows_selected(st.session_state.swapselection, len(df_swaps_active))
+    rowidx = rows_selected(
+        st.session_state[selection_key("swapselection")], len(df_swaps_active)
+    )
     if rowidx is None:
         st.toast("Please select a row", icon=":material/warning:")
     elif len(rowidx) > 1:
@@ -709,13 +736,145 @@ def swap_graph(df_swaps_active: pd.DataFrame, convert_from, convert_to, use_api)
         )
 
 
+def _merge_side_values(
+    df_rows: pd.DataFrame,
+    token_col: str,
+    amount_col: str,
+    fiat: str,
+    use_api: bool,
+) -> tuple[pd.DataFrame, list]:
+    """Sum one side of the selected swaps per token and value it in `fiat`.
+
+    Returns:
+        (DataFrame[Token, Amount, Value] sorted by value, tokens without price)
+    """
+    df_side = (
+        df_rows.groupby(token_col, as_index=False)[amount_col]
+        .sum()
+        .rename(columns={token_col: "Token", amount_col: "Amount"})
+    )
+    if use_api:
+        prices_usd = _get_api_latest_prices()
+        usd_to_eur = _get_api_fiat_rate()
+    now_ts = int(pd.Timestamp.now(tz="UTC").timestamp())
+
+    def rate(token: str):
+        if token == fiat:
+            return 1.0
+        if use_api:
+            return calculate_crypto_rate_api(token, fiat, prices_usd, usd_to_eur)
+        return calculate_crypto_rate(
+            token, fiat, now_ts, st.session_state.settings["dbfile"]
+        )
+
+    df_side["Value"] = pd.to_numeric(
+        df_side["Amount"] * df_side["Token"].map(rate), errors="coerce"
+    )
+    missing = df_side.loc[df_side["Value"].isna(), "Token"].tolist()
+    df_side = df_side.dropna(subset=["Value"]).sort_values("Value", ascending=False)
+    return df_side, missing
+
+
+def _merge_pie(df_side: pd.DataFrame, title: str, fiat: str) -> go.Figure:
+    """Pie chart of token values (absolute values hidden in privacy mode)."""
+    hover = (
+        "%{label}<br>%{percent}<extra></extra>"
+        if is_privacy_mode()
+        else "%{label}<br>%{customdata:.8g} tokens<br>"
+        f"%{{value:,.2f}} {fiat}<br>%{{percent}}<extra></extra>"
+    )
+    fig = go.Figure(
+        go.Pie(
+            labels=df_side["Token"],
+            values=df_side["Value"],
+            customdata=df_side["Amount"],
+            textinfo="label+percent",
+            hovertemplate=hover,
+            sort=False,
+        )
+    )
+    fig.update_layout(
+        title=title,
+        showlegend=False,
+        margin={"l": 0, "r": 0, "t": 40, "b": 0},
+    )
+    return fig
+
+
+@st.dialog("Merge swaps", width="large")
+def swap_merge_dialog(rows: list, df_swaps_active: pd.DataFrame, use_api: bool):
+    """Show the From / To token split (current fiat value) of the selected swaps."""
+    fiat = st.session_state.settings.get("fiat_currency", "EUR")
+    df_rows = df_swaps_active.iloc[rows]
+    st.caption(f"{len(rows)} swap(s) merged · values at current {fiat} prices")
+
+    with st.spinner("Loading prices..."):
+        sides = {
+            "From": _merge_side_values(
+                df_rows, "From Token", "From Amount", fiat, use_api
+            ),
+            "To": _merge_side_values(df_rows, "To Token", "To Amount", fiat, use_api),
+        }
+
+    for col, (side, (df_side, missing)) in zip(st.columns(2), sides.items()):
+        with col:
+            if df_side.empty:
+                st.warning(f"No current price for the {side} tokens")
+            else:
+                st.plotly_chart(
+                    _merge_pie(df_side, side, fiat),
+                    width="stretch",
+                    key=f"swap_merge_pie_{side}",
+                )
+                st.metric(
+                    f"{side} total ({fiat})",
+                    mask_amount(f"{df_side['Value'].sum():,.2f}"),
+                )
+            if missing:
+                st.caption("No current price: " + ", ".join(missing))
+
+    # resulting perf: current value received vs current value of what was spent
+    (df_from, missing_from), (df_to, missing_to) = sides["From"], sides["To"]
+    from_total, to_total = df_from["Value"].sum(), df_to["Value"].sum()
+    st.divider()
+    if missing_from or missing_to or from_total <= 0:
+        st.info("Resulting performance unavailable: some tokens have no current price")
+        return
+    gain = to_total - from_total
+    col_perf, col_gain = st.columns(2)
+    col_perf.metric(
+        "Resulting perf.",
+        f"{(to_total / from_total - 1) * 100:+.2f}%",
+        help="Current value of the To tokens vs current value of the From tokens "
+        "(what you would hold without these swaps)",
+    )
+    col_gain.metric(f"Gain ({fiat})", mask_amount(f"{gain:+,.2f}"))
+
+
+def swap_merge(df_swaps_active: pd.DataFrame, use_api: bool):
+    """Handle the merged view of the selected swap operations.
+
+    Shows the merge dialog if at least one row is selected.
+    Otherwise displays a warning toast.
+    """
+    rowidx = rows_selected(
+        st.session_state[selection_key("swapselection")], len(df_swaps_active)
+    )
+    if rowidx is None:
+        st.toast("Please select a row", icon=":material/warning:")
+    else:
+        swap_merge_dialog(rowidx, df_swaps_active, use_api)
+
+
 def swap_edit(df_swaps_active: pd.DataFrame):
     """Handle editing of selected swap operation.
 
     Shows edit dialog if a row is selected.
     Otherwise displays a warning toast.
     """
-    rowidx = rows_selected(st.session_state.swapselection, len(df_swaps_active))
+    rowidx = rows_selected(
+        st.session_state[selection_key("swapselection")], len(df_swaps_active)
+    )
     if rowidx is None:
         st.toast("Please select a row", icon=":material/warning:")
     elif len(rowidx) > 1:
@@ -731,7 +890,9 @@ def swap_delete(df_swaps_active: pd.DataFrame):
     Otherwise displays a warning toast.
     """
     logger.debug("Delete row")
-    rowidx = rows_selected(st.session_state.swapselection, len(df_swaps_active))
+    rowidx = rows_selected(
+        st.session_state[selection_key("swapselection")], len(df_swaps_active)
+    )
     if rowidx is None:
         st.toast("Please select a row", icon=":material/warning:")
     else:
@@ -759,7 +920,9 @@ def swap_archive(df_swaps_active: pd.DataFrame):
     Otherwise displays a warning toast.
     """
     logger.debug("Archive row")
-    rowidx = rows_selected(st.session_state.swapselection, len(df_swaps_active))
+    rowidx = rows_selected(
+        st.session_state[selection_key("swapselection")], len(df_swaps_active)
+    )
     if rowidx is None:
         st.toast("Please select a row", icon=":material/warning:")
     else:
@@ -773,7 +936,9 @@ def swap_unarchive(df_swaps_archived: pd.DataFrame):
     Otherwise displays a warning toast.
     """
     logger.debug("Unarchive row")
-    rowidx = rows_selected(st.session_state.swapachselection, len(df_swaps_archived))
+    rowidx = rows_selected(
+        st.session_state[selection_key("swapachselection")], len(df_swaps_archived)
+    )
     if rowidx is None:
         st.toast("Please select a row", icon=":material/warning:")
     else:
@@ -787,7 +952,9 @@ def swap_arch_delete(df_swaps_archived: pd.DataFrame):
     Otherwise displays a warning toast.
     """
     logger.debug("Delete archived row")
-    rowidx = rows_selected(st.session_state.swapachselection, len(df_swaps_archived))
+    rowidx = rows_selected(
+        st.session_state[selection_key("swapachselection")], len(df_swaps_archived)
+    )
     if rowidx is None:
         st.toast("Please select a row", icon=":material/warning:")
     else:
@@ -1393,7 +1560,11 @@ def draw_swap(
     df: pd.DataFrame, convert_from: str | None = None, convert_to: str | None = None
 ):
     _draw_swap_table(
-        df, "swapselection", "No swap operations", convert_from, convert_to
+        df,
+        selection_key("swapselection"),
+        "No swap operations",
+        convert_from,
+        convert_to,
     )
 
 
@@ -1401,7 +1572,11 @@ def draw_swap_arch(
     df: pd.DataFrame, convert_from: str | None = None, convert_to: str | None = None
 ):
     _draw_swap_table(
-        df, "swapachselection", "No archived swaps", convert_from, convert_to
+        df,
+        selection_key("swapachselection"),
+        "No archived swaps",
+        convert_from,
+        convert_to,
     )
 
 
@@ -1503,7 +1678,7 @@ with buy_tab:
                 column_config=column_config,
                 on_select="rerun",
                 selection_mode="single-row",
-                key="buyselection",
+                key=selection_key("buyselection"),
             )
     with col_buybtns:
         st.button(
@@ -1710,6 +1885,15 @@ with swap_tab:
             width="stretch",
             icon=":material/show_chart:",
             key="swap_graph",
+        )
+        st.button(
+            "Merge",
+            on_click=swap_merge,
+            args=(df_swaps_active, use_api),
+            width="stretch",
+            icon=":material/pie_chart:",
+            help="Token split (current value) of the selected swaps",
+            key="swap_merge",
         )
         st.button(
             "Archive",
