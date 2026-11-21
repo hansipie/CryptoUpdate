@@ -19,12 +19,14 @@ Cryptocurrency portfolio tracking and management application with Streamlit web 
 ### Visualizations & Analytics
 - **Interactive Graphs** - Portfolio performance visualization with Plotly
 - **Pie Charts** - Portfolio allocation and token distribution
+- **Pair Comparator** - Price of one token expressed in another over time
 - **Time-Series Analysis** - Value trends and performance metrics over time
 - **Performance Metrics** - Investment returns, profit/loss, percentage gains
 
 ### Transaction Management
 - **Buy/Sell Operations** - Track purchase and sale transactions
 - **Token Swaps** - Record token exchange operations
+- **Swap Merge** - Pie charts of the From / To token split of selected swaps (current fiat value) with their resulting performance
 - **Transaction History** - Complete audit trail of all operations
 - **Airdrop Support** - Handle zero-cost token acquisitions (source = 0)
 
@@ -232,7 +234,7 @@ Tables:
 - **Graphs (2_Graphs.py)**: Interactive performance visualizations with time-series charts and pie charts
 
 ### Tools Section
-- **Operations (3_Operations.py)**: Record buy, sell, and swap transactions
+- **Operations (3_Operations.py)**: Record buy, sell, and swap transactions; per-swap performance graph and merged view of selected swaps
 - **Import (4_Import.py)**: Bulk import/export portfolio data via CSV
 - **Token Metadata (5_TokenMetadata.py)**: Manage token status (active/delisted/deprecated/migrated) and MarketRaccoon ID mapping
 

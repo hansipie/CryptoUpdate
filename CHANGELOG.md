@@ -5,6 +5,18 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 The project has no tagged release yet: entries are grouped by date, newest first.
 
+## 2026-11-21
+
+### Added
+
+- Operations > Swap: **Merge** button. For one or more selected swaps, a
+  dialog shows two pie charts (From / To) splitting the tokens by their
+  current value in the fiat currency, with each side's total, the resulting
+  performance (current value received vs current value spent) and the gain.
+  Absolute values are hidden in privacy mode.
+- Graphs > Market: pair comparator charting the price of a token A expressed
+  in a token B over time.
+
 ## 2026-10-17
 
 ### Added
