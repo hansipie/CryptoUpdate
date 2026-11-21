@@ -141,108 +141,24 @@ def submit_swap(
     )
 
 
-PAGE_SIZE = 25
+def selection_key(name: str) -> str:
+    """Return the current widget key of a selectable table.
 
-
-def _page_count(df: pd.DataFrame, page_size: int) -> int:
-    return max(1, -(-len(df) // page_size))
-
-
-def paginate(df: pd.DataFrame, key: str, page_size: int = PAGE_SIZE) -> pd.DataFrame:
-    """Return the rows of `df` for the current page of table `key`.
-
-    Page number and sort choice live in session state (set by `page_controls`,
-    rendered below the table) so the sort applies to the whole dataframe, not
-    only to the page shown (the sort of a column header is client-side and
-    only reorders the visible page). The row offset and the sorted order are
-    kept there too so `rows_selected` can map a selection made on the page
-    back to a position in the original dataframe.
+    The key embeds a generation counter so that reset_selection() can drop the
+    stale row selection (indices would otherwise point at unrelated rows once
+    rows have been removed from the table).
     """
-    page_key = f"{key}_page"
-    pages = _page_count(df, page_size)
-    if st.session_state.get(page_key, 1) > pages:
-        st.session_state[page_key] = pages
-    page = st.session_state.get(page_key, 1)
-    order = list(range(len(df)))
-    sort_col = st.session_state.get(f"{key}_sortcol")
-    if sort_col in df.columns:
-        order = (
-            df.reset_index(drop=True)
-            .sort_values(
-                sort_col,
-                ascending=st.session_state.get(f"{key}_sortdir", "Ascending")
-                == "Ascending",
-                kind="stable",
-                na_position="last",
-            )
-            .index.tolist()
-        )
-    start = (page - 1) * page_size
-    st.session_state[f"{key}_offset"] = start
-    st.session_state[f"{key}_order"] = order
-    return df.iloc[order[start : start + page_size]]
+    return f"{name}_{st.session_state.get('selection_gen', {}).get(name, 0)}"
 
 
-def page_controls(
-    df: pd.DataFrame, key: str, columns=None, page_size: int = PAGE_SIZE
-) -> None:
-    """Display page and sort selectors below table `key`, if it spans pages.
-
-    `columns` lists the columns offered for sorting (default: all of `df`).
-    """
-    pages = _page_count(df, page_size)
-    if pages <= 1:
-        return
-    if st.session_state.get(f"{key}_page", 1) > pages:
-        st.session_state[f"{key}_page"] = pages
-    sort_options = [c for c in (columns or df.columns) if c in df.columns]
-    if st.session_state.get(f"{key}_sortcol") not in [None, *sort_options]:
-        st.session_state[f"{key}_sortcol"] = None
-
-    def _reset_selection():
-        # a selection made on another page no longer matches the rows shown
-        st.session_state[key] = {"selection": {"rows": [], "columns": [], "cells": []}}
-
-    def _sort_changed():
-        st.session_state[f"{key}_page"] = 1
-        _reset_selection()
-
-    col_page, col_sort, col_dir, col_info = st.columns(
-        [1, 2, 2, 3], vertical_alignment="bottom"
-    )
-    page = col_page.number_input(
-        "Page",
-        min_value=1,
-        max_value=pages,
-        step=1,
-        key=f"{key}_page",
-        on_change=_reset_selection,
-    )
-    col_sort.selectbox(
-        "Sort all rows by",
-        sort_options,
-        index=None,
-        placeholder="Default order",
-        key=f"{key}_sortcol",
-        on_change=_sort_changed,
-    )
-    col_dir.radio(
-        "Order",
-        ["Ascending", "Descending"],
-        horizontal=True,
-        key=f"{key}_sortdir",
-        on_change=_sort_changed,
-        label_visibility="collapsed",
-    )
-    start = (page - 1) * page_size
-    col_info.caption(f"Rows {start + 1}-{min(start + page_size, len(df))} of {len(df)}")
+def reset_selection(name: str) -> None:
+    """Clear the row selection of a table by changing its widget key."""
+    gen = st.session_state.setdefault("selection_gen", {})
+    gen[name] = gen.get(name, 0) + 1
 
 
-def rows_selected(selectable, max_len: int, key: str = "") -> list:
+def rows_selected(selectable, max_len: int) -> list:
     """Get the selected row index in the swap table.
-
-    When the table is paginated (see `paginate`), `key` is the table key and
-    the returned indices are positions in the full dataframe.
 
     Selection state can outlive the dataframe it was captured from (e.g. after
     an archive/delete or a refresh shrinks the table), so indices no longer
@@ -255,13 +171,7 @@ def rows_selected(selectable, max_len: int, key: str = "") -> list:
         and "rows" in selectable["selection"]
         and len(selectable["selection"]["rows"]) > 0
     ):
-        offset = st.session_state.get(f"{key}_offset", 0) if key else 0
-        order = st.session_state.get(f"{key}_order") if key else None
-        selected_row = [
-            order[i + offset] if order else i + offset
-            for i in selectable["selection"]["rows"]
-            if i + offset < max_len
-        ]
+        selected_row = [i for i in selectable["selection"]["rows"] if i < max_len]
         if not selected_row:
             logger.debug("Selection is stale for current data, ignoring")
             return None
@@ -321,6 +231,7 @@ def buy_add() -> None:
             to_wallet,
             adjust_portfolios=adjust_portfolios,
         )
+        reset_selection("buyselection")
         st.rerun()
 
 
@@ -399,6 +310,7 @@ def swap_add() -> None:
             note=swap_note,
             adjust_portfolios=adjust_portfolios,
         )
+        reset_selection("swapselection")
         st.rerun()
 
 
@@ -476,6 +388,7 @@ def buy_edit_dialog(data: dict) -> None:
             portfolio_adjusted=adjust_portfolios,
         )
         st.toast("Operation submitted", icon=":material/check:")
+        reset_selection("buyselection")
         st.rerun()
 
 
@@ -564,6 +477,7 @@ def swap_edit_dialog(data: dict):
             note=swap_note,
             portfolio_adjusted=adjust_portfolios,
         )
+        reset_selection("swapselection")
         st.rerun()
 
 
@@ -599,6 +513,7 @@ def buy_delete_dialog(data: dict):
     if st.button("Confirm"):
         logger.debug("Delete row: %s - %s", data, type(data["id"]))
         g_operation.delete(data["id"], revert_portfolio=sync_portfolios)
+        reset_selection("buyselection")
         st.rerun()
 
 
@@ -624,6 +539,7 @@ def swap_delete_dialog(rows: list, df_swaps_active: pd.DataFrame):
         for data in todelete:
             logger.debug("Delete row: %s - %s", data, type(data["id"]))
             g_swaps.delete(data["id"])
+        reset_selection("swapselection")
         st.rerun()
 
 
@@ -649,6 +565,7 @@ def swap_archive_dialog(rows: list, df_swaps_active: pd.DataFrame):
         for data in toarchive:
             logger.debug("Archive row: %s - %s", data, type(data["id"]))
             g_swaps.update_tag(data["id"], "archived")
+        reset_selection("swapselection")
         st.rerun()
 
 
@@ -676,6 +593,7 @@ def swap_unarchive_dialog(rows: list, df_swaps_archived: pd.DataFrame):
         for data in tounarchive:
             logger.debug("Unarchive row: %s - %s", data, type(data["id"]))
             g_swaps.update_tag(data["id"], None)
+        reset_selection("swapachselection")
         st.rerun()
 
 
@@ -703,6 +621,7 @@ def swap_arch_delete_dialog(rows: list, df_swaps_archived: pd.DataFrame):
         for data in todelete:
             logger.debug("Delete archived row: %s - %s", data, type(data["id"]))
             g_swaps.delete(data["id"])
+        reset_selection("swapachselection")
         st.rerun()
 
 
@@ -712,7 +631,7 @@ def buy_edit():
     Shows edit dialog if a row is selected.
     Otherwise displays a warning toast.
     """
-    _sel = rows_selected(st.session_state.buyselection, len(df_buy), "buyselection")
+    _sel = rows_selected(st.session_state[selection_key("buyselection")], len(df_buy))
     rowidx = _sel[0] if _sel is not None else None
     if rowidx is None:
         st.toast("Please select a row", icon=":material/warning:")
@@ -727,7 +646,7 @@ def buy_delete():
     Otherwise displays a warning toast.
     """
     logger.debug("Delete row")
-    _sel = rows_selected(st.session_state.buyselection, len(df_buy), "buyselection")
+    _sel = rows_selected(st.session_state[selection_key("buyselection")], len(df_buy))
     rowidx = _sel[0] if _sel is not None else None
     if rowidx is None:
         st.toast("Please select a row", icon=":material/warning:")
@@ -802,7 +721,7 @@ def swap_graph(df_swaps_active: pd.DataFrame, convert_from, convert_to, use_api)
     Otherwise displays a warning toast.
     """
     rowidx = rows_selected(
-        st.session_state.swapselection, len(df_swaps_active), "swapselection"
+        st.session_state[selection_key("swapselection")], len(df_swaps_active)
     )
     if rowidx is None:
         st.toast("Please select a row", icon=":material/warning:")
@@ -817,6 +736,136 @@ def swap_graph(df_swaps_active: pd.DataFrame, convert_from, convert_to, use_api)
         )
 
 
+def _merge_side_values(
+    df_rows: pd.DataFrame,
+    token_col: str,
+    amount_col: str,
+    fiat: str,
+    use_api: bool,
+) -> tuple[pd.DataFrame, list]:
+    """Sum one side of the selected swaps per token and value it in `fiat`.
+
+    Returns:
+        (DataFrame[Token, Amount, Value] sorted by value, tokens without price)
+    """
+    df_side = (
+        df_rows.groupby(token_col, as_index=False)[amount_col]
+        .sum()
+        .rename(columns={token_col: "Token", amount_col: "Amount"})
+    )
+    if use_api:
+        prices_usd = _get_api_latest_prices()
+        usd_to_eur = _get_api_fiat_rate()
+    now_ts = int(pd.Timestamp.now(tz="UTC").timestamp())
+
+    def rate(token: str):
+        if token == fiat:
+            return 1.0
+        if use_api:
+            return calculate_crypto_rate_api(token, fiat, prices_usd, usd_to_eur)
+        return calculate_crypto_rate(
+            token, fiat, now_ts, st.session_state.settings["dbfile"]
+        )
+
+    df_side["Value"] = pd.to_numeric(
+        df_side["Amount"] * df_side["Token"].map(rate), errors="coerce"
+    )
+    missing = df_side.loc[df_side["Value"].isna(), "Token"].tolist()
+    df_side = df_side.dropna(subset=["Value"]).sort_values("Value", ascending=False)
+    return df_side, missing
+
+
+def _merge_pie(df_side: pd.DataFrame, title: str, fiat: str) -> go.Figure:
+    """Pie chart of token values (absolute values hidden in privacy mode)."""
+    hover = (
+        "%{label}<br>%{percent}<extra></extra>"
+        if is_privacy_mode()
+        else "%{label}<br>%{customdata:.8g} tokens<br>"
+        f"%{{value:,.2f}} {fiat}<br>%{{percent}}<extra></extra>"
+    )
+    fig = go.Figure(
+        go.Pie(
+            labels=df_side["Token"],
+            values=df_side["Value"],
+            customdata=df_side["Amount"],
+            textinfo="label+percent",
+            hovertemplate=hover,
+            sort=False,
+        )
+    )
+    fig.update_layout(
+        title=title,
+        showlegend=False,
+        margin={"l": 0, "r": 0, "t": 40, "b": 0},
+    )
+    return fig
+
+
+@st.dialog("Merge swaps", width="large")
+def swap_merge_dialog(rows: list, df_swaps_active: pd.DataFrame, use_api: bool):
+    """Show the From / To token split (current fiat value) of the selected swaps."""
+    fiat = st.session_state.settings.get("fiat_currency", "EUR")
+    df_rows = df_swaps_active.iloc[rows]
+    st.caption(f"{len(rows)} swap(s) merged · values at current {fiat} prices")
+
+    with st.spinner("Loading prices..."):
+        sides = {
+            "From": _merge_side_values(
+                df_rows, "From Token", "From Amount", fiat, use_api
+            ),
+            "To": _merge_side_values(df_rows, "To Token", "To Amount", fiat, use_api),
+        }
+
+    for col, (side, (df_side, missing)) in zip(st.columns(2), sides.items()):
+        with col:
+            if df_side.empty:
+                st.warning(f"No current price for the {side} tokens")
+            else:
+                st.plotly_chart(
+                    _merge_pie(df_side, side, fiat),
+                    width="stretch",
+                    key=f"swap_merge_pie_{side}",
+                )
+                st.metric(
+                    f"{side} total ({fiat})",
+                    mask_amount(f"{df_side['Value'].sum():,.2f}"),
+                )
+            if missing:
+                st.caption("No current price: " + ", ".join(missing))
+
+    # resulting perf: current value received vs current value of what was spent
+    (df_from, missing_from), (df_to, missing_to) = sides["From"], sides["To"]
+    from_total, to_total = df_from["Value"].sum(), df_to["Value"].sum()
+    st.divider()
+    if missing_from or missing_to or from_total <= 0:
+        st.info("Resulting performance unavailable: some tokens have no current price")
+        return
+    gain = to_total - from_total
+    col_perf, col_gain = st.columns(2)
+    col_perf.metric(
+        "Resulting perf.",
+        f"{(to_total / from_total - 1) * 100:+.2f}%",
+        help="Current value of the To tokens vs current value of the From tokens "
+        "(what you would hold without these swaps)",
+    )
+    col_gain.metric(f"Gain ({fiat})", mask_amount(f"{gain:+,.2f}"))
+
+
+def swap_merge(df_swaps_active: pd.DataFrame, use_api: bool):
+    """Handle the merged view of the selected swap operations.
+
+    Shows the merge dialog if at least one row is selected.
+    Otherwise displays a warning toast.
+    """
+    rowidx = rows_selected(
+        st.session_state[selection_key("swapselection")], len(df_swaps_active)
+    )
+    if rowidx is None:
+        st.toast("Please select a row", icon=":material/warning:")
+    else:
+        swap_merge_dialog(rowidx, df_swaps_active, use_api)
+
+
 def swap_edit(df_swaps_active: pd.DataFrame):
     """Handle editing of selected swap operation.
 
@@ -824,7 +873,7 @@ def swap_edit(df_swaps_active: pd.DataFrame):
     Otherwise displays a warning toast.
     """
     rowidx = rows_selected(
-        st.session_state.swapselection, len(df_swaps_active), "swapselection"
+        st.session_state[selection_key("swapselection")], len(df_swaps_active)
     )
     if rowidx is None:
         st.toast("Please select a row", icon=":material/warning:")
@@ -842,7 +891,7 @@ def swap_delete(df_swaps_active: pd.DataFrame):
     """
     logger.debug("Delete row")
     rowidx = rows_selected(
-        st.session_state.swapselection, len(df_swaps_active), "swapselection"
+        st.session_state[selection_key("swapselection")], len(df_swaps_active)
     )
     if rowidx is None:
         st.toast("Please select a row", icon=":material/warning:")
@@ -872,7 +921,7 @@ def swap_archive(df_swaps_active: pd.DataFrame):
     """
     logger.debug("Archive row")
     rowidx = rows_selected(
-        st.session_state.swapselection, len(df_swaps_active), "swapselection"
+        st.session_state[selection_key("swapselection")], len(df_swaps_active)
     )
     if rowidx is None:
         st.toast("Please select a row", icon=":material/warning:")
@@ -888,7 +937,7 @@ def swap_unarchive(df_swaps_archived: pd.DataFrame):
     """
     logger.debug("Unarchive row")
     rowidx = rows_selected(
-        st.session_state.swapachselection, len(df_swaps_archived), "swapachselection"
+        st.session_state[selection_key("swapachselection")], len(df_swaps_archived)
     )
     if rowidx is None:
         st.toast("Please select a row", icon=":material/warning:")
@@ -904,7 +953,7 @@ def swap_arch_delete(df_swaps_archived: pd.DataFrame):
     """
     logger.debug("Delete archived row")
     rowidx = rows_selected(
-        st.session_state.swapachselection, len(df_swaps_archived), "swapachselection"
+        st.session_state[selection_key("swapachselection")], len(df_swaps_archived)
     )
     if rowidx is None:
         st.toast("Please select a row", icon=":material/warning:")
@@ -992,9 +1041,7 @@ def airdrop_edit_dialog(data: dict) -> None:
 
 def airdrop_edit() -> None:
     """Open the edit dialog for the selected airdrop, or warn if none."""
-    _sel = rows_selected(
-        st.session_state.airdropselection, len(df_airdrop), "airdropselection"
-    )
+    _sel = rows_selected(st.session_state.airdropselection, len(df_airdrop))
     if _sel is None:
         st.toast("Please select a row", icon=":material/warning:")
     else:
@@ -1425,6 +1472,9 @@ def build_swap_dataframe(
 
     # Calculate performance for each swap
     df["Perf."] = ((df["Swap Rate"] * 100) / df["Current Rate"].replace(0, pd.NA)) - 100
+    # pd.NA makes these columns object dtype, which sorts unreliably
+    for col in ("Swap Rate", "Current Rate", "Perf."):
+        df[col] = pd.to_numeric(df[col], errors="coerce")
 
     return df
 
@@ -1466,9 +1516,9 @@ def _draw_swap_table(
         )
         col_to_amount = f"To Amount ({convert_to})" if convert_to else "To Amount"
 
-        styled_df = mask_dataframe(
-            paginate(df, selection_key), [col_from_amount, col_to_amount]
-        ).style.apply(color_rows, axis=1)
+        styled_df = mask_dataframe(df, [col_from_amount, col_to_amount]).style.apply(
+            color_rows, axis=1
+        )
         rate_col = "Swap Rate"
 
         column_order = [
@@ -1493,7 +1543,6 @@ def _draw_swap_table(
             "Perf.": st.column_config.NumberColumn(format="%.2f%%"),
         }
 
-        page_controls(df, selection_key, column_order)
         st.dataframe(
             styled_df,
             width="stretch",
@@ -1511,7 +1560,11 @@ def draw_swap(
     df: pd.DataFrame, convert_from: str | None = None, convert_to: str | None = None
 ):
     _draw_swap_table(
-        df, "swapselection", "No swap operations", convert_from, convert_to
+        df,
+        selection_key("swapselection"),
+        "No swap operations",
+        convert_from,
+        convert_to,
     )
 
 
@@ -1519,7 +1572,11 @@ def draw_swap_arch(
     df: pd.DataFrame, convert_from: str | None = None, convert_to: str | None = None
 ):
     _draw_swap_table(
-        df, "swapachselection", "No archived swaps", convert_from, convert_to
+        df,
+        selection_key("swapachselection"),
+        "No archived swaps",
+        convert_from,
+        convert_to,
     )
 
 
@@ -1612,9 +1669,8 @@ with buy_tab:
                 "Perf.": st.column_config.NumberColumn(format="%.2f%%"),
             }
 
-            page_controls(df_buy, "buyselection", column_order)
             st.dataframe(
-                mask_dataframe(paginate(df_buy, "buyselection"), [COL_FROM, COL_TO]),
+                mask_dataframe(df_buy, [COL_FROM, COL_TO]),
                 width="stretch",
                 height="content",
                 hide_index=True,
@@ -1622,7 +1678,7 @@ with buy_tab:
                 column_config=column_config,
                 on_select="rerun",
                 selection_mode="single-row",
-                key="buyselection",
+                key=selection_key("buyselection"),
             )
     with col_buybtns:
         st.button(
@@ -1679,22 +1735,9 @@ with buy_tab:
             return [style] * len(row)
 
         styled_df_avg = mask_dataframe(
-            paginate(df_avg, "avgselection"), ["Total Bought", "Tokens Obtained"]
+            df_avg, ["Total Bought", "Tokens Obtained"]
         ).style.apply(color_avg_rows, axis=1)
 
-        page_controls(
-            df_avg,
-            "avgselection",
-            [
-                "Token",
-                "Total Bought",
-                "Currency",
-                "Tokens Obtained",
-                "Avg. Rate",
-                "Current Rate",
-                "Perf.",
-            ],
-        )
         st.dataframe(
             styled_df_avg,
             width="stretch",
@@ -1777,11 +1820,8 @@ with buy_tab:
             f"Cost of tokens no longer held: {mask_amount(f'{_exited:,.0f}')} "
             "(sale proceeds are not tracked)."
         )
-        page_controls(df_pnl, "pnltable")
         st.dataframe(
-            mask_dataframe(
-                paginate(df_pnl, "pnltable"), ["Quantity", "Cost", "Value", "P&L"]
-            ),
+            mask_dataframe(df_pnl, ["Quantity", "Cost", "Value", "P&L"]),
             width="stretch",
             height="content",
             hide_index=True,
@@ -1845,6 +1885,15 @@ with swap_tab:
             width="stretch",
             icon=":material/show_chart:",
             key="swap_graph",
+        )
+        st.button(
+            "Merge",
+            on_click=swap_merge,
+            args=(df_swaps_active, use_api),
+            width="stretch",
+            icon=":material/pie_chart:",
+            help="Token split (current value) of the selected swaps",
+            key="swap_merge",
         )
         st.button(
             "Archive",
@@ -1925,15 +1974,8 @@ with airdrop_tab:
         if df_airdrop_all.empty:
             st.info("No airdrops")
         else:
-            page_controls(
-                df_airdrop,
-                "airdropselection",
-                ["Date", "Amount", "Token", "Value", "Portfolio"],
-            )
             st.dataframe(
-                mask_dataframe(
-                    paginate(df_airdrop, "airdropselection"), ["Amount", "Value"]
-                ),
+                mask_dataframe(df_airdrop, ["Amount", "Value"]),
                 width="stretch",
                 height="content",
                 hide_index=True,
@@ -1974,11 +2016,8 @@ with airdrop_tab:
             .sort_values("Value", ascending=False)
             .reset_index(drop=True)
         )
-        page_controls(df_airdrop_totals, "airdroptotals")
         st.dataframe(
-            mask_dataframe(
-                paginate(df_airdrop_totals, "airdroptotals"), ["Amount", "Value"]
-            ),
+            mask_dataframe(df_airdrop_totals, ["Amount", "Value"]),
             width="stretch",
             height="content",
             hide_index=True,
